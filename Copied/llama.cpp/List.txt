@@ -1,94 +1,58 @@
-  Core API & Main Implementation
+  Core Foundation (Must Have)
 
-  1. include/llama.h - Main public API
-  2. src/llama.cpp - Core implementation (massive file)
-  3. src/llama-context.h/cpp - Context management
-  4. src/llama-model.h/cpp - Model structure
+  1. ✅ include/llama.h - Public API (line: 213)
+  2. ✅ src/llama.cpp - Main implementation
+  3. ggml/include/ggml.h - Tensor library API
+  4. ggml/src/ggml.c - Core tensor operations
 
-  Architecture & Parameters
+  Model Architecture
 
-  5. src/llama-arch.h/cpp - Architecture definitions
-  6. src/llama-hparams.h/cpp - Hyperparameters
-  7. src/llama-cparams.h/cpp - Context parameters
+  5. src/llama-model.h/cpp - Model structure & loading
+  6. src/llama-arch.h/cpp - Architecture registry (GPT, Llama, etc.)
+  7. src/llama-hparams.h/cpp - Model hyperparameters
 
-  Memory & KV Cache
+  Context & Inference
 
-  8. src/llama-kv-cache-unified.h/cpp - KV cache
-  9. src/llama-memory.h/cpp - Memory interface
-  10. src/llama-memory-hybrid.h/cpp - Hybrid memory
-  11. src/llama-memory-recurrent.h/cpp - Recurrent memory
-  12. src/llama-mmap.h/cpp - Memory mapping
+  8. src/llama-context.h/cpp - Inference context management
+  9. src/llama-batch.h/cpp - Batch processing (you've seen this!)
+  10. src/llama-sampling.h/cpp - Token sampling strategies
 
-  Batch Processing
+  Memory Management
 
-  13. src/llama-batch.h/cpp - Batch management
-  14. src/llama-graph.h/cpp - Computation graph
+  11. src/llama-kv-cache-unified.h/cpp - KV cache (critical for inference)
+  12. ggml/include/ggml-backend.h - Backend abstraction
+  13. ggml/src/ggml-backend.cpp - Backend implementation
 
-  Tokenization & Vocabulary
+  Tokenization
 
-  15. src/llama-vocab.h/cpp - Vocabulary handling
-  16. src/llama-chat.h/cpp - Chat templates
-  17. src/unicode.h/cpp - Unicode support
+  14. src/llama-vocab.h/cpp - Vocabulary & tokenization
+  15. src/llama-grammar.h/cpp - Grammar constraints
 
-  Sampling & Generation
+  Quantization
 
-  18. src/llama-sampling.h/cpp - Sampling strategies
-  19. src/llama-grammar.h/cpp - Grammar constraints
+  16. ggml/src/ggml-quants.h/c - Quantization formats (Q4_0, Q8_0, etc.)
 
-  Model Loading/Saving
+  Examples (See it in Action)
 
-  20. src/llama-model-loader.h/cpp - Load models
-  21. src/llama-model-saver.h/cpp - Save models
-  22. src/llama-io.h/cpp - I/O operations
-
-  Quantization & Adapters
-
-  23. src/llama-quant.h/cpp - Quantization
-  24. src/llama-adapter.h/cpp - LoRA adapters
-
-  GGML Core (Tensor Library)
-
-  25. ggml/include/ggml.h - Main tensor API
-  26. ggml/include/ggml-backend.h - Backend abstraction
-  27. ggml/include/ggml-alloc.h - Memory allocation
-  28. ggml/include/gguf.h - GGUF format
-
-  GGML Implementation
-
-  29. ggml/src/ggml.c - Core tensor ops
-  30. ggml/src/ggml-backend.cpp - Backend impl
-  31. ggml/src/ggml-quants.h/c - Quantization formats
-  32. ggml/src/ggml-cpu/quants.h - CPU quantization
+  17: src/llama-io.h/cpp - File I/O operations
+  18. examples/simple/simple.cpp - Minimal usage example
 
   Common Utilities
 
-  33. common/common.h/cpp - Shared utilities
-  34. common/sampling.h/cpp - Sampling helpers
-  35. common/arg.h/cpp - Argument parsing
-  36. common/log.h/cpp - Logging
+  19. common/common.h/cpp - Shared utilities
+  20. common/sampling.h/cpp - High-level sampling helpers
 
-  Examples (Learn Usage)
+  Model Loading
 
-  37. examples/main/main.cpp - CLI interface
-  38. examples/simple/simple.cpp - Minimal example
-  39. examples/server/server.cpp - HTTP server
+  21. src/llama-model-loader.h/cpp - GGUF loading
+  22. ggml/include/gguf.h - GGUF format definitions
 
-  GPU Backends
+  Implementation Details
 
-  40. ggml/include/ggml-cuda.h - CUDA interface
-  41. ggml/include/ggml-metal.h - Apple Metal
-  42. ggml/src/ggml-cuda.cu - CUDA implementation
+  23. src/llama-impl.h/cpp - Internal helpers
+  24. ggml/src/ggml-impl.h - Low-level tensor helpers
 
-  CPU Optimizations
+  Bonus
 
-  43. ggml/src/ggml-cpu/llamafile/sgemm.h - Matrix multiply
-  44. ggml/src/ggml-cpu/vec.h - Vector operations
-  45. ggml/src/ggml-cpu/simd-mappings.h - SIMD
-
-  Helpers & Implementation Details
-
-  46. src/llama-impl.h/cpp - Internal helpers
-  47. src/llama-kv-cells.h - KV cell management
-  48. common/speculative.h/cpp - Speculative decoding
-  49. common/ngram-cache.h/cpp - N-gram caching
-  50. vendor/cpp-httplib/httplib.h - HTTP library
+  25. tools/server/server.cpp - HTTP API server
+  26. src/llama-quant.h/cpp - Quantization utilities
