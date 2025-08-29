@@ -1,0 +1,146 @@
+  1. Core Decoding Functions (Lines ~950-1000)
+
+  // Process a batch of tokens using the decoder
+  // Return values are critical to understand:
+  //    0 - success
+  //    1 - could not find a KV slot for the batch
+  //    2 - aborted
+  //   -1 - invalid input batch
+  // < -1 - fatal error
+  LLAMA_API int32_t llama_decode(
+          struct llama_context * ctx,
+            struct llama_batch   batch);
+
+  // Process using encoder (for encoder-decoder models like T5)
+  LLAMA_API int32_t llama_encode(
+          struct llama_context * ctx,
+            struct llama_batch   batch);
+
+  Why learn: These are THE core inference functions. Understanding return codes is crucial for error handling.
+
+  2. Batch Management Pattern (Lines ~920-940)
+
+  // Allocates a batch that can hold n_tokens
+  // If embd != 0, uses embeddings instead of tokens
+  LLAMA_API struct llama_batch llama_batch_init(
+          int32_t n_tokens,
+          int32_t embd,      // 0 for tokens, >0 for embeddings
+          int32_t n_seq_max);
+
+  LLAMA_API void llama_batch_free(struct llama_batch batch);
+
+  // Helper for single sequence (avoid in production)
+  LLAMA_API struct llama_batch llama_batch_get_one(
+                llama_token * tokens,
+                    int32_t   n_tokens);
+
+  Why learn: Shows how to batch multiple sequences for efficient inference. The embd parameter enables embedding input.
+
+  3. Output Retrieval Functions (Lines ~1040-1070)
+
+  // Get logits for the ith token (-1 = last token)
+  LLAMA_API float * llama_get_logits_ith(struct llama_context * ctx, int32_t i);
+
+  // Get embeddings for a specific sequence
+  LLAMA_API float * llama_get_embeddings_seq(struct llama_context * ctx, llama_seq_id seq_id);
+
+  // Token logits from last decode - shape: [n_outputs, n_vocab]
+  LLAMA_API float * llama_get_logits(struct llama_context * ctx);
+
+  Why learn: Critical for understanding how to extract model outputs. Negative indices are Python-style.
+
+  4. Special Tokens API (Lines ~1100-1120)
+
+  // Special token getters - essential for proper tokenization
+  LLAMA_API llama_token llama_vocab_bos(const struct llama_vocab * vocab);
+  LLAMA_API llama_token llama_vocab_eos(const struct llama_vocab * vocab);
+  LLAMA_API llama_token llama_vocab_eot(const struct llama_vocab * vocab);  // end-of-turn
+
+  // FIM (Fill-in-the-middle) tokens for code completion
+  LLAMA_API llama_token llama_vocab_fim_pre(const struct llama_vocab * vocab);
+  LLAMA_API llama_token llama_vocab_fim_suf(const struct llama_vocab * vocab);
+  LLAMA_API llama_token llama_vocab_fim_mid(const struct llama_vocab * vocab);
+
+  Why learn: Shows the token types models use for structure. FIM tokens enable GitHub Copilot-style completion.
+
+  5. Tokenization Core (Lines ~1200-1230)
+
+  // Text to tokens - returns negative on failure!
+  LLAMA_API int32_t llama_tokenize(
+      const struct llama_vocab * vocab,
+                    const char * text,
+                       int32_t   text_len,
+                   llama_token * tokens,
+                       int32_t   n_tokens_max,
+                          bool   add_special,     // Add BOS/EOS
+                          bool   parse_special);  // Parse control tokens
+
+  // Tokens back to text
+  LLAMA_API int32_t llama_detokenize(
+      const struct llama_vocab * vocab,
+             const llama_token * tokens,
+                       int32_t   n_tokens,
+                          char * text,
+                       int32_t   text_len_max,
+                          bool   remove_special,
+                          bool   unparse_special);
+
+  Why learn: Core tokenization with important flags. Negative returns indicate buffer too small.
+
+  6. Sampler Interface Pattern (Lines ~1340-1370)
+
+  // Sampler interface - strategy pattern for token selection
+  struct llama_sampler_i {
+      const char *           (*name)  (const struct llama_sampler * smpl);
+      void                   (*accept)(      struct llama_sampler * smpl, llama_token token);
+      void                   (*apply) (      struct llama_sampler * smpl, llama_token_data_array * cur_p);
+      void                   (*reset) (      struct llama_sampler * smpl);
+      struct llama_sampler * (*clone) (const struct llama_sampler * smpl);
+      void                   (*free)  (      struct llama_sampler * smpl);
+  };
+
+  struct llama_sampler {
+      const struct llama_sampler_i * iface;  // vtable pattern
+      llama_sampler_context_t        ctx;
+  };
+
+  Why learn: Beautiful C implementation of OOP/strategy pattern. Shows how to make extensible APIs in C.
+
+  7. Sampler Chain Example (Lines ~1400-1420)
+
+  // Chain samplers together for complex sampling strategies
+  LLAMA_API struct llama_sampler * llama_sampler_chain_init(struct llama_sampler_chain_params params);
+
+  // Takes ownership!
+  LLAMA_API void llama_sampler_chain_add(struct llama_sampler * chain, struct llama_sampler * smpl);
+
+  // Available samplers
+  LLAMA_API struct llama_sampler * llama_sampler_init_top_k(int32_t k);
+  LLAMA_API struct llama_sampler * llama_sampler_init_top_p(float p, size_t min_keep);
+  LLAMA_API struct llama_sampler * llama_sampler_init_temp(float t);
+
+  Why learn: Shows composable sampling pipeline. Chain takes ownership = it will free the samplers.
+
+  8. Chat Template Application (Lines ~1250-1270)
+
+  // Apply chat template (like ChatML, Llama2, etc.)
+  LLAMA_API int32_t llama_chat_apply_template(
+                          const char * tmpl,      // Custom Jinja template
+     const struct llama_chat_message * chat,     // Array of messages
+                              size_t   n_msg,
+                                bool   add_ass,   // Add assistant prefix
+                                char * buf,
+                             int32_t   length);
+
+  Why learn: Critical for chat models - converts conversation to model's expected format.
+
+  Key Learning Points:
+
+  1. Return codes matter: Negative = error, positive = warning
+  2. Ownership semantics: Chain "takes ownership" = it frees the resource
+  3. Negative indices: -1 means "last item" (Python-style)
+  4. Special tokens: Different models use different control tokens
+  5. Interface pattern: C structs with function pointers = OOP in C
+  6. Buffer patterns: Functions return required size when buffer too small
+
+  This section shows the actual inference pipeline - from tokens to logits to sampling!
