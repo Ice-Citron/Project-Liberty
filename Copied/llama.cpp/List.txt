@@ -1,6 +1,6 @@
   Core Foundation (Must Have)
 
-  1. ✅ include/llama.h - Public API (line: 213)
+  1. ✅ include/llama.h - Public API (line: 380-420)
   2. ✅ src/llama.cpp - Main implementation
   3. ggml/include/ggml.h - Tensor library API
   4. ggml/src/ggml.c - Core tensor operations
