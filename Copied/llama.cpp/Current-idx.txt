@@ -1,0 +1,43 @@
+  Priority Sections to Copy (Lines 175-800):
+
+  1. Platform-Specific Macros (175-270) - ESSENTIAL
+
+  #ifdef GGML_SHARED
+  #    if defined(_WIN32) && !defined(__MINGW32__)
+  #        ifdef GGML_BUILD
+  #            define GGML_API __declspec(dllexport) extern
+  Why: Masterclass in cross-platform C++ - visibility macros, compiler detection, conditional compilation.
+
+  2. Clever Macro Magic (271-324) - MUST COPY
+
+  #define GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
+      const type prefix##0 = (pointer)->array[0]; \
+      GGML_UNUSED(prefix##0);
+  Why: Advanced C macro techniques - token pasting (##), variadic argument handling, code generation patterns.
+
+  3. Data Type Enum (370-412) - CRITICAL
+
+  enum ggml_type {
+      GGML_TYPE_F32     = 0,
+      GGML_TYPE_Q4_0    = 2,  // Quantization types
+      GGML_TYPE_IQ2_XXS = 16, // Innovative quantization
+  Why: Shows evolution of quantization strategies, forward compatibility design.
+
+  4. Operation Types Enum (450-550) - ESSENTIAL
+
+  enum ggml_op {
+      GGML_OP_ADD, GGML_OP_SUB, GGML_OP_MUL,
+      GGML_OP_FLASH_ATTN_EXT,  // Modern attention
+      GGML_OP_CUSTOM,          // Extensibility
+  Why: Complete neural network operation taxonomy, extensible design patterns.
+
+  5. Tensor Structure (614-646) - ABSOLUTELY CRITICAL
+
+  struct ggml_tensor {
+      enum ggml_type type;
+      struct ggml_backend_buffer * buffer;
+      int64_t ne[GGML_MAX_DIMS]; // Elegant multidimensional design
+      size_t  nb[GGML_MAX_DIMS]; // Stride calculation pattern
+      // ...
+  };
+  Why: Perfect example of C struct design - memory layout, cache efficiency, flexible dimensions.
