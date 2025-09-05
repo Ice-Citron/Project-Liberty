@@ -1,13 +1,4 @@
-Based on my scan of lines 672-2467, here are the additional critical sections you should copy for maximum learning value:
 
-  Essential Additional Sections:
-
-  1. Memory Introspection Functions (683-742) - COPY THIS
-
-  GGML_API int64_t ggml_nelements (const struct ggml_tensor * tensor);
-  GGML_API size_t  ggml_nbytes    (const struct ggml_tensor * tensor);
-  GGML_API bool    ggml_is_contiguous(const struct ggml_tensor * tensor);
-  Why: Elegant C API design - consistent naming, memory layout analysis, tensor introspection patterns.
 
   2. Core Context Management (747-759) - MUST COPY
 
