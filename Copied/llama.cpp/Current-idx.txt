@@ -1,19 +1,4 @@
-  Priority Sections to Copy (Lines 175-800):
 
-  1. Platform-Specific Macros (175-270) - ESSENTIAL
-
-  #ifdef GGML_SHARED
-  #    if defined(_WIN32) && !defined(__MINGW32__)
-  #        ifdef GGML_BUILD
-  #            define GGML_API __declspec(dllexport) extern
-  Why: Masterclass in cross-platform C++ - visibility macros, compiler detection, conditional compilation.
-
-  2. Clever Macro Magic (271-324) - MUST COPY
-
-  #define GGML_TENSOR_LOCALS_1(type, prefix, pointer, array) \
-      const type prefix##0 = (pointer)->array[0]; \
-      GGML_UNUSED(prefix##0);
-  Why: Advanced C macro techniques - token pasting (##), variadic argument handling, code generation patterns.
 
   3. Data Type Enum (370-412) - CRITICAL
 
