@@ -1,12 +1,53 @@
+Based on my scan of lines 672-2467, here are the additional critical sections you should copy for maximum learning value:
 
+  Essential Additional Sections:
 
-  5. Tensor Structure (614-646) - ABSOLUTELY CRITICAL
+  1. Memory Introspection Functions (683-742) - COPY THIS
 
-  struct ggml_tensor {
-      enum ggml_type type;
-      struct ggml_backend_buffer * buffer;
-      int64_t ne[GGML_MAX_DIMS]; // Elegant multidimensional design
-      size_t  nb[GGML_MAX_DIMS]; // Stride calculation pattern
-      // ...
-  };
-  Why: Perfect example of C struct design - memory layout, cache efficiency, flexible dimensions.
+  GGML_API int64_t ggml_nelements (const struct ggml_tensor * tensor);
+  GGML_API size_t  ggml_nbytes    (const struct ggml_tensor * tensor);
+  GGML_API bool    ggml_is_contiguous(const struct ggml_tensor * tensor);
+  Why: Elegant C API design - consistent naming, memory layout analysis, tensor introspection patterns.
+
+  2. Core Context Management (747-759) - MUST COPY
+
+  GGML_API struct ggml_context * ggml_init (struct ggml_init_params params);
+  GGML_API void                  ggml_free (struct ggml_context * ctx);
+  GGML_API size_t  ggml_used_mem(const struct ggml_context * ctx);
+  Why: RAII-style resource management in C, memory pool patterns.
+
+  3. Tensor Creation API (760-800) - COPY SELECTIVELY
+
+  GGML_API struct ggml_tensor * ggml_new_tensor_1d(
+          struct ggml_context * ctx,
+          enum   ggml_type type,
+          int64_t ne0);
+  Why: Dimensional type safety, factory pattern in C.
+
+  4. Custom Operations (2214-2291) - VERY IMPORTANT
+
+  typedef void (*ggml_custom1_op_t)(struct ggml_tensor * dst, const struct ggml_tensor * a,
+                                    int ith, int nth, void * userdata);
+  GGML_API struct ggml_tensor * ggml_map_custom1(...);
+  Why: Brilliant extensibility pattern - function pointer architecture, threading integration, user data handling.
+
+  What to SKIP:
+
+  - Lines 800-1200: Standard math ops (add, mul, etc.) - you'll understand the pattern quickly
+  - Lines 1300-1800: Convolution ops - specialized, can study later
+  - Lines 1900-2200: Attention mechanisms - complex but not fundamental to C++ elegance
+
+  ★ Insight ─────────────────────────────────────
+  The custom operations section (lines 2214-2291) showcases advanced C elegance: using function pointers as first-class citizens, threading parameters (ith/nth), and opaque user data - essentially implementing
+  polymorphism and dependency injection in pure C.
+  ─────────────────────────────────────────────────
+
+  Recommended Copy Strategy:
+
+  1. Lines 683-759 (~77 lines) - Core API patterns
+  2. Lines 760-800 (~40 lines) - Tensor creation patterns
+  3. Lines 2214-2291 (~77 lines) - Custom operations architecture
+
+  Total additional: ~194 lines - manageable and highly educational for C/C++ elegance patterns.
+
+  This gives you the complete architectural foundation before moving to ggml.c where you'll see these patterns implemented with actual performance-critical code.
