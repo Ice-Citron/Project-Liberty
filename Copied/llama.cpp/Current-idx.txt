@@ -1,21 +1,5 @@
 
 
-  3. Data Type Enum (370-412) - CRITICAL
-
-  enum ggml_type {
-      GGML_TYPE_F32     = 0,
-      GGML_TYPE_Q4_0    = 2,  // Quantization types
-      GGML_TYPE_IQ2_XXS = 16, // Innovative quantization
-  Why: Shows evolution of quantization strategies, forward compatibility design.
-
-  4. Operation Types Enum (450-550) - ESSENTIAL
-
-  enum ggml_op {
-      GGML_OP_ADD, GGML_OP_SUB, GGML_OP_MUL,
-      GGML_OP_FLASH_ATTN_EXT,  // Modern attention
-      GGML_OP_CUSTOM,          // Extensibility
-  Why: Complete neural network operation taxonomy, extensible design patterns.
-
   5. Tensor Structure (614-646) - ABSOLUTELY CRITICAL
 
   struct ggml_tensor {
