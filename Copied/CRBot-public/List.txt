@@ -2,4 +2,9 @@
 2. env.py ✅
 3. dqn_agent.py ✅
 4. elixir_verification.py ✅
-5. train.py // 1-85
+5. train.py ✅
+6. test_cards.py ✅
+
+---
+
+Repo fully copied out manually: ✅
