@@ -1,4 +1,0 @@
-- Circuit Tracer // Claude
-    - https://github.com/safety-research/circuit-tracer/blob/main/demos/circuit_tracing_tutorial.ipynb
-
-    -
