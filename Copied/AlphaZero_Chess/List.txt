@@ -1,2 +1,4 @@
-1. MCTS_chess.py ✅
-2. 
+1. MCTS_chess.py ✅✅
+    [but officially we will have to revisit this a few time, because I don't fully understand the code here]
+2. alpha_net.py ✅
+3. 
