@@ -1,4 +1,5 @@
 1. MCTS_chess.py ✅✅
     [but officially we will have to revisit this a few time, because I don't fully understand the code here]
 2. alpha_net.py ✅
-3. chess_board.py // 670-
+3. chess_board.py ✅
+4. encoder_decoder.py
