@@ -1,2 +1,3 @@
 1. learning/CIS194/Week5.hs ✅
-2. learning/CIS194/Week6.hs // 100 onwards
+2. learning/CIS194/Week6.hs ✅
+2. learning/CIS194/Week7.hs // 
