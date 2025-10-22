@@ -6,4 +6,6 @@
 6. utama_core/entities/game/game_frame.py ✅
 7. utama_core/entities/game/game_history.py ✅
 8. utama_core/entities/game/game.py ✅
-9. utama_core/entities/game/proximity_lookup.py ✅
+9. utama_cfore/entities/game/proximity_lookup.py ✅
+10. utama_core/entities/game/robot.py ✅
+11. utama_core/entities/game/team_info.py ✅
