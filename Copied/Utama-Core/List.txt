@@ -9,3 +9,70 @@
 9. utama_cfore/entities/game/proximity_lookup.py ✅
 10. utama_core/entities/game/robot.py ✅
 11. utama_core/entities/game/team_info.py ✅
+
+
+---
+
+  CORE EXECUTION (Must-read - understand the main loop)
+
+  12. main.py - Entry point, see how everything starts
+  13. utama_core/run/strategy_runner.py - Main orchestrator, coordinates everything
+  14. utama_core/run/game_gater.py - Game state validation
+  15. utama_core/run/receivers/vision_receiver.py - How vision data is received
+  16. utama_core/run/receivers/referee_receiver.py - How referee commands are received
+  17. utama_core/run/refiners/base_refiner.py - Base for data refinement
+  18. utama_core/run/refiners/position.py - Position smoothing
+  19. utama_core/run/refiners/velocity.py - Velocity calculation
+  20. utama_core/run/refiners/robot_info.py - Robot state aggregation
+
+  STRATEGY & BEHAVIOR TREES (Core AI logic)
+
+  21. utama_core/strategy/common/abstract_strategy.py - Base strategy class
+  22. utama_core/strategy/common/abstract_behaviour.py - Behavior tree node base
+  23. utama_core/strategy/common/base_blackboard.py - Shared state management
+  24. utama_core/strategy/examples/strategies/defense_strategy.py - Example strategy implementation
+  25. utama_core/strategy/examples/strategies/startup_strategy.py - Simple test strategy
+  26. utama_core/strategy/examples/strategies/one_robot_placement_strategy.py - Single robot example
+
+  SKILLS (Individual robot actions - very important!)
+
+  27. utama_core/skills/src/go_to_ball.py - Navigate to ball
+  28. utama_core/skills/src/go_to_point.py - Navigate to position
+  29. utama_core/skills/src/kick_ball_at_angle.py - Kick ball
+  30. utama_core/skills/src/score_goal.py - Attempt to score
+  31. utama_core/skills/src/block.py - Block opponent
+  32. utama_core/skills/src/man_mark.py - Defend against opponent
+  33. utama_core/skills/src/goalkeep.py - Goalkeeper behavior
+  34. utama_core/skills/src/intercept_ball.py - Intercept ball trajectory
+  35. utama_core/skills/src/receive_ball.py - Receive ball
+
+  ENTITIES - DATA STRUCTURES (Complete your understanding)
+
+  36. utama_core/entities/data/vision.py - Vision packet structure
+  37. utama_core/entities/data/command.py - Robot command structure
+  38. utama_core/entities/data/object.py - Vector types and enums
+  39. utama_core/entities/referee/referee_command.py - Referee command enums
+  40. utama_core/entities/referee/stage.py - Game stage enums
+
+  TEAM CONTROLLER (Hardware/simulator interface)
+
+  41. utama_core/team_controller/src/controllers/abstract_sim_controller.py - Base simulator interface
+  42. utama_core/team_controller/src/controllers/rsim_controller.py - rSoccer simulator
+  43. utama_core/team_controller/src/controllers/grsim_controller.py - grSim simulator
+
+  CONFIGURATION (Important constants and settings)
+
+  44. utama_core/config/settings.py - Global parameters (TIMESTEP, MAX_ROBOTS, etc.)
+  45. utama_core/config/roles.py - Role enumerations
+  46. utama_core/config/tactics.py - Tactic enumerations
+  47. utama_core/config/defaults.py - Default robot positions
+
+  UTILITIES (Helper functions)
+
+  48. utama_core/global_utils/math_utils.py - Math operations (angles, distances)
+  49. utama_core/global_utils/mapping_utils.py - Mapping utilities
+
+  BONUS - If you want deeper understanding
+
+  50. utama_core/motion_planning/src/motion_controller.py - Motion control
+  51. utama_core/replay/replay_writer.py - Match recording
