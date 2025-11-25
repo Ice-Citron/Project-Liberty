@@ -251,7 +251,7 @@ WHERE e.dept_id = d.id
 -- Apply equivalences:
 -- 1. Push selection down (Select and Product)
 -- 2. Turn cross product into proper join
--- 3. Project early (Project)
+-- 3. Project early (Project and Product)
 SELECT e.name, e.salary
 FROM (
     SELECT name, salary, dept_id
