@@ -86,6 +86,9 @@ train (synthetic data) -> simulate (irl testing is a lot more expensive in compa
     - Platform: Jetson AGX Thor  
 
 
+    Newton
+     - Open source physics engine
+
 
     Robotics is multidisciplinary... 
 */
