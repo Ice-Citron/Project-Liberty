@@ -249,5 +249,22 @@ main = do
         - Idiomatic (English definition): using, containing, or denoting 
           expressions that are natural to a native speaker.
             * synonym: natural, native-speaker, grammatical
+-}
 
--}    
+f <$> mx <*> my <*> mz
+
+{-
+    The operator style means "Apply `f` to `mx`, then apply that result to `my`,
+    then to `mz`." You can keep chaining `<*>` for as many arguments as you 
+    need."
+
+    --
+
+    Summary
+    1. `liftA2` applies a normal 2-argument function to two "wrapped" values.
+    2. `liftM2` is the old Monad-specific version; prefer `liftA2` nowadays.
+    3. Higher versions exist, but for 3+ arguments, it is cleaner to use the
+      `<$>` and `<*>` operators.
+-}
+
+
