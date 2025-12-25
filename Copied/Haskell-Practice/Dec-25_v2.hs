@@ -92,14 +92,79 @@ instance Functor Maybe2 where
 -}
 
 instance Applicative Maybe2 where
-    pure = Just2
+    pure :: a -> Maybe2 a
+    pure = Just2          -- Just2 :: a -> Maybe2 a
+            -- eta-reduction for `pure x = Just2 x`
 
     (<*>) :: Maybe2 (a -> b) -> Maybe2 a -> Maybe2 b
     (Just2 func) <*> (Just2 x) = Just2 (func x)
     (Just2 func) <*> j         = fmap func j -- fmap (+3) (Just2 1) // duplicate of above
     Nothing2     <*> j         = Nothing2
 
--- 
+{-
+            ghci> pure 3 :: Maybe Int
+            Just 3
+
+    Intuition: `pure` should inject a value with "no effects". For `Maybe`-like
+    types, the "no failure" case is the `Just` constructor.
+
+    With your `(<*>)` (which is essentially the standard `Maybe` applicative),
+    the Applicative laws work out, e.g. identity:
+
+            pure id <*> v
+            = Just2 id <*> v
+            = fmap id v
+            = v
+
+
+    ---
+
+    In programming, eta-reduction (or η-reduction) is a simplifcation rule in 
+    lambda calculus that removes an unnecessary function argument, transforming
+    `\x. f(x)` into just `f`, as long as `x` isn't used elsewhere in f. It makes
+    code more concise, readable and sometimes more efficient by removing 
+    redundant function wrappers, a core technique for point-free style in 
+    functional programming.            
+-}
+
+----- -----  ----- -----        ----- -----       ----- ----- 
+
+
+
+{-
+data Tree a = Tip a | Branch (Tree a) (Tree a) deriving Show
+
+instance Functor Tree where
+    fmap f (Tip a)        = Tip (f a)
+    fmap f (Branch lt rt) = Branch (fmap f lt) (fmap f rt)  -- fmap f rt <=> f <$> rt
+-}
+
+instance Applicative Tree where
+    pure :: a -> Tree a
+    pure = Tip
+
+    (<*>) :: Tree (a -> b) -> Tree a -> Tree b
+    (<*>) (Branch fl fr) (Tip a)        = Tip (func a)
+    (<*>) (Branch fl fr) (Branch lt rt) = Branch (Tree func <*> lt) (Tree func <*> rt)
+    (<*>) (Tip f)     _              = fmap f t
+
+    {-
+        Type `Tree (a -> b)` means the left argument is not "a function", but
+        rather a TREE OF FUNCTIONS.
+
+        That means a value like
+
+        ```
+        Branch fl fr :: Tree (a -> b)
+        ```
+
+        literally contains potentially diferent functions in the left and right
+        subtrees. So `<*>` has to say what it means to apply a function tree to
+        a value tree. 
+    -}
+
+
+
 
 ------ ------       ------ ------                ------ ------ ------ ------
 ------ ------       ------ ------                ------ ------ ------ ------
