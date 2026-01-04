@@ -120,9 +120,13 @@ liftA2 (+) mx my
     `case` STATEMENT WITHIN A `do` BLOCK/
 
     Because `do` notation is just syntactic sugar for chaining functions, 
-    anything valid in standard Haskell (like `case` with guards) is valide
+    anything valid in standard Haskell (like `case` with guards) is valide          
     inside a `do` block.
 
+
+            BECAUSE `DO` NOTATION IS JUST SYNTACTIC SUGAR FOR CHAINING FUNCTIONS,
+            ANYTHING VALID IN STANDARD HASKELL (LIKE `CASE` WITH GUARDS) IS VALID               ANYTHING VALID
+            INSIDE A `DO` BLOCK
 
     USING GUARDS IN `case`
 -}
@@ -199,7 +203,28 @@ checkAndLog = do
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
+{-
+    You are effectively writing "imperative" scripts, but the compiler is
+    secretly stitching them together into big, pure functions.
 
+    ... replicate loops and list comprehensions using `do` notations
+
+
+    ---
+
+    1. "FOR LOOPS" (USING `forM_`)
+
+    In Python, you do `for x in list: do_something(x)`. In Haskell, you use             `forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m ()`
+    `forM_ ` (from `Data.Foldable`). It takes a list and a lambda (a mini 
+    function) that acts as the loop body.
+
+                    because of the fact that forM_ takes input (a -> m b)... which (a -> m b) is basically the same as the lambda 
+                    function to the right of >>= and >> for monads... and given how these types of (a -> m b)... from what i see 
+                    so far where these functions can in a way be like an imperative program and be as long as they want... so does 
+                    this mean that forM_... like for in python... can basically contain any possible code?
+
+
+-}
 
 
 
@@ -207,6 +232,58 @@ checkAndLog = do
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
 
+
+{-
+    `forM_` can run an arbitrarily large "loop body", but only as a monadic 
+    action--i.e., only whatever effects are permitted by the monad `m`.
+
+
+    WHAT `forM_` ACTUALLY WANTS
+
+        `forM_ :: (Foldable t, Monad m) => t a -> (a -> m b) -> m b`
+
+    So the "loop body" is a function that, given an `a`, produces an action 
+    `m b`.
+
+
+    When you write
+    ```Haskell
+    forM_ xs $ \i -> do
+        ...
+    ```
+
+    the `do ...` must have type `m something` (often `m ()`). It can be as long
+    as you want, call helpers, do `let` bindings, pattern matches, etc.
+
+                            “Any possible code” depends on m
+                                    If m ~ IO, then yes: the body can do essentially any IO you want (print, read files, network, etc.).
+                                    If m ~ State Stack, then the body can do state actions (push/pop/modify/get), but cannot do IO.
+                                    If you want both, you use a transformer, e.g. StateT Stack IO, and then the body can do state + IO.
+
+
+    
+    ---
+
+    EXAMPLE (pure state only):
+-}
+
+-- for1 :: StateT Stack Data.Functor.Identity.Identity ()
+for1 = forM_ [1..5] $ \i -> do
+    push i
+    when (i == 3) (push 999)
+    -- cannot `putStrLn` here if this is State Stacl
+
+
+        {-
+                    ghci> :t do push 5; when (5 == 3) (push 999)
+                    do push 5; when (5 == 3) (push 999)
+                    :: StateT Stack Data.Functor.Identity.Identity ()
+                    ghci> :t do push 5; when (3 == 3) (push 999)
+                    do push 5; when (3 == 3) (push 999)
+                    :: StateT Stack Data.Functor.Identity.Identity ()
+        -}
+
+-- > execState for1 []
 
 
 
@@ -227,6 +304,35 @@ checkAndLog = do
 
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
+{-
+SUMMARY OF FINDINGS
+- one can use ghci's `:type` to check for the type of a `do` expression
+
+                ghci> :t do x <- Just 3; y <- Just 4; pure (x + y)
+                do x <- Just 3; y <- Just 4; pure (x + y) :: Maybe Int
+
+                ghci> :t do x <- [1,2]; y <- [10,20]; pure (x+y)
+                do x <- [1,2]; y <- [10,20]; pure (x+y) :: [Int]
+
+---
+
+    - By itself, `do` is a syntax, not a value... hence can't direclty use :t on it...
+      akin to `(::)`
+
+    - A `do` block is an expression whose type is some monadic type `m b`. It's 
+      not "a function" unless you make it one... (e.g. `\x -> ...`)                     <-- do blocks are basically a chain of `(>>=)` and `(>>)`
+                                                                                                                            nested binds... and sequencing
+
+                                - `do` desugars into nested binds (>>=), sequencing ()>>) and lambdas (\x -> ...).
+
+
+
+
+
+
+
+
+-}
 
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
