@@ -110,11 +110,25 @@ import Control.Monad.State
 type Stack = [Int]
 
 -- Helper to pop
+{-
 pop :: State Stack Int
 pop = do
     (x:xs) <- get       --  Read the current list
     put xs              -- Save the list WITHOUT the head (xs)
     return x            -- Return the head as the value
+-}
+
+
+-- Helper to pop
+pop :: State Stack Int
+pop = do
+  st <- get             -- 1. Get the whole stack (irrefutable)
+  case st of
+    (x:xs) -> do        -- 2. Pattern match manually
+        put xs
+        return x
+    []     -> do        -- 3: Handles the empty case.
+        error "Stack underflow: Cannot pop from an empty stack!"
 
 
 -- Helper to push
@@ -183,6 +197,33 @@ stackStuff = do
 
 
 {-
+THE TWO FACES OF MONAD: `join` and `(>>=)`
+
+    `join`--flattening nested structures:
+
+    ```Haskell
+    join :: Monad m => m (m a) -> m a
+    ```
+
+    For Maybe:
+    ```Haskell
+    joinMaybe :: Maybe (Maybe a) -> Maybe a
+    joinMaybe Nothing   = Nothing       -- no inner Maybe to extract
+    joinMaybe (Just mx) = mx            -- unwrap and return the inner Maybe
+    ```
+
+    For Lists:
+    ```Haskell
+    joinList :: [[a]] -> [a]
+    joinList = concat                   -- just flatten!
+    ```
+
+
+        .....
+
+    ---
+
+
     `(>>=)` -- "bind", the workhorse
 
     ```Haskell
@@ -201,17 +242,295 @@ stackStuff = do
 
         For lists:
         ```Haskell
+        xs >>= f = concatMap f xs       -- apply f to each element, concat results
+        ```
 
+
+
+
+        THE KEY INSIGHT: `(>>=)` and `join` are EQUALLY POWERFUL. You can define
+        each in terms of the other:
+
+        ```Haskell 
+        mx >>= f    = join (fmap f mx)
+        join mmx    = mmx >>= id
         ```
 -}
 
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+            -- mx >>= f     = join (fmap f mx)
+            -- join mmx     = mmx >>= id
+{-
+    WHAT IF SOMETHING FAILS?                                        
+
+    ```Haskell
+    safeDiv 10 0 >>= (\m ->
+      safeDiv 6 3 >>= (\n ->
+        safeDiv m n
+      )    
+    )
+    ```
+
+    Step 1: `safeDiv 10 0 = Nothing`
+
+    ```Haskell
+    Nothing >>= (\m -> ...) = Nothing
+    ```
+
+    We stop immediately! The `Nothing` propagates, and we never even try the
+    second division. This is the "short-circuting" behavior
+-}
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+
+
+{-
+    DO-NOTATION: MAKING IT READABLE.
+
+    That nested lambda syntax is ugly. Haskell provides DO-NOTATION as syntactic
+     sugar.
+
+    ```Haskell
+    safeDiv 10 2 >>= (\m ->
+      safeDiv 6 3 >>= (\n ->
+        safeDiv m n
+      )
+    )
+
+    do
+      m <- safeDiv 10 2
+      n <- safeDiv 6 3
+      safeDiv m n
+    ```
+
+
+    EACH `x -> action` desugars to `action >>= (\x -> ...)`.
+
+    RULES FOR DO-NOTAION:
+    1. Each line is an action in the monad
+    2. `x <- action` binds thje result of `action` to `x`
+    3. The last line must be an action (not a binding)
+    4. IF YOU DON'T NEED THE RESULT, JUST WRITE THE ACTION ALONE
+
+
+
+
+
+    x <- action     ===     action >>= (\x -> ...)
+
+-}
+
+
+
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+
+{-
+    THE RELATIONSHIP: FUNCTOR < APPLICATIVE < MONAD
+
+
+    Every Monad gives you Applicative for free:
+
+    ```Haskell
+    liftA2 f mx my = do
+      x <- mx
+      y <- my
+      pure (f x y)
+
+    -- ===                      OR EQUIVALENTLY:
+    liftA2 f mx my = mx >>= (\x -> fmap (f x) my)                   -- so interestingly,  i believe unlike the do-notation variant
+                                                                    -- this raw variant relies on `fmap :: (a -> b) -> f a -> f b`
+                                                                    -- ... since it takes (f x) as `f :: a -> b -> c`
+    ```
+
+    WHEN TO USE WHICH:
+    - FUNCTOR: Transform values, one structure at a time
+    - APPLICATIVE: Combine strucutres, but the "shape" of computation is fixed
+      upfront.
+    - MONAD: The result of one computation determines what to do next
+-}
+
+
+
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+-- A CONCRETE EXAMPLE: BUSH (TREE)
+
+data Bush a = Leaf a | Fork (Bush a) (Bush a) deriving Show
+{-
+    `join` for BUSH--GRAFTING TREES:                                -- defintion of 'grafting' == insert (a shoot or twig) as a graft.
+
+    Imagine a `Bush (Bush a)` -- a tree where each leaf contains another tree.
+    `join` "grafts" those inner trees into place:
+-}
+
+joinBush :: Bush (Bush a) -> Bush a
+joinBush (Leaf t) = t                                       -- replace tree wrapper with its contents
+joinBush (Fork lt rt) = Fork (joinBush lt) (joinBush rt)    -- recurse
+
+
+{-
+**Visual example:**
+```
+Before (Bush (Bush Int)):
+
+    Fork
+   /    \
+Leaf    Leaf
+  |       |
+ Fork   Leaf
+ / \      |
+1   2     3
+
+After join:
+
+    Fork
+   /    \
+ Fork   Leaf
+ / \      |
+1   2     3
+-}
+
+
+{-
+    mx >>= f        ===         join (fmap f mx)                <-- i believe this is also contributed by the fact that fmap itself also outputs f container
+    join mmx        ===         mmx >>= id
+
+-}
+
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+-- `(>>=)` for BUSH -- SPROUTING:
+instance Monad Bush where
+  (>>=) :: Bush a -> (a -> Bush b) -> Bush b
+  Leaf x     >>= f = f x                                -- replace leaf with f's result
+  Fork lt rt >>= f = Fork (lt >>= f) (rt >>= f)         -- recurse
+
+
+-- EXAMPLE: MAKING TREES GROW IN SPRING
+sprout :: Int -> Bush Int
+sprout n = Fork (Leaf n) (Leaf (n + 1))
+
+spring :: Bush Int -> Bush Int
+spring t = t >>= sprout
+
+{-
+Starting tree:
+```
+    Fork
+   /    \
+Leaf 1  Leaf 3
+```
+
+After `spring`:
+```
+      Fork
+     /    \
+   Fork   Fork
+   / \    / \
+  1   2  3   4
+-}
+
+
+-- Each leaf was replaced by a small sprout!
+
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+-- IO: THE REAL WORLD MONAD
+
+{-
+    `IO a` represents a PROGRAM that, when executed, interacts with the outside 
+    world and produces a value of type `a`.
+
+    KEY OPERATIONS:
+                putStrLn  :: String -> IO ()           -- print a line
+                print     :: Show a => a -> IO ()      -- print any showable value
+                getLine   :: IO String                 -- read a line of input
+                readFile  :: FilePath -> IO String     -- read a file
+                writeFile :: FilePath -> String -> IO ()  -- write a file
+-}
+
+
+-- YOUR FIRST REAL PROGRAM:
+main :: IO()
+main = putStrLn "Hello World!"
+
+
+-- SEQUENCING WITH DO-NOTATION:
+greet :: IO ()
+greet = do
+  putStrLn "What's your name?"
+  name <- getLine                   -- bind the result to 'name'
+  putStrLn ("Hello, " ++ "!")
+
+
+-- CONDITIONAL LOOPING:
+askUntilYes :: IO ()
+askUntilYes = do
+  putStrLn "Do you like Haskell?"
+  answer <- getLine
+  if answer == "yes"
+    then pure ()        -- stop
+    else askUntilYes    -- recurse
+
+
+
+{-
+    THE KEY INSIGHT: We can use regular Haskell control flow (`if`, recursion)
+    because each branch just produces an `IO ()` action.
+
+    ---
+
+    ### THE OPERATOR FAMILY: Visual Guide
+
+    (<$>) :: (a -> b) -> t a -> t b         -- Functor: transform inside
+    (<$) :: a -> t b -> t a                 -- Functor: replace with constant
+
+    (<*>) :: t (a -> b) -> t a -> t b       -- Applicative: apply wrapped function
+    (<*) :: t a -> t b -> t a               -- Applicative: do both, keep left
+    (*>) :: t a -> t b -> t b               -- Applicative: do both, keep right
+
+    (>>=) :: m a -> (a -> m b) -> m b       -- Monad: Chain with function
+    (>>) :: m a -> m b -> m b               -- Monad: Chain, ignore first result
+
+
+    ---
+
+
+    THE ARROW POINTS TO WHAT YOU KEEP
+    - `<*` keeps left
+    - `*>` keeps right
+    - `>>=` chains forward (and the `=` means "binds the result")
+
+-}
+
+
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+
+
+
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
 
+
+
 ------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
 
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
+------------    --------    --  --  --------    --- --- -   --  ------  -   ---
 
 
 
