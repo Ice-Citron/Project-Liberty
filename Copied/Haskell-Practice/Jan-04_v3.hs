@@ -141,8 +141,43 @@ search target currentTree =
                                     --  Note: This standard recursion is cleaner than do notation for this specific "drill-down" logic.
 
 
+
+
+
+            -- A `do` block is literally a simulation of a different programming language running inside Haskell.
+                        -- because one can literally define a new function which uses do blocks too inside a do block of a function
+
+
+                {-
+                                ghci> a = do print "hi"; do print "hi"          <-- writing a do-block inside a do-block! there are no bounds!
+                                ghci> a
+                                "hi"
+                                "hi"
+                                ghci> 
+                -}
                 
 
+sophon :: IO ()
+sophon = do
+    putStrLn "Entering the pocket dimension..."
+
+    -- 1. We define a LOCAL function (a tool just for this block)
+    -- This function doesn't exist outside this 'do' block.
+    let logError msg = putStrLn $ "[URGENT] " ++ msg
+    
+    -- 2. We can even define RECURSIVE functions inside here!
+    let retry input = do
+            if input == "secret"
+                then return "Access Granted"
+                else do
+                    logError "Wrong password!" -- Using our local tool
+                    next <- getLine
+                    retry next                 -- Recursion inside the block
+
+    -- 3. Run the simulation
+    val <- getLine
+    result <- retry val
+    putStrLn result
 
 
 
