@@ -4,8 +4,11 @@ import Control.Monad (forM)
 
 
 m1 = Map.fromList [("a", 12), ("b", 30)]
-m2 = Map.fromList [("b", False), ("c", True)]
+m2 = Map.fromList [("b", True), ("c", False)]
 
+
+
+-- unionWithDiff (\x y -> if y == False then x else x + 1) id (\x -> if x == True then 1 else 0) m1 m2
 
 -- | Merge two maps with potentially different value types
 unionWithDiff :: (Ord k, Show k) => (a -> b -> c)         -- fBoth : when key in both maps
@@ -13,37 +16,129 @@ unionWithDiff :: (Ord k, Show k) => (a -> b -> c)         -- fBoth : when key in
                                 -> (b -> c)              -- fRight: when key only in m2
                                 -> Map.Map k a
                                 -> Map.Map k b
-                                -> IO ()
-                                -- -> Map.Map k c
--- unionWithDiff fBoth fLeft fRight m1 m2 = Map.fromList $ do
-unionWithDiff fBoth fLeft fRight m1 m2 = do
+                                -> Map.Map k c
+unionWithDiff fBoth fLeft fRight m1 m2 = Map.fromList $ do
     -- STEP 1: Get all keys
     let allKeys = Set.union (Map.keysSet m1) (Map.keysSet m2)              -- Hint: Set.toList, Set.union, Map.keysSet
-    print allKeys
     
-    {-
     -- STEP 2: "for k in allKeys"
-    k <- allKeys
+    k <- Set.toList allKeys
 
     -- STEP 3: Lookups              -- incredible... so we use lookup here which then consequently tells the case...of block whether to call fBoth, fLeft or fRight!
-    let maybeA = undefined
-    let maybeB = undefined
+    let maybeA = Map.lookup k m1
+    let maybeB = Map.lookup k m2
 
     -- STEP 4: Compute the new value
     let newVal = case (maybeA, maybeB) of
-        (Just a, Just b)   -> undefined
-        (Just a, Nothing)  -> undefined
-        (Nothing, Nothing) -> undefined
-        _                  -> error "impossible"
+                    (Just a, Just b)   -> fBoth a b
+                    (Just a, Nothing)  -> fLeft a
+                    (Nothing, Just b)  -> fRight b
+                    _                  -> error "impossible"
+    
 
     -- STEP 5: 
     return (k, newVal)
-    -}
         -- <-- since (>>=) === join (fmap f ms)... this means stuff gets automaticaly stitched together!
 
 
+{-
+            fromList [("a",12),("b",30),("c",1)]
+            ghci> unionWithDiff (\x y -> if y == False then x else x + 1) id (\x -> if x == True then 1 else 0) m1 m2
+            fromList [("a",12),("b",30),("c",1)]
+-}
 
 
+
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+
+-- Map.fromListWith (+) [(x, 1) | x <- list]
+        {-
+            1. You turn the list into `[(1, 1), (2, 1), (2, 1), (3, 1)]`
+            2. `fromListWith (+)` builds the map. When it hits second `(2, 1)`,
+               it sees '2' exists and runs `1 + 1 = 2`
+        -}
+
+
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+
+{-
+
+     /  \        /  \        /  \        /  \        /  \        /  \
+__/        \__/        \__/        \__/        \__/        \__/       
+  \        /  \        /  \        /  \        /  \        /  \       
+     \__/        \__/        \__/        \__/        \__/        \__/
+     /  \        /  \        /  \        /  \        /  \        /  \
+__/        \__/        \__/        \__/        \__/        \__/       
+  \        /  \        /  \        /  \        /  \        /  \       
+     \__/        \__/        \__/        \__/        \__/        \__/
+     /  \        /  \        /  \        /  \        /  \        /  \
+__/        \__/        \__/        \__/        \__/        \__/       
+  \        /  \        /  \        /  \        /  \        /  \       
+     \__/        \__/        \__/        \__/        \__/        \__/
+     /  \        /  \        /  \        /  \        /  \        /  \
+__/        \__/        \__/        \__/        \__/        \__/       
+  \        /  \        /  \        /  \        /  \        /  \
+-}
+
+
+preOpFuncs :: Map PreOp (Double -> Double)
+preOpFuncs = Map.fromList [
+    (Neg, negate)
+  , (Sin, sin)
+  , (Cos, cos)
+  , (Log, log)
+  , (Exp, exp)
+]
+
+-- WHY? Instead of pattern matching in `eval`:
+
+eval env (Pre Neg e) = negate (eval env e)
+eval env (Pre op e) = ((fromJust . Map.lookup) op preOpFuncs) (eval env e)
+
+
+
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+
+-- 3. SET OPERATIONS FOR `vars`
+vars :: Expr -> Set String
+vars (Val _)        = Set.empty
+vars (Id name)      = Set.singleton name
+vars (Bin _ e1 e2)  = Set.union (vars e1) (vars e2)
+vars (Pre _ e)      = vars e
+
+{-
+    KEY FUNCTIONS:
+    - `Set.empty` -- `{}`
+    - `Set.singleton "x"` -- `{"x"}`
+    - `Set.union` -- combine two sets
+    - `Set.delete x s` -- remove x from s
+    - `Set.null s` -- is s empty?
+
+-}
+
+
+-- 4. `iterate` for INFINITE LISTS
+iterate :: (a -> a) -> a -> [a]
+iterate f x = [x, f x, f $ f x, f $ f $ f x ...]
+
+
+-- IN YOUR CODE:
+derivatives = iterate (diff "x") f
+-- [f, f', f'', f''', ...]
+
+powers = iterate (* x) 1
+-- [1, x, x^2, ...]
+
+
+
+----------- --- ----            --- -   -   -   --------    -
+-- 5. `scanl` for RUNNING ACCUMULATION
+
+
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
+-----   --- --  --  -   -   -   --  ----------- -   --------    --------------
 
 
 {-
@@ -71,6 +166,12 @@ unionWithDiff fBoth fLeft fRight m1 m2 = do
 {-
     0.
         PPT 3, 4, 5 LEFT
+
+    0.1. 
+        This is actually the best possible position to be in.
+
+    0.2. 
+        FINISH MONDAY REVISION ... AND ASK GEMINI TO CREATE NOTES FROM IT
 
 
     1. I think just focused very heavily on running through PPTs and PPQs... just look at all the techniques used by them and also 
