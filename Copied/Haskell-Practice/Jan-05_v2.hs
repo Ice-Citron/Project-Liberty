@@ -353,7 +353,27 @@ eval env (Pre Neg e) = negate
 
 
 
+{-
+    FILL THIS OUT BEFORE EXAM
 
+
+                SUMMARY CHEAT SHEET
+
+                        Operation               List (`Data.List`)              Set (`Data.Set`)                Map (`Data.Maps`)
+                        Convert from List       `id`                    
+                        Check exists
+                        Access Item
+                        Insert
+                        Delete
+                        Filter
+                        Map
+
+                        CCA IDF M <-- convert from list // check exists // access item // insert // delete // filter // map
+
+
+
+    ALSO FOCUS ON DOING QUIZZES PROVIDED BY GEMINI... THEY ARE ACTUALLY VERY USEFUL!
+-}
 
 {-
     0.

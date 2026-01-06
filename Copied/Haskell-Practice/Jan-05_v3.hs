@@ -1,3 +1,24 @@
+import Data.Foldable
+import Data.Traversable         -- importing forM_ and mapM_
+
+prettyPrint :: Board -> IO ()
+prettyPrint b = do
+  let myRows = rows b               -- 1. Grab the rows (The data source)
+  forM_ myRows $ \i -> do           -- 2. Start the "Loop"
+    let cellStrings   = map showCell row                -- A. Convert the cells in this specific row to Strings
+    let formattedLine = intersperse " " cellStrings     -- B. Insert the spaces (The formatting logic)
+    putStrln formattedLine                              -- C. The actual IO action (printing)
+
+
+
+ghci> import qualified Data.Map as Map
+ghci> let ms = Map.fromList [("a", 33), ("b", 27)]
+ghci> :type ms
+ms :: Num a => Map.Map String a
+ghci> let ms2 = Map.fromList [("a", 33), ("b", 27)] :: Map.Map String Int
+ghci> :type ms2
+ms2 :: Map.Map String Int
+
 
 -- "Cheat Sheet" for the essential survival kit of `Data.List`, `Data.Set`, 
 -- `Data.Map`
@@ -254,8 +275,194 @@
         ```Haskell
         Map.findWithDefault 0 "Charlie" scores          -- Returns 0 if Charlie isn't in maps
         ```
+-}
+
+
+prettyPrint :: Board -> IO ()
+prettyPrint b = do
+    let myRows = rows b
+    for myRows $ \i -> do
+        let temp   = showCell i             -- cellStrings
+        putStrLn intersperse ' ' temp       -- formattedLine
     
-    
+
+{-
+       .--.                   .---.
+   .---|__|           .-.     |~~~|
+.--|===|--|_          |_|     |~~~|--.
+|  |===|  |'\     .---!~|  .--|   |--|
+|%%|   |  |.'\    |===| |--|%%|   |  |
+|%%|   |  |\.'\   |   | |__|  |   |  |
+|  |   |  | \  \  |===| |==|  |   |  |
+|  |   |__|  \.'\ |   |_|__|  |~~~|__|
+|  |===|--|   \.'\|===|~|--|%%|~~~|--|
+^--^---'--^    `-'`---^-^--^--^---'--' 
+-}
+
+
+{-
+    MODIFICATION
+    - `Map.insert k v m`: Adds/Overwrites key `k` with value `v`.
+    - `Map.delete k m`: Removes key `k`.
+    - `Map.adjust f k m`: Updates value at `k` by applying function `f` (only
+      if key exists).
+    ```Haskell
+    Map.adjust (+1) "Alice" scores      -- Increments Alice's score
+    ```
+                    ghci> :type Map.insert
+                    Map.insert :: Ord k => k -> a -> Map.Map k a -> Map.Map k a
+                    ghci> :type Map.delete
+                    Map.delete :: Ord k => k -> Map.Map k a -> Map.Map k a
+                    ghci> :type Map.adjust
+                    Map.adjust :: Ord k => (a -> a) -> k -> Map.Map k a -> Map.Map k a
+
+
+    ADVANCED BUT ESSENTIAL
+    - `Map.union`: merges two maps. (Left-biased: if keys exists in both, keeps
+      the one from the first map).
+    - `Map.unionWith`: Merges, but if a collision occurs, uses a function to
+      combine them.
+      ```Haskell
+      -- Merges scores, summing points if player exists in both
+      Map.unionWith (+) map1 map2
+      ```
+
+                    ghci> :type Map.union
+                    Map.union :: Ord k => Map.Map k a -> Map.Map k a -> Map.Map k a
+                    ghci> :type Map.unionWith
+                    Map.unionWith
+                    :: Ord k => (a -> a -> a) -> Map.Map k a -> Map.Map k a -> Map.Map k a
 
 -}
 
+
+
+
+
+{-
+------- -   --  -   -   --------    ------       __   __
+      /  \./  \/\_
+  __{^\_ _}_   )  }/^\
+ /  /\_/^\._}_/  //  /
+(  (__{(@)}\__}.//_/__A____A_______A________A________A_____A___A___A______
+ \__/{/(_)\_}  )\\ \\---v-----V-----V---Y-----v----Y------v-----V-----v---
+   (   (__)_)_/  )\ \>
+    \__/     \__/\/\/
+       \__,--'
+------- -   --  -   -   --------    ------- -   -   -   ------------    -   ---
+-}
+
+{-
+    `unionWith` keeps ALL KEYS FROM BOTH MAPS; `intersectionWith` keeps ONLY
+    keys that appear in BOTH MAPS. In both cases, when a key is present in
+    both inputs, you provide a function to combine the two values.
+
+    ```Haskell
+    unionWith        :: Ord k => (a -> a -> c) -> Map k a -> Map k a -> Map k a
+    intersectionWith :: Ord k => (a -> b -> c) -> Map k a -> Map k b -> Map k c
+    ```
+
+
+            ghci> print ms
+            fromList [("a",2),("b",3),("c",4)]
+            ghci> print ms2
+            fromList [("a",3),("ab",1),("b",5),("c",20)]
+            ghci> Map.unionWith (+) ms ms2
+            fromList [("a",5),("ab",1),("b",8),("c",24)]
+-}
+
+
+
+
+{-
+    ... a subtle constraint that dictates how these functions must be typed.
+
+    The difference comes down to WHAT HAPPENS TO THE "LONERS" (keys that appear
+    in only one of the two maps).
+
+    Here is the logic in a nutshell:
+    - UNION keeps the loners. (So everything must match).
+    - INTERSECTION discards the loners. (So you have total freedom).
+
+    Let's break it down.
+
+    ---
+
+
+    1. WHY `unionWith` forces `(a -> a -> a)`
+
+        Imagine you are trying to union with two maps:
+        - `Map 1`: `[(Key "A", Int 1)]` (Type: `Map String Int`)
+        - `Map 2`: `[(Key "B", Bool True)]`
+
+
+        If you try to union these, what is the type of the result?
+        - It must contain Key "A" (value `1` :: Int)
+        - It must contain Key "B" (value `True` :: Bool)
+
+        CRASH: A Haskell Map cannot hold `Int` in one slot and `Bool` in another
+        . A `Map k v` must have uniform values.                                     
+
+        THE RULE: Because `union` preserves keys that exist in only one map, 
+        both input maps must already have the same type (`Map k a`). Therefore,
+        the combining function only ever sees two things of the same type:
+        `f :: a -> a -> a`
+
+    ---
+
+
+
+
+
+
+
+
+    ---
+
+    KEY DIFFERENCE IN BEHAVIOR
+
+
+    COMMON USE CASES
+    - 
+-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+{-
+    SUMMARY CHEAT SHEET
+
+    Operation               List (`Data.List`)              Set (`Data.Set`)                Map (`Data.Maps`)
+    Convert from List       `id`                            `Set.fromList`                  `Map.fromList`
+    Check exists            `elem`                          `Set.member`                    `Map.member`
+    Access Item             `!!` (index), `lookup` (key)    N/A                             `Map.lookup`
+    Insert                  `(++)`, `(:)` (cons)            `Set.insert`                    `Map.insert`
+    Delete                  `List.delete`                   `Set.delete`                    `Map.delete`
+    Filter                  `filter`                        `Set.filter`                    `Map.filter`
+    Map (<$>)               `map`                           `Set.map`                       `Map.map`
+
+        -- Map.keysSet
+        -- Set.toList, Set.union
+
+
+            -- `filter (/= x) xs` is recommended over delete for all occurrences
+            -- use `Data.Set` of frequent deletes or frequent membership checks
+
+
+
+        -- `length`
+
+    CCA IDF M <-- convert from list // check exists // access item // insert // delete // filter // map
+-} 
