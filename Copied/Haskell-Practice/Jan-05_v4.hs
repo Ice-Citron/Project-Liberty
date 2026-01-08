@@ -133,6 +133,7 @@ powers = iterate (* x) 1
 
 
 
+
 ----------- --- ----            --- -   -   -   --------    -
 -- 5. `scanl` for RUNNING ACCUMULATION
 
@@ -171,7 +172,7 @@ powers = iterate (* x) 1
         This is actually the best possible position to be in.
 
     0.2. 
-        FINISH MONDAY REVISION ... AND ASK GEMINI TO CREATE NOTES FROM IT
+        FINISH MONDAY + TEUSDAY REVISION lecture sessions ... AND ASK GEMINI TO CREATE NOTES FROM IT
 
 
     1. I think just focused very heavily on running through PPTs and PPQs... just look at all the techniques used by them and also 
@@ -211,8 +212,6 @@ powers = iterate (* x) 1
 
     ADDITIONAL
         - check what was the interrim incredible monad technique useds
-        - Claude chat - Four Approaches to LSystem Parsing
-                            https://claude.ai/chat/9189b553-f13c-4cd2-90e2-cd9243d88d30
 
 
 
