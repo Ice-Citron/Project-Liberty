@@ -1,0 +1,88 @@
+package g0201_0300.s0235_lowest_common_ancestor_of_a_binary_search_tree
+
+import com_github_leetcode.TreeNode
+import org.hamcrest.CoreMatchers.equalTo
+import org.hamcrest.MatcherAssert.assertThat
+import org.junit.jupiter.api.Test
+
+internal class SolutionTest {
+    @Test
+    fun lowestCommonAncestor() {
+        val leftNodeLeftNode = TreeNode(0)
+        val leftNodeRightNode = TreeNode(4, TreeNode(3), TreeNode(5))
+        val leftNode = TreeNode(2, leftNodeLeftNode, leftNodeRightNode)
+        val rightNode = TreeNode(6, TreeNode(7), TreeNode(9))
+        val root = TreeNode(6, leftNode, rightNode)
+        assertThat(
+            Solution().lowestCommonAncestor(root, TreeNode(2), TreeNode(8))!!.`val`,
+            equalTo(6),
+        )
+    }
+
+    @Test
+    fun lowestCommonAncestor2() {
+        val leftNodeLeftNode = TreeNode(0)
+        val leftNodeRightNode = TreeNode(4, TreeNode(3), TreeNode(5))
+        val leftNode = TreeNode(2, leftNodeLeftNode, leftNodeRightNode)
+        val rightNode = TreeNode(6, TreeNode(7), TreeNode(9))
+        val root = TreeNode(6, leftNode, rightNode)
+        assertThat(
+            Solution().lowestCommonAncestor(root, TreeNode(2), TreeNode(4))!!.`val`,
+            equalTo(2),
+        )
+    }
+
+    @Test
+    fun lowestCommonAncestor3() {
+        assertThat(
+            Solution()
+                .lowestCommonAncestor(
+                    TreeNode(2, TreeNode(1), null),
+                    TreeNode(2),
+                    TreeNode(1),
+                )!!.`val`,
+            equalTo(2),
+        )
+    }
+
+    @Test
+    fun lowestCommonAncestor4() {
+        assertThat(
+            Solution()
+                .lowestCommonAncestor(
+                    TreeNode.create(listOf(6, 2, 8, 0, 4, 7, 9, null, null, 3, 5)),
+                    TreeNode(3),
+                    TreeNode(5),
+                )!!.`val`,
+            equalTo(4),
+        )
+    }
+
+    @Test
+    fun lowestCommonAncestor5() {
+        val root = TreeNode(1)
+        val result = Solution().lowestCommonAncestor(root, TreeNode(1), TreeNode(1))
+        assertThat(result!!.`val`, equalTo(1))
+    }
+
+    @Test
+    fun lowestCommonAncestor6() {
+        val root = TreeNode(3, TreeNode(1), TreeNode(4))
+        val result = Solution().lowestCommonAncestor(root, TreeNode(1), TreeNode(1))
+        assertThat(result!!.`val`, equalTo(1))
+    }
+
+    @Test
+    fun lowestCommonAncestor7() {
+        val root = TreeNode(3, TreeNode(1), TreeNode(4))
+        val result = Solution().lowestCommonAncestor(root, TreeNode(4), TreeNode(4))
+        assertThat(result!!.`val`, equalTo(4))
+    }
+
+    @Test
+    fun lowestCommonAncestor8() {
+        val root = TreeNode(5, TreeNode(3), TreeNode(8))
+        val result = Solution().lowestCommonAncestor(root, TreeNode(3), TreeNode(8))
+        assertThat(result!!.`val`, equalTo(5))
+    }
+}
