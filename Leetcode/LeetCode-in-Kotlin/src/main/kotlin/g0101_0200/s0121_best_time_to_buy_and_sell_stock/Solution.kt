@@ -6,6 +6,12 @@ package g0101_0200.s0121_best_time_to_buy_and_sell_stock
 
 class Solution {
     fun maxProfit(prices: IntArray): Int {
-        TODO("Practice 5: scan once while tracking the cheapest price seen so far and the best profit.")
+        var minPrice: Int = Int.MAX_VALUE
+        var maxProfit: Int = 0
+        for (currentPrice in prices) {
+            minPrice = minOf(minPrice, currentPrice)
+            maxProfit = maxOf(maxProfit, currentPrice - minPrice)
+        }
+        return maxProfit
     }
 }

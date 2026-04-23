@@ -6,43 +6,66 @@ package g0001_0100.s0015_3sum
 // #2023_07_03_Time_493_ms_(93.45%)_Space_53_MB_(93.97%)
 
 class Solution {
+
     fun threeSum(nums: IntArray): List<List<Int>> {
+        val result = mutableListOf<List<Int>>()
         nums.sort()
-        val len = nums.size
-        val result: MutableList<List<Int>> = ArrayList()
-        var l: Int
-        var r: Int
-        var i = 0
-        while (i < len - 2) {
-            l = i + 1
-            r = len - 1
-            while (r > l) {
-                val sum = nums[i] + nums[l] + nums[r]
+        for (i in 0..nums.size-2) {
+            if (i > 0 && nums[i] == nums[i-1]) {
+                continue            // Skips this iteration entirely
+            }
+            var left = i + 1
+            var right = nums.size - 1
+            while (left < right) {
+                var sum = nums[left] + nums[right] + nums[i]
                 if (sum < 0) {
-                    l++
+                    left++
                 } else if (sum > 0) {
-                    r--
+                    right--
                 } else {
-                    val list: MutableList<Int> = ArrayList()
-                    list.add(nums[i])
-                    list.add(nums[l])
-                    list.add(nums[r])
-                    result.add(list)
-                    while (l < r && nums[l + 1] == nums[l]) {
-                        l++
+                    result.add(listOf(nums[i], nums[left], nums[right]))
+                    left++
+                    right--         // Must immediately move pointers here, to prevent infintie loops
+                    while (left < right && nums[left] == nums[left - 1]) {
+                        left++
                     }
-                    while (r > l && nums[r - 1] == nums[r]) {
-                        r--
-                    }
-                    l++
-                    r--
                 }
             }
-            while (i < len - 1 && nums[i + 1] == nums[i]) {
-                i++
-            }
-            i++
         }
-        return result
+        return result.toList().also { println(it.joinToString(",")) }
     }
 }
+
+
+
+/*
+    At its core, 3Sum is just Two Sum disguised inside a loop. Think ... if you
+    need three numbers to add up to 0... you can just lock in the first number
+    (let's say it's -4). Now, your new goal is simply to find two other numbers
+    in the rest of the array that adds up to +4 (because +4 -4 = 0).
+
+    To avoid duplicate triplets and to make finding those two other numbers
+    extremely fast, the absolute most important first step is to SORT THE
+    ARRAY. Once sorted, you can use the exact same `left` and `right` pointer
+    logic you learned.
+* */
+
+
+
+/*
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+* */

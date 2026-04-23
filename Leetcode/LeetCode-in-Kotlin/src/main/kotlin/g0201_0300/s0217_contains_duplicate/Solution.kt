@@ -5,6 +5,17 @@ package g0201_0300.s0217_contains_duplicate
 
 class Solution {
     fun containsDuplicate(nums: IntArray): Boolean {
-        TODO("Practice 2: track seen numbers and return true as soon as one repeats.")
+                // val seen: ArrayList<Int> = arrayListOf()
+        // 1. Creating a mutable set (backed by Java's HashSet)
+        val seen = mutableSetOf<Int>()
+
+        for (value in nums) {
+            // 2. Checking for existence (Instant lookup)
+            if (value in seen) return true      // or `seen.contains(value)`
+            seen.add(value)         // adding a value returns a boolean... returns true if successfully added, false if it was already in the set
+        }
+        return false
     }
 }
+
+

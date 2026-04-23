@@ -5,6 +5,33 @@ package g0201_0300.s0242_valid_anagram
 
 class Solution {
     fun isAnagram(s: String, t: String): Boolean {
-        TODO("Practice 3: compare the two strings by character counts.")
+        val sArr = s.toCharArray() // s.toList().sorted() //
+        val tArr = t.toCharArray()
+        sArr.sort()
+        tArr.sort()
+        if (sArr.contentEquals(tArr)) return true
+        return false
+    }
+}
+
+
+
+
+/*
+    In Kotlin, `.sort()` on a `CharArray`, `IntArray`, or `FloatArray` performs
+    an IN-PLACE sort that rearranges the elements into ASCENDING ORDER (lowest
+    to highest). For characters, this follows the Unicode/ASCII values, which
+    effectively means alphabetical order for standard letters (`'a'` comes
+    before `'b'`). For numbers and floats, it sorts from the smallest numerical
+    value to the largest. Because this is an "in-place" operation, ...
+    ... function returns `Unit`... rather than a new array.
+* */
+
+
+
+
+class Solution2 {
+    fun isAnagram(s: String, t: String): Boolean {
+        return false
     }
 }
