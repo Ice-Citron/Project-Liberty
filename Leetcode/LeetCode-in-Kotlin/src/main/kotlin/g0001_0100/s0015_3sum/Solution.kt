@@ -53,19 +53,30 @@ class Solution {
 
 
 /*
+    The biggest secret to cracking these practicals and algorithmic challenges
+    is shifting your focus from memorising code to recoginising patterns. You've
+    probably noticed already: problems like Two Sum and Group Anagrams are just
+    the "Hash Map" pattern, while Valid Palindrome and 3Sum are the "Two
+    Pointers" pattern. When you read  anew prompt, look for the literal keywords
+    . If an array is already "sorted", that's a massive neon sign pointing
+    to Binary Search or Two Pointers. If the problem asks about "frequencies",
+    "uniqueness," or "complements," you should immediately be reaching for a Map
+    or a Set.
 
+    Second, always give yourself permission to think of the "dumb" brute-force
+    solution first. When you're trying to build something fast under pressure,
+    it's easy to get paralysed trying to write the perfect O(n) optimal solution
+    on line one. Instead, figure out how you would solve it with terrible,
+    nested `for` loops. Once you know the brute-force way, ask yourself: "What
+    information am I calculating more than once?" or "What am I spending too
+    much time searching for?" That exact bottleneck is where your optimised data
+    structure slots in to save the day.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+    Finally, never write your loop logic without "dry running" a tiny, nasty
+    example first. As we saw with the infinite loop in 3Sum, the core logic is
+    rarely the issue, it's the edge cases like `[0, 0, 0]` or getting stuck
+    on duplicates that crash the system. Grab a piece of paper or open a comment
+    block, draw your array, and physically move your mental `left` and `right`
+    pointers through a weird edge case, translating that into Kotlin becomes
+    trivial.
 * */
