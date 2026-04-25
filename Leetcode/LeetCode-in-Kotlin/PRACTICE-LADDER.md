@@ -81,6 +81,23 @@ Do these after Batch 1:
 4. `s0739_daily_temperatures`
 5. `s0155_min_stack`
 
+
+## Imperial-Style Practice
+
+After the LeetCode warmups, switch to the COMP40009 retrofit packs. These are larger than normal LeetCode problems and are closer to the Java/Kotlin practical exam style.
+
+Start here:
+
+- `01-imperial40009/structures-pack-01/README.md`
+
+Batch 1 topics:
+
+1. linked lists
+2. queues
+3. ordered hash maps
+4. frequency trees
+5. block iterators
+
 ## Rule For This Repo
 
 When a problem already has an answer prewritten and you want to practice it, replace the method body with a `TODO(...)` first and solve it back from the tests. You do **not** need to hunt for some hidden “follow-up” unless you specifically want a harder extension.

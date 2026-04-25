@@ -7,3 +7,10 @@ bin/
 .settings
 build/
 .gradle/
+.gradle-user-home/
+.kotlin/
+out/
+*.lck
+*.lock
+*.class
+*.kotlin_module

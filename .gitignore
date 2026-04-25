@@ -5,6 +5,21 @@ wakatime/
 Finished/
 Interested/
 
+# Local Gradle/Kotlin/IDE caches. These are generated, machine-specific, and
+# can include huge binaries or lock files that must not be committed.
+.gradle/
+.gradle-user-home/
+.kotlin/
+**/.gradle/
+**/.gradle-user-home/
+**/.kotlin/
+**/build/
+**/out/
+*.lck
+*.lock
+*.class
+*.kotlin_module
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

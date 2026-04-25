@@ -15,17 +15,24 @@ class Solution {
                 val poppedIndex = stack.removeLast()
                 val h = heights[poppedIndex]
                 val w = if (stack.isEmpty()) {
-
+                    i
+                } else {
+                    i - stack.last() - 1        // The distance between the right wall and the left wall
                 }
                 maxArea = maxOf(maxArea, h * w)
-                stack.removeLast()
             }
             stack.addLast(i)
         }
         while (stack.isNotEmpty()) {
-            val tailArea = heights[stack.last()] * (heights.size - stack.last())
-            maxArea = maxOf(maxArea, tailArea)
-            stack.removeLast()
+            val poppedIndex = stack.removeLast()
+            val h = heights[poppedIndex]
+
+            val w = if (stack.isEmpty()) {
+                heights.size
+            } else {
+                heights.size - stack.last() - 1
+            }
+            maxArea = maxOf(maxArea, h * w)
         }
         return maxArea
     }
@@ -33,6 +40,69 @@ class Solution {
 
 
 /*
+    ... exact line of code that makes the Monoonic Stack so confusing to read,
+    but you have actually ... onto the exact secret of how it works!
+
+    You are 100% correct: we ARE calling a different index. And that is
+    exactly what we want to do.
+
+    If we just used `poppedIndex`, we would only know where the bar is. But to#
+    calculate a width, we need to know where the bar stops.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+* */
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*
+    A monotonic stack is a specialised data structure in LeetCode used to solve
+    "next/previous greater/smaller element" problems in O(N) time. It maintains
+    elements in strictly increasing or decreasing order by popping elements that
+    violate this order, allowing efficient tracking of boundaries for array-based
+    questions. Common patterns are monotonic increasing (for smaller elements)
+    and decreasing (for greater eleements).
+
+
+Key LeetCode Usage Example
+    - Next Greater Element: Finding the next larger number for each element.
+    - Daily Temperatures: Calculating how many days to wait for a warmer
+      temperature.
+    - Largest Rectangle in Histogram: Finding the largest rectangular area by
+      identifying the left and right boundary (smaller element) for each bar.
+    - Remove Duplicate Letters / Smallest Subsequence: ...
+    - Trapping Rain Water: Determining the boundaries for water accumulation.
+    - Sum of Subarray Minimums: Finding the boundaries where an element is the
+      minimum.
+      ...
+
+
+
+
+
+
+
 
 * */
 
