@@ -23,45 +23,85 @@ class OrderedHashMap<K, V>(
         require(bucketCount > 0) { "bucketCount must be positive" }
     }
 
-    fun put(key: K, value: V): V? {
-        val hcode: Int = key.hashCode() % bucketCount
-        val newNode: Node<K, V> = Node(key, value)
-        var present: Boolean = false
-        if (head == null && tail == null) {
-            head = newNode
-            tail = newNode
+    // HELPER METHODS (Single Responsibility Principle)
+    // Standard Practice: Never mix Doubly Linked List pointer math inside your main map logic.
+    private fun appendToTail(node: Node<K, V>) {
+        if (head == null) {
+            head = node
+            tail = node
         } else {
-            tail!!.nextInOrder = newNode
-            newNode.prevInOrder = tail
-            tail = newNode
+            tail?.nextInOrder = node
+            node.prevInOrder = tail
+            tail = node
         }
-        var curr: Node<K, V>? = buckets[hcode]
-        while (curr != null) {
-            if (curr!!.key == key) {
-                present = true
-                break
-            }
-            curr = curr.nextInBucket
-        }
-        return if (!present) {
-            newNode.nextInBucket = buckets[hcode]
-            buckets[hcode] = newNode
-            currentSize++
-            null
-        } else {
+    }
 
-            val oldValue: V = curr!!.value
-            curr.value = value
-            oldValue
+    private fun detachFromOrder(node: Node<K, V>) {
+        val prev = node.prevInOrder
+        val next = node.nextInOrder
+
+        if (prev != null) prev.nextInOrder = next else head = next
+        if (next != null) next.prevInOrder = prev else tail = prev
+
+        // Clean up the node's own pointers
+        node.prevInOrder = null
+        node.nextInOrder = null
+    }
+
+    fun put(key: K, value: V): V? {
+        // 1. Safe Hash Math: abs() prevents negative indices from crashing the program
+        val index = kotlin.math.abs(key.hashCode() % bucketCount)
+        var current = buckets[index]
+
+        // 2. Searching for existing key (No `!!` needed, smart casting handles it)
+        while (current != null) {
+            if (current.key == key) {
+                // Key exists: Update value and move to newest position
+                val oldValue = current.value
+                current.value = value
+
+                detachFromOrder(current)
+                appendToTail(current)
+
+                return oldValue // Early return
+            }
+            current = current.nextInBucket
         }
+
+        // 3. Key does not exist: Create new entry
+        val newNode = Node(key, value)
+
+        // Standard Practice: Prepend to bucket chain for O(1) insertion. Do not
+        // walk to the end of the bucket chain; it wastes time!
+        newNode.nextInBucket = buckets[index]
+        buckets[index] = newNode
+
+        // 4. Update the timeline and size
+        appendToTail(newNode)
+        currentSize++
+
+        return null
     }
 
     operator fun get(key: K): V? {
-        TODO("practice")
+        val index = kotlin.math.abs(key.hashCode() % bucketCount)   // Safe hashmap math `kotlin.math.abs()`
+        var current: Node<K, V>? = buckets[index]
+
+        while (current != null) {       // Traverse only the O(1) bucket chain, completely ignoring the timeline DLL
+            if (current.key == key) {
+                return current.value        // Fast return, no timeline modification
+            }
+            current = current.nextInBucket
+        }
+
+        return null // key not foudn
     }
 
     fun containsKey(key: K): Boolean {
-        TODO("practice")
+        return get(key) != null
+        // Standard practice -- Don't Repeat Yourself
+        // Since our map does not accept null values (V is not V?)
+        // a non-null return from get() strictly guarantees existence.
     }
 
     fun remove(key: K): V? {
@@ -107,6 +147,74 @@ class OrderedHashMap<K, V>(
         var nextInOrder: Node<K, V>? = null
     )
 }
+
+
+/*
+    ... especially when mapping concepts... Reading good ... Here are the standard,
+    production-ready implementations for `get` and `containsKey`.
+
+
+---
+Kotlin Standards && Best Practices Used Here
+    1. The DRY Principle in Maps: You will almost never see a manual
+       bucket-traversal loop written inside `containsKey`. Because `get(key)`
+       already executes the exact O(1) bucket lookup required, `containsKey`
+       simply wraps it. This prevents duplicate logic that could go out of sync
+       if the bucket structure ever changed.
+    2. READ-ONLY SAFETIES: Notice that `get` never touches `head`, `tail`,
+       `prevInOrder`, or `nextInOrder`. The prompt explicitly forbids making
+       this an "access-order" map (like an LRU Cache usually does when you read
+       a value). By strictly using `nextInBucket`, the traversal remains
+       isolated to the underlying array.
+    3. OPERATOR OVERLOADING: By using the `operator` keyword on `fun get`, Kotlin
+       allows the syntax `map["crew"]` at the call site. Under the hood, the
+       compiler translates those brackets directly into a call to this specific
+       function.
+
+
+
+
+
+
+* */
+
+
+
+
+
+
+
+/*
+Kotlin Standards && Best Practices Used Here
+    1. The "No `!!` Rule": You should almost never use `!!` in production Kotlin
+       . It explicitly tells the compiler "I don't care about your safety checks
+       , crash the app with a NullPointerException if I'm wrong."
+            * How we fixed it: By using a standard `while (current != null)`
+              loop, Kotlin's compiler automatically "smart casts" `current` to a
+              non-null type inside the loop. You can just type `current.key`
+              safely!
+    2. EARLY RETURNS (Guard Clauses): Instead of using a `var present = false`
+       flag and nesting a massive `if/else` at the bottom, standard practice is
+       to return immediately the moment you finish your work. If we find the
+       key, we update it, relink it, and `return oldValue` right then and there.
+       If the loop finishes without returning, we knwo the key is entirely new.
+    3. O(1) Linked List Prepending: In your code, you write `while (curr.nextInBucket !=  null)`
+       to attach the new node to the very end of the hash bucket. That makes
+       insertion O(n) based on bucket size. Standard map implementaions just
+       attach the new node to the front of the bucket (`newNode.next = buckets[index]`),
+       making insertion a flawless O(1).
+    4. SINGLE RESPONSIBILITY: Separating pointers into `detachFromOrder` and
+       `appendToTail` isn't just to look pretty. When we write `remove()` later,
+       you will have to detach nodes again. Writing it once as a helper prevents
+       catastrophic copy-paste errros.
+
+
+
+
+* */
+
+
+
 
 
 /*
