@@ -105,36 +105,71 @@ class OrderedHashMap<K, V>(
     }
 
     fun remove(key: K): V? {
-        TODO("practice")
+        val index = kotlin.math.abs(key.hashCode() % bucketCount)
+        var current: Node<K, V>? = buckets[index]
+        var prevInBucket: Node<K, V>? = null
+
+        // 1. Traverse the SLL (Bucket)
+        while (current != null) {
+            if (current.key == key) {
+                if (prevInBucket == null) {
+                    buckets[index] = current.nextInBucket
+                } else {
+                    // Case B: It's in the middle/end of the bucket
+                    prevInBucket.nextInBucket = current.nextInBucket
+                }
+                detachFromOrder(current)
+                currentSize--
+                return current.value
+            }
+            // Move pointers forward
+            prevInBucket = current
+            current = current.nextInBucket
+        }
+        return null                 // Key not found
     }
 
     fun removeOldest(): Pair<K, V>? {
-        if (head == null)
-            return null
-        if (head == tail) {
-            
-            head = null
-            tail = null
-        }
-        TODO("practice")
+        val oldestNode = head ?: return null
+        val removedValue = remove(oldestNode.key)
+            ?: error("State corruption: Node found in timeline but missing from buckets")
+        return oldestNode.key to removedValue       // Use `to` infix function to create a `Pair` cleanly
     }
 
     fun valuesInInsertionOrder(): List<V> {
-        return listOf()
+        // Standard Practice: Program to an Interface, not an Implementation.
+        // We use mutableListOf internally, but return it as a read-only List<K>
+        val result: MutableList<V> = mutableListOf()
+        var current: Node<K, V>? = head
+
+        while (current != null) {
+            result.add(current.value)
+            current = current.nextInOrder
+        }
+        return result
     }
 
     fun keysInInsertionOrder(): List<K> {
-        return listOf()
+        val result: MutableList<K> = mutableListOf()
+        var current: Node<K, V>? = head
+
+        while (current != null) {
+            result.add(current.key)
+            current = current.nextInOrder
+        }
+        return result
     }
 
     override fun iterator(): Iterator<Pair<K, V>> {
         return object : Iterator<Pair<K, V>>{
-            override fun hasNext(): Boolean {
-                TODO("Not yet implemented")
-            }
+            var current = head
+
+            override fun hasNext(): Boolean = current != null
 
             override fun next(): Pair<K, V> {
-                TODO("Not yet implemented")
+                val node = current ?: throw Exception("No more elements to iterate")
+                current = node.nextInOrder
+                return node.key to node.value
             }
         }
     }
@@ -150,6 +185,15 @@ class OrderedHashMap<K, V>(
 
 
 /*
+    SLL Traversal (`prevInBucket`): Because our buckets only point forward,
+    the only way to delete a node is to connect the guy behind it to the guy
+    in front of it. Tracking `prevInBucket` as you loop is the standard pattern
+    for O(N) SLL deletion.
+
+
+
+
+
     ... especially when mapping concepts... Reading good ... Here are the standard,
     production-ready implementations for `get` and `containsKey`.
 

@@ -2,91 +2,276 @@
 
 Suggested value: 15 marks
 
-## Problem Description
+This question is about implementing a generic first-in-first-out queue in Kotlin. Queue structures appear frequently in practical papers: for example in graph algorithms, scheduling, priority systems, and producer/consumer-style simulations.
 
-In this question you will implement a generic first-in-first-out queue. Queue structures appear frequently in the Java practical papers: for example in graph algorithms, priority scheduling, critical path analysis, and producer/consumer style simulations.
+You should edit:
 
-A queue stores elements in arrival order. New elements are placed at the back. Elements are removed from the front. The first element inserted should be the first element removed.
+```text
+src/main/kotlin/a40009_imperial/structurespack01/queue/ExamQueue.kt
+```
 
-You are given a skeleton class:
+Use the tests in:
 
-- `ExamQueue<T>`
+```text
+src/test/kotlin/a40009_imperial/structurespack01/queue/ExamQueueTest.kt
+```
 
-The class is generic, so it should support any value type `T`.
+## Background
 
-## Getting Started
+A queue stores elements in arrival order.
 
-You should edit only:
+```text
+front -> first inserted -> next -> newest <- back
+```
 
-- `ExamQueue.kt`
+New values are enqueued at the back. Values are dequeued from the front.
 
-You should use the public tests in:
+The first value inserted should be the first value removed.
 
-- `ExamQueueTest.kt`
+Do not solve this by wrapping Kotlin's `ArrayDeque`, `MutableList`, Java `Queue`, or Java `LinkedList`.
 
-The public tests cover the main behaviours, but they are not a substitute for reasoning about your representation invariants.
+## 1. Representation and Size
 
-## What To Do
+Methods involved:
 
-1. Queue representation. [3 marks]
-   Implement private state for the queue. A linked representation with a front node, a back node, and a size counter is a natural choice.
+```kotlin
+val size: Int
+val isEmpty: Boolean
+```
 
-2. Enqueue. [3 marks]
-   Implement `enqueue(value: T)`.
+### Implementation Requirement
 
-   This method should add `value` to the back of the queue. It must handle both the empty and non-empty cases.
+Choose private state that can represent an empty or non-empty queue. A typical linked solution uses:
 
-3. Peek and dequeue. [4 marks]
-   Implement `peek()` and `dequeue()`.
+- a private node class;
+- a `front` reference;
+- a `back` reference;
+- an integer counter for the number of queued values.
 
-   `peek()` should return the front element without removing it. `dequeue()` should remove and return the front element. If the queue is empty, both methods should return `null`.
+The `size` property should return the current number of values in the queue. The `isEmpty` property is already written in terms of `size`.
 
-4. Size and emptiness. [2 marks]
-   Implement the `size` property so that it is correct after every queue operation. The existing `isEmpty` property should then work from `size`.
+### Restriction
 
-5. Queue views. [3 marks]
-   Implement `toList()` and `iterator()`.
+Do not compute `size` by walking the queue every time. Keep a counter and update it when values are enqueued or dequeued.
 
-   Both should expose the remaining queue contents from front to back. Neither method should mutate the queue.
+Do not delegate the queue implementation to `ArrayDeque`, `MutableList`, Java `Queue`, or Java `LinkedList`.
 
-## Restrictions
+### Example
 
-- Do not delegate the queue implementation to `ArrayDeque`, `MutableList`, Java `Queue`, or Java `LinkedList`.
-- You may use a private node class.
-- `peek`, `toList`, and `iterator` must not remove values from the queue.
-- When the final element is removed, both front and back references should be updated consistently.
+For a new queue:
 
-## Examples
+```kotlin
+val queue = ExamQueue<String>()
 
-If the following operations are performed:
+queue.size == 0
+queue.isEmpty == true
+```
+
+After adding two values:
+
+```kotlin
+queue.enqueue("raw")
+queue.enqueue("goods")
+
+queue.size == 2
+queue.isEmpty == false
+```
+
+## 2. `enqueue`
+
+Method involved:
+
+```kotlin
+fun enqueue(value: T)
+```
+
+### Implementation Requirement
+
+Add `value` to the back of the queue.
+
+This method must handle both cases:
+
+- the queue is empty;
+- the queue already contains one or more values.
+
+### Restriction
+
+When enqueuing into an empty queue, update both `front` and `back` consistently. A one-element queue should have both references pointing at the same node.
+
+### Example
+
+```kotlin
+val queue = ExamQueue<String>()
+queue.enqueue("raw-plastic")
+queue.enqueue("manufactured-good")
+queue.enqueue("disposed-good")
+
+queue.size == 3
+```
+
+The next value to leave the queue should be `"raw-plastic"`.
+
+## 3. `peek`
+
+Method involved:
+
+```kotlin
+fun peek(): T?
+```
+
+### Implementation Requirement
+
+Return the value at the front of the queue without removing it.
+
+If the queue is empty, return `null`.
+
+### Restriction
+
+Calling `peek()` must not mutate the queue. It should not change `front`, `back`, `size`, or any node links.
+
+### Example
+
+```kotlin
+val queue = ExamQueue<String>()
+queue.enqueue("raw")
+queue.enqueue("goods")
+
+queue.peek() == "raw"
+queue.size == 2
+queue.peek() == "raw"
+queue.size == 2
+```
+
+For an empty queue:
+
+```kotlin
+queue.peek() == null
+```
+
+## 4. `dequeue`
+
+Method involved:
+
+```kotlin
+fun dequeue(): T?
+```
+
+### Implementation Requirement
+
+Remove and return the value at the front of the queue.
+
+If the queue is empty, return `null`.
+
+The queue must remain valid after removing:
+
+- the first value from a multi-element queue;
+- the only value from a one-element queue.
+
+### Restriction
+
+When the final element is removed, both `front` and `back` should become empty references. Leaving `back` pointing to a removed node is a stale-state bug.
+
+### Example
 
 ```kotlin
 val queue = ExamQueue<String>()
 queue.enqueue("raw")
 queue.enqueue("recycled")
 queue.enqueue("goods")
+
+queue.dequeue() == "raw"
+queue.dequeue() == "recycled"
+queue.dequeue() == "goods"
+queue.dequeue() == null
+queue.isEmpty == true
 ```
 
-then repeated calls to `dequeue()` should return:
+## 5. `toList`
 
-```text
-raw
-recycled
-goods
-null
-```
-
-Before any dequeue operation:
+Method involved:
 
 ```kotlin
-queue.peek() == "raw"
-queue.toList() == listOf("raw", "recycled", "goods")
+fun toList(): List<T>
 ```
 
-## Edge Cases To Think About
+### Implementation Requirement
 
-- Calling `dequeue` on an empty queue.
-- Calling `peek` on an empty queue.
-- Enqueuing after the queue has become empty again.
-- Iterating over a queue with one element.
-- Confirming that iteration does not change `size`.
+Return the remaining queue contents from front to back.
+
+This method should not remove values from the queue.
+
+### Restriction
+
+Return a new list. A caller should not be able to mutate your internal queue representation by changing the returned list.
+
+### Example
+
+```kotlin
+val queue = ExamQueue<Int>()
+queue.enqueue(4)
+queue.enqueue(8)
+queue.enqueue(15)
+
+queue.toList() == listOf(4, 8, 15)
+queue.size == 3
+queue.dequeue() == 4
+```
+
+## 6. Iterator
+
+Method involved:
+
+```kotlin
+override fun iterator(): Iterator<T>
+```
+
+### Implementation Requirement
+
+Return an iterator over the remaining queue contents from front to back.
+
+The class declaration already says:
+
+```kotlin
+class ExamQueue<T> : Iterable<T>
+```
+
+so this method is what allows:
+
+```kotlin
+for (value in queue) {
+    println(value)
+}
+```
+
+### Restriction
+
+The iterator must not remove values from the queue. It should expose the current order without changing `size`.
+
+### Example
+
+```kotlin
+val queue = ExamQueue<Int>()
+queue.enqueue(4)
+queue.enqueue(8)
+queue.enqueue(15)
+
+queue.iterator().asSequence().toList() == listOf(4, 8, 15)
+queue.size == 3
+```
+
+## Public Tests
+
+The public tests check the following behaviours:
+
+- a new queue reports empty state correctly;
+- `peek` and `dequeue` return `null` for an empty queue;
+- values are dequeued in first-in-first-out order;
+- `toList` and `iterator` do not mutate the queue.
+
+Passing the public tests is not a proof of full correctness. You should also think through:
+
+- enqueuing after the queue has become empty again;
+- dequeuing the only element;
+- peeking repeatedly;
+- iterating over an empty queue;
+- confirming that `front`, `back`, and `size` stay consistent after every operation.
