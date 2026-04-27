@@ -15,6 +15,7 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib:2.2.21")
+    testImplementation(kotlin("test-junit5"))
     testImplementation("org.junit.jupiter:junit-jupiter:[5.13.3,)")
     testImplementation("org.hamcrest:hamcrest-core:[3.0,)")
     testImplementation("org.zapodot:embedded-db-junit-jupiter:[2.2.3,)")
