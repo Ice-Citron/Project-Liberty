@@ -1,0 +1,1063 @@
+
+below is transcript of what im allowed to bring to exams as a cheatsheet... please tell me what do you think how would i use it for each question, and potentially what i should add onto it as well. thanks
+
+---
+
+
+Here is the full transcription of the second cheat sheet, organized by columns from left to right. Diagram representations have been replaced with text descriptions, as requested.
+COLUMN 1
+ASYNC DIVIDE BY 5
+[Diagram Description: A circuit with three D flip-flops. The main clock ('clk') feeds into the first flip-flop. The Q output of the first flip-flop acts as the clock for the second, and the Q output of the second acts as the clock for the third. The inverted Q outputs of the first and third flip-flops feed into a NAND gate. The output of this NAND gate connects to the asynchronous 'Clear' input of all three flip-flops. The overall output, labeled '&c', is taken from the inverted Q of the final flip-flop.]
+4-to-1 MULTIPLEXER
+[Diagram Description: Logic circuit for a 4-to-1 MUX. Select lines S1 and S0 are passed through inverters to create both normal and inverted signals. Four 4-input AND gates take data inputs A, B, C, D respectively, along with the corresponding binary combination of S1 and S0. An 'Enable' signal provides the fourth input to all four AND gates. The outputs of these four AND gates feed into a single 4-input OR gate to produce the 'Out' signal.]
+8-to-1 MULTIPLEXER
+[Diagram Description: Block diagram showing two 4-to-1 multiplexers used to build an 8-to-1 MUX. The top MUX takes inputs A, B, C, D; the bottom takes E, F, G, H. Both share select lines S0 and S1. A third select line, S2, acts as the enable signal: it connects directly to the 'EN' port of the top MUX and goes through an inverter to the 'EN' port of the bottom MUX. The outputs of both 4-to-1 MUXes feed into an OR gate. The final output passes through an AND gate controlled by a master 'Enable' signal.]
+2-to-4 DEMULTIPLEXER
+[Diagram Description: Logic circuit for a 2-to-4 DEMUX. Select lines S1 and S0 are passed through inverters. Four 3-input AND gates produce outputs D00, D01, D10, D11 based on the four binary combinations of S1 and S0. A master 'Enable' signal feeds into the third input of all four AND gates.]
+3-to-8 DEMULTIPLEXER
+[Diagram Description: Block diagram showing two 2-to-4 demultiplexers used to build a 3-to-8 DEMUX. An 'Enable' signal feeds the common input data line. Select lines S0 and S1 are shared by both demultiplexers. Select line S2 determines which block is active: it connects directly to the enable of the bottom DEMUX and via an inverter to the top DEMUX. This yields outputs D000 through D111.]
+COLUMN 2
+FUNCTIONAL COMPARATOR
+[Diagram Description: A 1-bit comparator circuit taking inputs A and B. A and inverted B go to an AND gate to produce 'A>B'. Inverted A and normal B go to an AND gate to produce 'A<B'. A and B go to an XNOR gate to produce 'A=B'. A master 'Enable' signal gates the outputs.]
+SCALED UP COMPARATOR
+[Diagram Description: Block diagram of a cascaded multi-bit comparator. Individual 1-bit comparator blocks (A3-B3 down to A0-B0) are chained together. The 'A=B' equality output of a higher-order stage feeds into the 'Enable' (EN) input of the next lower-order stage. The 'A>B' and 'A<B' outputs from all active stages feed into respective OR gates to generate the final comparison result.]
+HALF-ADDER
+$CARRY = A \cdot B \quad SUM = A \oplus B$
+[Diagram Description: Logic circuit showing inputs A and B feeding into an AND gate to produce the Carry (C) and an XOR gate to produce the Sum (S).]
+FULL-ADDER
+$SUM = A \oplus B \oplus C$
+$C_{out} = C \cdot (A \oplus B) + A \cdot B$
+[Diagram Description: Logic circuit showing inputs Cin, A, and B. A and B go to an XOR gate and an AND gate. The output of the first XOR goes to a second XOR alongside Cin to produce the Sum (S). The output of the first XOR also goes to an AND gate with Cin. The outputs of the two AND gates go to an OR gate to produce Cout.]
+N-BIT ADDER
+[Diagram Description: A chain of Full Adder blocks. $C_{in}$ goes to the first block ($A_0, B_0$). The $C_{out}$ of each block feeds into the $C_{in}$ of the next block. Outputs are $S_0, S_1... S_{n-1}$ and a final $C_{out}$.]
+1-BIT FULL SUBTRACTOR UNIT
+$DIFFERENCE = A \oplus B \oplus P$
+$BORROW = B \cdot P + A' \cdot (B \oplus P)$
+[Diagram Description: Logic circuit for a full subtractor. Inputs A, B, and P (previous borrow). It is structurally similar to a full adder but includes inverters on specific A input paths to correctly calculate the borrow out.]
+4-BIT MULTIPLIER
+[Diagram Description: A block diagram demonstrating a 4x4 multiplier built from combinational logic. It utilizes a matrix of four '2 bit multiplier' blocks and three '4 bit Adder' blocks, arranged in a cascading tree to sum the partial products based on inputs A0-A3 and B0-B3, producing outputs O0-O7.]
+COLUMN 3
+(Top Large Diagram: CPU Datapath)
+[Diagram Description: A detailed schematic of a CPU datapath. It includes a Register File (R0-R7) connected via multiplexers to an A-bus and a B-bus. These buses feed into an ALU and a Shifter block. The output of the ALU/Shifter goes to a C-bus, which loops back to the Register File. The diagram also shows a Program Counter (PC), Memory Address Register (MAR), Memory Data Register (MDR), and Instruction Register (IR) connected to an external Memory block. A central Controller coordinates multiplexers and clock signals.]
+SERIAL ADDER
+[Diagram Description: A single Full Adder block operating sequentially over time. Inputs 'Serial In' (A) and 'B' go to the Full Adder. The resulting 'Sum' is the 'Serial Out'. The 'Cout' goes into a D flip-flop, whose 'Q' output loops back into the 'Cin' of the Full Adder for the next clock cycle.]
+2'S COMPLEMENT SUBTRACTOR
+[Diagram Description: Block diagram showing an n-bit Full Adder configured for subtraction. Input A goes directly to the adder. Input B goes through a bank of NOT gates (inverters) before entering the adder (1's complement). The $C_{in}$ of the adder is permanently tied high (to 1), completing the 2's complement conversion of B. Output is A-B.]
+2-BIT MULTIPLIER
+[Diagram Description: Logic circuit for a 2-bit multiplier taking inputs A0, A1 and B0, B1. Four AND gates generate the partial products. These feed into a network of Half Adders to sum the products and produce the final outputs O0 to O3.]
+MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOAD Rdest, AddressE1
+
+E2
+
+E3
+MAR $\leftarrow$ PC
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+Via the bit mask
+
+
+No Mask
+STORE Rdest, AddressE1
+
+E2
+MAR $\leftarrow$ MDR; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+Via the bit mask
+
+Shifter (unchanged)
+JUMP AddressE1PC $\leftarrow$ MDRVia the bit maskCALL Rdest, AddressE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ MDR
+
+
+Via the bit mask
+INDIRECT MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOADINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+
+E4
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+
+
+
+No Mask
+STOREINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+
+via the shifter
+
+via the shifter
+JUMPINDIRECT RscrE1
+
+E2
+A $\leftarrow$ Rscr
+
+PC $\leftarrow$ A
+
+via the shifter
+CALLINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1; A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ A
+
+
+via the shifter
+TWO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathMOVE Rdest, RsrcE1
+
+E2
+A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (unchanged)
+ADD Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+
+ALU=A+B, Cin=0
+COMPARE Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+C $\leftarrow$ ALUcout
+
+
+ALU=A-B, Cin=0
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...16 (Rscr) | 15...0 (Unused)]
+COLUMN 4
+(Basic Logic Gates)
+NOT: [Diagram Description: Standard NOT gate symbol (triangle with a circle at the tip).]
+AND: [Diagram Description: Standard AND gate symbol (D-shape).]
+OR: [Diagram Description: Standard OR gate symbol (shield or arrowhead shape).]
+NOR: [Diagram Description: Standard NOR gate symbol (OR shape with a circle at the tip).]
+XOR: [Diagram Description: Standard XOR gate symbol (OR shape with a curved line at the input).]
+ONE-BIT STATIC RAM
+[Diagram Description: Circuit schematic for a 1-bit SRAM cell. An 'Address' line feeds a 'DECODER'. A 'Read' signal and a 'Clock' signal go into an AND gate. 'Data in' goes to the D input of a flip-flop, clocked by the Address/Clock AND gate. The Q output goes to an AND gate controlled by the 'Read' signal, which connects to the 'Data out' line.]
+RAM PHYSICAL LAYOUT
+[Diagram Description: Block diagram illustrating the grid structure of RAM. Address lines split into a 'Row Decoder' and a 'Column Decoder'. The grid intersections contain 'One bit' cells. Global 'Data Read' and 'Data Enable' lines connect to each cell.]
+COLUMN 5
+ARITHMETIC SHIFTS
+Left Shift with Carry: [Diagram Description: A register shifting bits to the left. The MSB shifts out into the Carry ('Cin') flag. A zero is shifted into the LSB.]
+Arithmetic Right Shift: [Diagram Description: A register shifting bits to the right. The LSB is discarded. The MSB (sign bit) is duplicated: it stays in its original position while also shifting right, preserving the sign of the number.]
+Rotate Right: [Diagram Description: A register shifting bits to the right. The LSB loops around and enters the MSB position.]
+TRI-STATE BUFFER
+If the control line, C, is set to 0 the output follows the input exactly.
+If C is set to 1 the output is neither zero nor one, but is effectively disconnected from the data line.
+[Diagram Description: Symbol for a tri-state buffer. An input D goes through a triangle symbol to an output. A control line C points to the top of the triangle. Adjacent is an equivalent logic diagram using an inverter and an open/close switch controlled by C.]
+FETCH CYCLE
+MAR $\leftarrow$ PC
+MDR $\leftarrow$ RAM[MAR], PC $\leftarrow$ PC+1
+IR $\leftarrow$ MDR
+COLUMN 6
+4-FUNCTION SHIFTER
+[Diagram Description: Block diagram of a shifter circuit. It uses multiplexers for each bit slice (I[0] to I[7]). Two control lines S1 and S0 select the operation. Multiplexers route the current bit, adjacent bits (for left/right shifts), or a 0/Cin based on the selected function.]
+STATIC VS DYNAMIC RAM
+SRAM: Reading is combinatorial but writing is sequential since the address and data must be present when the clock pulse sets the flip-flop.
+DRAM: Is sequential since they must complete their refresh cycle before reads/writes. Uses a capacitor and transistor for each bit.
+[Diagram Description: Simple schematic of a single DRAM cell showing a word line activating a transistor to access a storage capacitor connected to a bit line.]
+BIT MASK
+The memory reference instructions contain a memory address in the bottom 20 bits.
+The bit mask converts this unsigned 20 bit number to a 32 bit number by masking the top bits.
+[Diagram Description: Box diagram showing a 32-bit word. The top 12 bits (I20-I31) are tied to Ground (0). The bottom 20 bits (I0-I19) pass straight through to the output O0-O19. Outputs O20-O31 are forced to 0.]
+IMPROVEMENTS
+INSTRUCTION FORMATS:
+All instructions are 32 bit, but mostly the bottom 16 bits are empty.
+This means that we are wasting memory space and doing many more fetch cycles than we need.
+We could pack up the instructions on byte boundaries and introduce some multiplexing hardware to load the IR correctly.
+ARITHMETIC:
+We have three unused inputs on the multiplexer that selects the internal bus. Additional arithmetic hardware could include:
+A sixteen bit multiplier (multiply the bottom 16 bits of A and B to obtain a 32 bit result)
+An incrementer and decrementer
+DATA PATHS:
+Additional multiplexers could help us to reduce the instruction cycles of many instructions. For instance a multiplexer to select the input to B independently of A would reduce many three cycle instructions to two cycles.
+A data path from the registers to the internal bus would reduce some instructions by one cycle.
+This would require an additional input on the bus selector multiplexer, and so might be considered an alternative to the additional arithmetic functions already discussed.
+COMBINATORIAL CIRCUITS:
+We want to have the minimum time delays in all our combinational logic.
+This is partly a question of path length, but does require looking at low level transistor models to calculate the time accurately
+NO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathSKIPE1PC $\leftarrow$ PC+1
+[Instruction format diagram below: 31...24 (Opcode) | 23...0 (Unused)]  
+
+ONE REGISTER INSTRUCTIONS  
+InstructionCycleTransfersPathCLEAR RdestE1Rdest $\leftarrow$ ALUresALU = zero outINC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = zero out
+
+ALU=A+B, Cin=1
+DEC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = -1 out
+
+ALU=A+B, Cin=0
+COMP RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres
+
+ALU = -1 out
+
+ALU=A xor B
+ASL RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (Arithmetic left)
+RETURN RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+PC $\leftarrow$ Shifter
+
+Shifter (Unchanged)
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...0 (Unused)]  
+write me out the answer for this please. thanks. 
+
+---
+
+below is transcript of what im allowed to bring to exams as a cheatsheet... please tell me what do you think how would i use it for each question, and potentially what i should add onto it  as well. thanks
+
+
+
+---
+
+
+Here is the full transcription of the second cheat sheet, organized by columns from left to right. Diagram representations have been replaced with text descriptions, as requested.
+COLUMN 1
+ASYNC DIVIDE BY 5
+[Diagram Description: A circuit with three D flip-flops. The main clock ('clk') feeds into the first flip-flop. The Q output of the first flip-flop acts as the clock for the second, and the Q output of the second acts as the clock for the third. The inverted Q outputs of the first and third flip-flops feed into a NAND gate. The output of this NAND gate connects to the asynchronous 'Clear' input of all three flip-flops. The overall output, labeled '&c', is taken from the inverted Q of the final flip-flop.]
+4-to-1 MULTIPLEXER
+[Diagram Description: Logic circuit for a 4-to-1 MUX. Select lines S1 and S0 are passed through inverters to create both normal and inverted signals. Four 4-input AND gates take data inputs A, B, C, D respectively, along with the corresponding binary combination of S1 and S0. An 'Enable' signal provides the fourth input to all four AND gates. The outputs of these four AND gates feed into a single 4-input OR gate to produce the 'Out' signal.]
+8-to-1 MULTIPLEXER
+[Diagram Description: Block diagram showing two 4-to-1 multiplexers used to build an 8-to-1 MUX. The top MUX takes inputs A, B, C, D; the bottom takes E, F, G, H. Both share select lines S0 and S1. A third select line, S2, acts as the enable signal: it connects directly to the 'EN' port of the top MUX and goes through an inverter to the 'EN' port of the bottom MUX. The outputs of both 4-to-1 MUXes feed into an OR gate. The final output passes through an AND gate controlled by a master 'Enable' signal.]
+2-to-4 DEMULTIPLEXER
+[Diagram Description: Logic circuit for a 2-to-4 DEMUX. Select lines S1 and S0 are passed through inverters. Four 3-input AND gates produce outputs D00, D01, D10, D11 based on the four binary combinations of S1 and S0. A master 'Enable' signal feeds into the third input of all four AND gates.]
+3-to-8 DEMULTIPLEXER
+[Diagram Description: Block diagram showing two 2-to-4 demultiplexers used to build a 3-to-8 DEMUX. An 'Enable' signal feeds the common input data line. Select lines S0 and S1 are shared by both demultiplexers. Select line S2 determines which block is active: it connects directly to the enable of the bottom DEMUX and via an inverter to the top DEMUX. This yields outputs D000 through D111.]
+COLUMN 2
+FUNCTIONAL COMPARATOR
+[Diagram Description: A 1-bit comparator circuit taking inputs A and B. A and inverted B go to an AND gate to produce 'A>B'. Inverted A and normal B go to an AND gate to produce 'A<B'. A and B go to an XNOR gate to produce 'A=B'. A master 'Enable' signal gates the outputs.]
+SCALED UP COMPARATOR
+[Diagram Description: Block diagram of a cascaded multi-bit comparator. Individual 1-bit comparator blocks (A3-B3 down to A0-B0) are chained together. The 'A=B' equality output of a higher-order stage feeds into the 'Enable' (EN) input of the next lower-order stage. The 'A>B' and 'A<B' outputs from all active stages feed into respective OR gates to generate the final comparison result.]
+HALF-ADDER
+$CARRY = A \cdot B \quad SUM = A \oplus B$
+[Diagram Description: Logic circuit showing inputs A and B feeding into an AND gate to produce the Carry (C) and an XOR gate to produce the Sum (S).]
+FULL-ADDER
+$SUM = A \oplus B \oplus C$
+$C_{out} = C \cdot (A \oplus B) + A \cdot B$
+[Diagram Description: Logic circuit showing inputs Cin, A, and B. A and B go to an XOR gate and an AND gate. The output of the first XOR goes to a second XOR alongside Cin to produce the Sum (S). The output of the first XOR also goes to an AND gate with Cin. The outputs of the two AND gates go to an OR gate to produce Cout.]
+N-BIT ADDER
+[Diagram Description: A chain of Full Adder blocks. $C_{in}$ goes to the first block ($A_0, B_0$). The $C_{out}$ of each block feeds into the $C_{in}$ of the next block. Outputs are $S_0, S_1... S_{n-1}$ and a final $C_{out}$.]
+1-BIT FULL SUBTRACTOR UNIT
+$DIFFERENCE = A \oplus B \oplus P$
+$BORROW = B \cdot P + A' \cdot (B \oplus P)$
+[Diagram Description: Logic circuit for a full subtractor. Inputs A, B, and P (previous borrow). It is structurally similar to a full adder but includes inverters on specific A input paths to correctly calculate the borrow out.]
+4-BIT MULTIPLIER
+[Diagram Description: A block diagram demonstrating a 4x4 multiplier built from combinational logic. It utilizes a matrix of four '2 bit multiplier' blocks and three '4 bit Adder' blocks, arranged in a cascading tree to sum the partial products based on inputs A0-A3 and B0-B3, producing outputs O0-O7.]
+COLUMN 3
+(Top Large Diagram: CPU Datapath)
+[Diagram Description: A detailed schematic of a CPU datapath. It includes a Register File (R0-R7) connected via multiplexers to an A-bus and a B-bus. These buses feed into an ALU and a Shifter block. The output of the ALU/Shifter goes to a C-bus, which loops back to the Register File. The diagram also shows a Program Counter (PC), Memory Address Register (MAR), Memory Data Register (MDR), and Instruction Register (IR) connected to an external Memory block. A central Controller coordinates multiplexers and clock signals.]
+SERIAL ADDER
+[Diagram Description: A single Full Adder block operating sequentially over time. Inputs 'Serial In' (A) and 'B' go to the Full Adder. The resulting 'Sum' is the 'Serial Out'. The 'Cout' goes into a D flip-flop, whose 'Q' output loops back into the 'Cin' of the Full Adder for the next clock cycle.]
+2'S COMPLEMENT SUBTRACTOR
+[Diagram Description: Block diagram showing an n-bit Full Adder configured for subtraction. Input A goes directly to the adder. Input B goes through a bank of NOT gates (inverters) before entering the adder (1's complement). The $C_{in}$ of the adder is permanently tied high (to 1), completing the 2's complement conversion of B. Output is A-B.]
+2-BIT MULTIPLIER
+[Diagram Description: Logic circuit for a 2-bit multiplier taking inputs A0, A1 and B0, B1. Four AND gates generate the partial products. These feed into a network of Half Adders to sum the products and produce the final outputs O0 to O3.]
+MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOAD Rdest, AddressE1
+
+E2
+
+E3
+MAR $\leftarrow$ PC
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+Via the bit mask
+
+
+No Mask
+STORE Rdest, AddressE1
+
+E2
+MAR $\leftarrow$ MDR; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+Via the bit mask
+
+Shifter (unchanged)
+JUMP AddressE1PC $\leftarrow$ MDRVia the bit maskCALL Rdest, AddressE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ MDR
+
+
+Via the bit mask
+INDIRECT MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOADINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+
+E4
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+
+
+
+No Mask
+STOREINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+
+via the shifter
+
+via the shifter
+JUMPINDIRECT RscrE1
+
+E2
+A $\leftarrow$ Rscr
+
+PC $\leftarrow$ A
+
+via the shifter
+CALLINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1; A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ A
+
+
+via the shifter
+TWO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathMOVE Rdest, RsrcE1
+
+E2
+A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (unchanged)
+ADD Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+
+ALU=A+B, Cin=0
+COMPARE Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+C $\leftarrow$ ALUcout
+
+
+ALU=A-B, Cin=0
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...16 (Rscr) | 15...0 (Unused)]
+COLUMN 4
+(Basic Logic Gates)
+NOT: [Diagram Description: Standard NOT gate symbol (triangle with a circle at the tip).]
+AND: [Diagram Description: Standard AND gate symbol (D-shape).]
+OR: [Diagram Description: Standard OR gate symbol (shield or arrowhead shape).]
+NOR: [Diagram Description: Standard NOR gate symbol (OR shape with a circle at the tip).]
+XOR: [Diagram Description: Standard XOR gate symbol (OR shape with a curved line at the input).]
+ONE-BIT STATIC RAM
+[Diagram Description: Circuit schematic for a 1-bit SRAM cell. An 'Address' line feeds a 'DECODER'. A 'Read' signal and a 'Clock' signal go into an AND gate. 'Data in' goes to the D input of a flip-flop, clocked by the Address/Clock AND gate. The Q output goes to an AND gate controlled by the 'Read' signal, which connects to the 'Data out' line.]
+RAM PHYSICAL LAYOUT
+[Diagram Description: Block diagram illustrating the grid structure of RAM. Address lines split into a 'Row Decoder' and a 'Column Decoder'. The grid intersections contain 'One bit' cells. Global 'Data Read' and 'Data Enable' lines connect to each cell.]
+COLUMN 5
+ARITHMETIC SHIFTS
+Left Shift with Carry: [Diagram Description: A register shifting bits to the left. The MSB shifts out into the Carry ('Cin') flag. A zero is shifted into the LSB.]
+Arithmetic Right Shift: [Diagram Description: A register shifting bits to the right. The LSB is discarded. The MSB (sign bit) is duplicated: it stays in its original position while also shifting right, preserving the sign of the number.]
+Rotate Right: [Diagram Description: A register shifting bits to the right. The LSB loops around and enters the MSB position.]
+TRI-STATE BUFFER
+If the control line, C, is set to 0 the output follows the input exactly.
+If C is set to 1 the output is neither zero nor one, but is effectively disconnected from the data line.
+[Diagram Description: Symbol for a tri-state buffer. An input D goes through a triangle symbol to an output. A control line C points to the top of the triangle. Adjacent is an equivalent logic diagram using an inverter and an open/close switch controlled by C.]
+FETCH CYCLE
+MAR $\leftarrow$ PC
+MDR $\leftarrow$ RAM[MAR], PC $\leftarrow$ PC+1
+IR $\leftarrow$ MDR
+COLUMN 6
+4-FUNCTION SHIFTER
+[Diagram Description: Block diagram of a shifter circuit. It uses multiplexers for each bit slice (I[0] to I[7]). Two control lines S1 and S0 select the operation. Multiplexers route the current bit, adjacent bits (for left/right shifts), or a 0/Cin based on the selected function.]
+STATIC VS DYNAMIC RAM
+SRAM: Reading is combinatorial but writing is sequential since the address and data must be present when the clock pulse sets the flip-flop.
+DRAM: Is sequential since they must complete their refresh cycle before reads/writes. Uses a capacitor and transistor for each bit.
+[Diagram Description: Simple schematic of a single DRAM cell showing a word line activating a transistor to access a storage capacitor connected to a bit line.]
+BIT MASK
+The memory reference instructions contain a memory address in the bottom 20 bits.
+The bit mask converts this unsigned 20 bit number to a 32 bit number by masking the top bits.
+[Diagram Description: Box diagram showing a 32-bit word. The top 12 bits (I20-I31) are tied to Ground (0). The bottom 20 bits (I0-I19) pass straight through to the output O0-O19. Outputs O20-O31 are forced to 0.]
+IMPROVEMENTS
+INSTRUCTION FORMATS:
+All instructions are 32 bit, but mostly the bottom 16 bits are empty.
+This means that we are wasting memory space and doing many more fetch cycles than we need.
+We could pack up the instructions on byte boundaries and introduce some multiplexing hardware to load the IR correctly.
+ARITHMETIC:
+We have three unused inputs on the multiplexer that selects the internal bus. Additional arithmetic hardware could include:
+A sixteen bit multiplier (multiply the bottom 16 bits of A and B to obtain a 32 bit result)
+An incrementer and decrementer
+DATA PATHS:
+Additional multiplexers could help us to reduce the instruction cycles of many instructions. For instance a multiplexer to select the input to B independently of A would reduce many three cycle instructions to two cycles.
+A data path from the registers to the internal bus would reduce some instructions by one cycle.
+This would require an additional input on the bus selector multiplexer, and so might be considered an alternative to the additional arithmetic functions already discussed.
+COMBINATORIAL CIRCUITS:
+We want to have the minimum time delays in all our combinational logic.
+This is partly a question of path length, but does require looking at low level transistor models to calculate the time accurately
+NO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathSKIPE1PC $\leftarrow$ PC+1
+[Instruction format diagram below: 31...24 (Opcode) | 23...0 (Unused)]  
+
+ONE REGISTER INSTRUCTIONS  
+InstructionCycleTransfersPathCLEAR RdestE1Rdest $\leftarrow$ ALUresALU = zero outINC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = zero out
+
+ALU=A+B, Cin=1
+DEC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = -1 out
+
+ALU=A+B, Cin=0
+COMP RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres
+
+ALU = -1 out
+
+ALU=A xor B
+ASL RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (Arithmetic left)
+RETURN RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+PC $\leftarrow$ Shifter
+
+Shifter (Unchanged)
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...0 (Unused)]  
+Here is the full transcription of the second cheat sheet, organized by columns from left to right. Diagram representations have been replaced with text descriptions, as requested.
+COLUMN 1
+ASYNC DIVIDE BY 5
+[Diagram Description: A circuit with three D flip-flops. The main clock ('clk') feeds into the first flip-flop. The Q output of the first flip-flop acts as the clock for the second, and the Q output of the second acts as the clock for the third. The inverted Q outputs of the first and third flip-flops feed into a NAND gate. The output of this NAND gate connects to the asynchronous 'Clear' input of all three flip-flops. The overall output, labeled '&c', is taken from the inverted Q of the final flip-flop.]
+4-to-1 MULTIPLEXER
+[Diagram Description: Logic circuit for a 4-to-1 MUX. Select lines S1 and S0 are passed through inverters to create both normal and inverted signals. Four 4-input AND gates take data inputs A, B, C, D respectively, along with the corresponding binary combination of S1 and S0. An 'Enable' signal provides the fourth input to all four AND gates. The outputs of these four AND gates feed into a single 4-input OR gate to produce the 'Out' signal.]
+8-to-1 MULTIPLEXER
+[Diagram Description: Block diagram showing two 4-to-1 multiplexers used to build an 8-to-1 MUX. The top MUX takes inputs A, B, C, D; the bottom takes E, F, G, H. Both share select lines S0 and S1. A third select line, S2, acts as the enable signal: it connects directly to the 'EN' port of the top MUX and goes through an inverter to the 'EN' port of the bottom MUX. The outputs of both 4-to-1 MUXes feed into an OR gate. The final output passes through an AND gate controlled by a master 'Enable' signal.]
+2-to-4 DEMULTIPLEXER
+[Diagram Description: Logic circuit for a 2-to-4 DEMUX. Select lines S1 and S0 are passed through inverters. Four 3-input AND gates produce outputs D00, D01, D10, D11 based on the four binary combinations of S1 and S0. A master 'Enable' signal feeds into the third input of all four AND gates.]
+3-to-8 DEMULTIPLEXER
+[Diagram Description: Block diagram showing two 2-to-4 demultiplexers used to build a 3-to-8 DEMUX. An 'Enable' signal feeds the common input data line. Select lines S0 and S1 are shared by both demultiplexers. Select line S2 determines which block is active: it connects directly to the enable of the bottom DEMUX and via an inverter to the top DEMUX. This yields outputs D000 through D111.]
+COLUMN 2
+FUNCTIONAL COMPARATOR
+[Diagram Description: A 1-bit comparator circuit taking inputs A and B. A and inverted B go to an AND gate to produce 'A>B'. Inverted A and normal B go to an AND gate to produce 'A<B'. A and B go to an XNOR gate to produce 'A=B'. A master 'Enable' signal gates the outputs.]
+SCALED UP COMPARATOR
+[Diagram Description: Block diagram of a cascaded multi-bit comparator. Individual 1-bit comparator blocks (A3-B3 down to A0-B0) are chained together. The 'A=B' equality output of a higher-order stage feeds into the 'Enable' (EN) input of the next lower-order stage. The 'A>B' and 'A<B' outputs from all active stages feed into respective OR gates to generate the final comparison result.]
+HALF-ADDER
+$CARRY = A \cdot B \quad SUM = A \oplus B$
+[Diagram Description: Logic circuit showing inputs A and B feeding into an AND gate to produce the Carry (C) and an XOR gate to produce the Sum (S).]
+FULL-ADDER
+$SUM = A \oplus B \oplus C$
+$C_{out} = C \cdot (A \oplus B) + A \cdot B$
+[Diagram Description: Logic circuit showing inputs Cin, A, and B. A and B go to an XOR gate and an AND gate. The output of the first XOR goes to a second XOR alongside Cin to produce the Sum (S). The output of the first XOR also goes to an AND gate with Cin. The outputs of the two AND gates go to an OR gate to produce Cout.]
+N-BIT ADDER
+[Diagram Description: A chain of Full Adder blocks. $C_{in}$ goes to the first block ($A_0, B_0$). The $C_{out}$ of each block feeds into the $C_{in}$ of the next block. Outputs are $S_0, S_1... S_{n-1}$ and a final $C_{out}$.]
+1-BIT FULL SUBTRACTOR UNIT
+$DIFFERENCE = A \oplus B \oplus P$
+$BORROW = B \cdot P + A' \cdot (B \oplus P)$
+[Diagram Description: Logic circuit for a full subtractor. Inputs A, B, and P (previous borrow). It is structurally similar to a full adder but includes inverters on specific A input paths to correctly calculate the borrow out.]
+4-BIT MULTIPLIER
+[Diagram Description: A block diagram demonstrating a 4x4 multiplier built from combinational logic. It utilizes a matrix of four '2 bit multiplier' blocks and three '4 bit Adder' blocks, arranged in a cascading tree to sum the partial products based on inputs A0-A3 and B0-B3, producing outputs O0-O7.]
+COLUMN 3
+(Top Large Diagram: CPU Datapath)
+[Diagram Description: A detailed schematic of a CPU datapath. It includes a Register File (R0-R7) connected via multiplexers to an A-bus and a B-bus. These buses feed into an ALU and a Shifter block. The output of the ALU/Shifter goes to a C-bus, which loops back to the Register File. The diagram also shows a Program Counter (PC), Memory Address Register (MAR), Memory Data Register (MDR), and Instruction Register (IR) connected to an external Memory block. A central Controller coordinates multiplexers and clock signals.]
+SERIAL ADDER
+[Diagram Description: A single Full Adder block operating sequentially over time. Inputs 'Serial In' (A) and 'B' go to the Full Adder. The resulting 'Sum' is the 'Serial Out'. The 'Cout' goes into a D flip-flop, whose 'Q' output loops back into the 'Cin' of the Full Adder for the next clock cycle.]
+2'S COMPLEMENT SUBTRACTOR
+[Diagram Description: Block diagram showing an n-bit Full Adder configured for subtraction. Input A goes directly to the adder. Input B goes through a bank of NOT gates (inverters) before entering the adder (1's complement). The $C_{in}$ of the adder is permanently tied high (to 1), completing the 2's complement conversion of B. Output is A-B.]
+2-BIT MULTIPLIER
+[Diagram Description: Logic circuit for a 2-bit multiplier taking inputs A0, A1 and B0, B1. Four AND gates generate the partial products. These feed into a network of Half Adders to sum the products and produce the final outputs O0 to O3.]
+MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOAD Rdest, AddressE1
+
+E2
+
+E3
+MAR $\leftarrow$ PC
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+Via the bit mask
+
+
+No Mask
+STORE Rdest, AddressE1
+
+E2
+MAR $\leftarrow$ MDR; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+Via the bit mask
+
+Shifter (unchanged)
+JUMP AddressE1PC $\leftarrow$ MDRVia the bit maskCALL Rdest, AddressE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ MDR
+
+
+Via the bit mask
+INDIRECT MEMORY REFERENCE INSTRUCTIONS
+InstructionCycleTransfersPathLOADINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+
+E4
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A
+
+MDR $\leftarrow$ Memory
+
+Rdest $\leftarrow$ MDR
+
+
+
+No Mask
+STOREINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+MAR $\leftarrow$ A; A $\leftarrow$ Rdest
+
+Memory $\leftarrow$ A
+
+via the shifter
+
+via the shifter
+JUMPINDIRECT RscrE1
+
+E2
+A $\leftarrow$ Rscr
+
+PC $\leftarrow$ A
+
+via the shifter
+CALLINDIRECT Rdest, RscrE1
+
+E2
+
+E3
+PC $\leftarrow$ PC+1; A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ PC
+
+PC $\leftarrow$ A
+
+
+via the shifter
+TWO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathMOVE Rdest, RsrcE1
+
+E2
+A $\leftarrow$ Rscr
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (unchanged)
+ADD Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+
+ALU=A+B, Cin=0
+COMPARE Rdest, RsrcE1
+
+E2
+
+E3
+A $\leftarrow$ Rscr
+
+B $\leftarrow$ Rdest
+
+C $\leftarrow$ ALUcout
+
+
+ALU=A-B, Cin=0
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...16 (Rscr) | 15...0 (Unused)]
+COLUMN 4
+(Basic Logic Gates)
+NOT: [Diagram Description: Standard NOT gate symbol (triangle with a circle at the tip).]
+AND: [Diagram Description: Standard AND gate symbol (D-shape).]
+OR: [Diagram Description: Standard OR gate symbol (shield or arrowhead shape).]
+NOR: [Diagram Description: Standard NOR gate symbol (OR shape with a circle at the tip).]
+XOR: [Diagram Description: Standard XOR gate symbol (OR shape with a curved line at the input).]
+ONE-BIT STATIC RAM
+[Diagram Description: Circuit schematic for a 1-bit SRAM cell. An 'Address' line feeds a 'DECODER'. A 'Read' signal and a 'Clock' signal go into an AND gate. 'Data in' goes to the D input of a flip-flop, clocked by the Address/Clock AND gate. The Q output goes to an AND gate controlled by the 'Read' signal, which connects to the 'Data out' line.]
+RAM PHYSICAL LAYOUT
+[Diagram Description: Block diagram illustrating the grid structure of RAM. Address lines split into a 'Row Decoder' and a 'Column Decoder'. The grid intersections contain 'One bit' cells. Global 'Data Read' and 'Data Enable' lines connect to each cell.]
+COLUMN 5
+ARITHMETIC SHIFTS
+Left Shift with Carry: [Diagram Description: A register shifting bits to the left. The MSB shifts out into the Carry ('Cin') flag. A zero is shifted into the LSB.]
+Arithmetic Right Shift: [Diagram Description: A register shifting bits to the right. The LSB is discarded. The MSB (sign bit) is duplicated: it stays in its original position while also shifting right, preserving the sign of the number.]
+Rotate Right: [Diagram Description: A register shifting bits to the right. The LSB loops around and enters the MSB position.]
+TRI-STATE BUFFER
+If the control line, C, is set to 0 the output follows the input exactly.
+If C is set to 1 the output is neither zero nor one, but is effectively disconnected from the data line.
+[Diagram Description: Symbol for a tri-state buffer. An input D goes through a triangle symbol to an output. A control line C points to the top of the triangle. Adjacent is an equivalent logic diagram using an inverter and an open/close switch controlled by C.]
+FETCH CYCLE
+MAR $\leftarrow$ PC
+MDR $\leftarrow$ RAM[MAR], PC $\leftarrow$ PC+1
+IR $\leftarrow$ MDR
+COLUMN 6
+4-FUNCTION SHIFTER
+[Diagram Description: Block diagram of a shifter circuit. It uses multiplexers for each bit slice (I[0] to I[7]). Two control lines S1 and S0 select the operation. Multiplexers route the current bit, adjacent bits (for left/right shifts), or a 0/Cin based on the selected function.]
+STATIC VS DYNAMIC RAM
+SRAM: Reading is combinatorial but writing is sequential since the address and data must be present when the clock pulse sets the flip-flop.
+DRAM: Is sequential since they must complete their refresh cycle before reads/writes. Uses a capacitor and transistor for each bit.
+[Diagram Description: Simple schematic of a single DRAM cell showing a word line activating a transistor to access a storage capacitor connected to a bit line.]
+BIT MASK
+The memory reference instructions contain a memory address in the bottom 20 bits.
+The bit mask converts this unsigned 20 bit number to a 32 bit number by masking the top bits.
+[Diagram Description: Box diagram showing a 32-bit word. The top 12 bits (I20-I31) are tied to Ground (0). The bottom 20 bits (I0-I19) pass straight through to the output O0-O19. Outputs O20-O31 are forced to 0.]
+IMPROVEMENTS
+INSTRUCTION FORMATS:
+All instructions are 32 bit, but mostly the bottom 16 bits are empty.
+This means that we are wasting memory space and doing many more fetch cycles than we need.
+We could pack up the instructions on byte boundaries and introduce some multiplexing hardware to load the IR correctly.
+ARITHMETIC:
+We have three unused inputs on the multiplexer that selects the internal bus. Additional arithmetic hardware could include:
+A sixteen bit multiplier (multiply the bottom 16 bits of A and B to obtain a 32 bit result)
+An incrementer and decrementer
+DATA PATHS:
+Additional multiplexers could help us to reduce the instruction cycles of many instructions. For instance a multiplexer to select the input to B independently of A would reduce many three cycle instructions to two cycles.
+A data path from the registers to the internal bus would reduce some instructions by one cycle.
+This would require an additional input on the bus selector multiplexer, and so might be considered an alternative to the additional arithmetic functions already discussed.
+COMBINATORIAL CIRCUITS:
+We want to have the minimum time delays in all our combinational logic.
+This is partly a question of path length, but does require looking at low level transistor models to calculate the time accurately
+NO REGISTER INSTRUCTIONS
+InstructionCycleTransfersPathSKIPE1PC $\leftarrow$ PC+1
+[Instruction format diagram below: 31...24 (Opcode) | 23...0 (Unused)]  
+
+ONE REGISTER INSTRUCTIONS  
+InstructionCycleTransfersPathCLEAR RdestE1Rdest $\leftarrow$ ALUresALU = zero outINC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = zero out
+
+ALU=A+B, Cin=1
+DEC RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres; C $\leftarrow$ ALUcout
+
+ALU = -1 out
+
+ALU=A+B, Cin=0
+COMP RdestE1
+
+E2
+
+E3
+A $\leftarrow$ Rdest
+
+B $\leftarrow$ ALUres
+
+Rdest $\leftarrow$ ALUres
+
+ALU = -1 out
+
+ALU=A xor B
+ASL RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+Rdest $\leftarrow$ Shifter
+
+Shifter (Arithmetic left)
+RETURN RdestE1
+
+E2
+A $\leftarrow$ Rdest
+
+PC $\leftarrow$ Shifter
+
+Shifter (Unchanged)
+[Instruction format diagram below: 31...24 (Opcode) | 23...20 (Rdest) | 19...0 (Unused)]  
+Here is the full transcription of the cheat sheet, organized by columns from left to right. Diagram representations have been replaced with descriptive text as requested.
+COLUMN 1
+INTEGER REPRESENTATION
+In any representation, desirable properties are:
+Only one bit-pattern per value
+Equal number of positive and negative values
+Maximum range of values
+No gaps in the range
+Fast, economic hardware implementation of integer arithmetic
+Minimal number of transistors AND fast arithmetic, if possible
+SIGN AND MAGNITUDE
+Leftmost ("most significant") bit represents the sign of the integer
+Remaining bits to represent its magnitude
+For n-bits, $-(2^{n-1}-1) \leq \text{Sign & Magnitude} \leq +(2^{n-1}-1)$
+Simplest for humans to understand
+Two representations for zero: +0 and -0
+Costly to implement (need to compare signs and implement subtractors)
+ONE'S COMPLEMENT
+Negative numbers are the complement of the positive numbers
+$-(2^{n-1}-1) \leq \text{One's Complement} \leq +(2^{n-1}-1)$
+Less intuitive (for humans) than Sign & Magnitude
+Less costly to implement but a bit fiddly
+TWO'S COMPLEMENT
+Negative of an integer is achieved by inverting each of the bits and adding 1 to it.
+$-2^{n-1} \leq \text{Two's Complement} \leq 2^{n-1}-1$
+Most useful property: X – Y = X + (-Y)
+EXCESS-N (BIAS-N) REPRESENTATION
+Sorting Two's complement values is tricky — negatives appear greater than positives.
+Add a fixed bias (n) to the actual number. Ensures binary values sort naturally.
+In 3-bit excess-4: $000 = -4$, $111 = +3$
+BINARY CODED DECIMAL (BCD)
+Each decimal digit is represented by a fixed number of bits, usually four or eight
+Easy for humans to understand
+Takes up much more space
+Bit Pattern Table:
+Bit Pattern0000000100100011010001010110011110001001101010111100110111101111Unsigned0123456789101112131415Sign & Magnitude+0+1+2+3+4+5+6+7-0-1-2-3-4-5-6-71s Complement+0+1+2+3+4+5+6+7-7-6-5-4-3-2-1-02s Complement+0+1+2+3+4+5+6+7-8-7-6-5-4-3-2-1Excess-8-8-7-6-5-4-3-2-101234567BCD0123456789------
+SIGNED ARITHMETIC OVERFLOWS
+ADDITION: Occurs if and only if 2 Two's Complement numbers are added and they both have the same sign (both positive or both negative) and the result has the opposite sign
+SUBTRACTION: Occurs if and only if 2 Two's Complement numbers are subtracted, and their signs are different, and the result has the same sign as the subtrahend (the first one)
+FLOATING POINT
+$M \times 2^E$
+M is the coefficient (aka, significand, fraction or mantissa)
+E is the exponent (aka, characteristic)
+No. of bits in exponent determines the range (big/smallness)
+No. of bits in coefficient determines the precision (exactness)
+ZONES OF EXPRESSIBILITY
+Assume numbers are formed with a signed 3-digit coefficient and a signed 2-digit exponent:
+[Diagram Description: A number line showing regions of expressibility. From left to right: Negative overflow ($< -999 \times 10^{99}$), Negative expressible numbers, Negative underflow (between $-001 \times 10^{-99}$ and 0), Positive underflow (between 0 and $+001 \times 10^{-99}$), Positive expressible numbers, Positive overflow ($> +999 \times 10^{99}$).]
+IEEE FLOATING POINT STANDARD - SINGLE PRECISION
+Coefficient is called the significand in the IEEE standard
+Value represented is $+/- 1.F \times 2^{(E-127)}$
+The normal bit (the 1.) is omitted from the significand field $\rightarrow$ a hidden bit
+Single precision yields 24 bits (approx. 7 decimal digits of precision)
+[Diagram Description: A 32-bit block divided into three sections: Sign S (1 bit), Exponent E (8 bits), and Significand F (23 bits).]
+DOUBLE PRECISION FORMAT (64-bit)
+Value represented is $+/- 1.F \times 2^{(E-1023)}$
+Double precision yields 53 bits (approx. 16 decimal digits of precision)
+Single precision generally reserved for when memory is scarce or for debugging numerical calculations since rounding errors show up more quickly
+[Diagram Description: A 64-bit block divided into three sections: Sign S (1 bit), Exponent E (11 bits), and Significand F (52 bits).]
+COLUMN 2
+ALGEBRAIC MANIPULATION
+$A \cdot 0 = 0$
+$A \cdot 1 = A$
+$A \cdot A = A$
+$A \cdot \overline{A} = 0$
+$\overline{\overline{A}} = A$
+$A + 0 = A$
+$A + 1 = 1$
+$A + A = A$
+$A + \overline{A} = 1$
+Idempotent:
+$A \cdot A = A$
+$A + A = A$
+Associative:
+$(A \cdot B) \cdot C = A \cdot (B \cdot C)$
+$(A+B)+C = A+(B+C)$
+Commutative:
+$A \cdot B = B \cdot A$
+$A+B = B+A$
+Distributive:
+$A \cdot (B+C) = A \cdot B + A \cdot C$
+$A+(B \cdot C) = (A+B) \cdot (A+C)$
+De Morgan's:
+$\overline{(A \cdot B)} = \overline{A} + \overline{B}$
+$\overline{(A+B)} = \overline{A} \cdot \overline{B}$
+COMBINATORIAL CIRCUITS
+Combinatorial circuits are those in which variables on the RHS of the Boolean equations do not appear on the LHS
+CANONICAL FORMS
+A canonical form is a standard way of writing an equation: a shape or form of equation.
+CANONICAL MINTERM FORM
+$R = \overline{A} \cdot \overline{B} \cdot C + A \cdot \overline{B} \cdot \overline{C} + \overline{A} \cdot B \cdot C$
+CANONICAL MAXTERM FORM
+$R = (A+B+C) \cdot (\overline{A}+B+C) \cdot (A+\overline{B}+\overline{C})$
+MINIMISING CIRCUIT SIZE
+GateNominal SizeINVERTER3NAND, NOR4AND, OR6XOR, XNOR8
+TESTING THE FINAL DESIGN
+Unfortunately debugging hardware is difficult. The final circuit may not implement the original specification for a few - difficult to identify - inputs.
+SYSTEMATIC TESTING
+Feed a large range of inputs to the circuit and observe its behaviour.
+This is done using simulation before manufacture, and after manufacture with real tests.
+The problem is that there are too many possible input combinations to test a large circuit exhaustively. Thus is is not feasible to identify all bugs.
+FORMAL TECHNIQUES
+This approach aims to verify the chip at design stage (before silicon).
+Abstraction, simulation equivalence, and bounded model checking are used extensively to identify bugs.
+However, it's very hard to reason about all possible behaviours because of the very large state spaces.
+QUASI-PHYSICAL MODELS
+[Diagram Description: Switch and Delay model. A basic inverter circuit showing a switch connected to $V_{out}$, with internal node capacitance represented. To its right are idealized step waveforms showing $V_{in}$ instantly changing, and $V_{out}$ changing inversely but with a noticeable delay ($t_{delay}$) between the ideal switch point and the actual voltage change.]
+Text: This model only really differs from Boolean algebra by the inclusion of a time delay between input (left hand side) and output (right hand side). Its time behaviour is described by the following example:
+[Diagram Description: Resistance and Capacitance model. An inverter circuit showing $R_{source}$ and an RC node representing $R_{load}$ and $C_{load}$ before $V_{out}$. The corresponding waveforms show $V_{in}$ changing as an ideal step, while $V_{out}$ changes with a curved RC charging/discharging profile, gradually reaching the final state instead of an instant step or linear slope.]
+Text: This gives us a more accurate representation of the real behaviour. We no longer have a valid Boolean signal output when changing from 0 to 1 and back.
+NOISE MARGIN
+The variable resistance/capacitance model is not digital but analogue. The variable resistor can be adjusted continuously.
+The noise margin gives us a definite threshold (1.7volts) above which we know that our signal represents a Boolean 1, and similarly a definite threshold (0.5Volts) below which we know our signal represents Boolean 0.
+[Diagram Description: A waveform graph of Voltage (0.5V to 1.7V on Y axis) vs Time. A signal curve drops below 1.7V into an "Indeterminate" region, briefly fluctuates, and then drops below 0.5V to the "Logic-0" region. The region above 1.7V is marked "Logic-1".]
+COLUMN 3
+POTENTIAL DIVIDERS
+[Diagram Description: Two circuit diagrams side by side. The first shows an input voltage (5v) connected across a series combination of $R_{source}$ and a general load. The second shows a more specific potential divider with $R_{source}$ and $R_t$ (total load resistance) in series. $V_{out}$ is tapped between them.]  
+
+$\frac{1}{R_t} = \frac{1}{R_{load}} + \frac{1}{R_{load}}$
+$V_{out} = \frac{5 R_t}{R_{source} + R_t}$
+FAN OUT  
+The fan-out of a gate is the number of different gate inputs to which it is connected. If a transistor is connected to $n$ gates, the circuit becomes:
+[Diagram Description: Circuit showing a 5V source dropping over $R_{source}$ to node $V_{out}$. From $V_{out}$, parallel branches connect to Gate 1 ($R_1$), Gate 2 ($R_2$), Gate 3 ($R_3$), up to Gate n ($R_n$).]
+$\frac{1}{R_t} = \frac{1}{R_1} + \frac{1}{R_2} + \frac{1}{R_3} ... + \frac{1}{R_n}$
+Fan-Out $\rightarrow$ Decreases Operating Voltage
+Fan-Out $\rightarrow$ Increases Delay
+Another undesirable property of large fan-outs is that the time delay increases because the load capacitor increases.
+Time delay is directly proportional to the size of the load capacitor. Capacitors in parallel add.
+CIRCUITS WITH FEEDBACK
+[Diagram Description: A simple logic gate setup showing a variable 'A' feeding into a logic block which feeds 'B', with a feedback loop returning to the input side.]
+Transition Table
+NOW (AR)NEXT (AR)0 00 10 10 11 01 11 11 0
+Transition Diagram
+[Diagram Description: A state machine diagram with four states: 00, 01, 10, 11. State 00 transitions to 01. State 01 transitions to itself (marked "Stable"). State 11 transitions to 10. State 10 transitions to 11 (marked "Stable").]  
+
+R-S FLIP FLOP
+[Diagram Description: Circuit schematic of an R-S Flip Flop built with two cross-coupled NOR gates. Input S goes to the top NOR gate (output P), and input R goes to the bottom NOR gate (output Q). P feeds back into the bottom gate, and Q feeds back into the top gate.]  
+
+SRP_tQ_tP_{t+1}Q_{t+1}State110011Unstable110101Stable111010Stable111100Unstable
+UNCERTAINTY AT START UP
+Logic Level
+[Diagram Description: Three waveform graphs showing S, R, and Q over time. S and R start high and go low. Q starts in an unknown state (marked with a question mark), and the text "Spikes present in t are blocked from reaching g" applies here. Q eventually settles based on S and R inputs.]
+TYPES OF CIRCUITS
+Combinatorial: output is a combination of only inputs
+Sequential: output is a combination of inputs and previous outputs (we need a transition table or state diagram, it needs some notion of time)
+Asynchronous: output will have correct value after an undefined amount of time
+Synchronous: output will have correct value after a defined amount of time (a clock signal tells us time)
+D-TYPE LATCH
+We want to extend the R-S flip-flop such that:
+D = 0 $\rightarrow$ S = 0, R = 1
+D = 1 $\rightarrow$ S = 1, R = 0
+[Diagram Description: Two circuit diagrams. The first shows how to create a D-Latch using an R-S flip flop. Input D splits: one path goes to an AND gate for S, the other goes through an inverter to an AND gate for R. A "Latch" (enable) signal acts as the second input to both AND gates. The second diagram is a standard block symbol for a D-Latch with inputs D and Latch, and outputs Q and $\overline{Q}$.]
+The value that is held on the Q output of a D-Type latch is the value of D at the instant at which the latch goes from 1 to 0.
+When the latch is at 1, any change on D causes a change of Q.
+COLUMN 4
+EDGE TRIGGERING
+[Diagram Description: A clock waveform showing downward edges labeled. A corresponding logic diagram shows input D and Clock passing through an edge-triggered D flip flop, with output Q and $\overline{Q}$. Binary sequences 00011100, 10110110, 11100011, 00010111, 00000011 are shown above and below the logic paths, illustrating bit transfer.]
+Each event in a sequence starts with a downward edge of a clock.
+J-K FLIP FLOP
+[Diagram Description: State transition diagram for a J-K flip flop. States are Q=0 and Q=1. Transitions indicate conditions for J and K. Underneath is a truth table:]
+JKFunctionOutput Q(t+1)00No ChangeQ(t)01Reset010Set111Toggle$\overline{Q(t)}$
+GENERAL FORM OF SYNCHRONOUS DIGITAL CIRCUIT
+[Diagram Description: Block diagram showing "Inputs" entering "State Sequencing Logic" (combinatorial). This feeds into a block of registers/flip-flops clocked by a "Clock" signal. The current state loops back as an input to the State Sequencing Logic. The state also feeds into "Output Logic" to produce "Outputs".]
+DEALING WITH UNKNOWN STATE TRANSITIONS
+Design a safe circuit: We can specify the unknown state transitions ourselves to ensure that the circuit operates correctly.
+Design the smallest possible circuit: We treat all unknown states and transitions as "don't cares" in order to have a good chance of getting the smallest possible design. However we then must check that the final circuit works correctly in all instances.
+MEALEY MACHINE
+The most general form of the finite state machine is called the Mealey machine.
+[Diagram Description: Block diagram where "Inputs" (I) feed into combinatorial logic block "f" alongside the output of the state register "D-Q". The output of "f" updates the register. The "Inputs" (I) and the state register output both feed into another combinatorial logic block "g" to produce the output (O).]
+MOORE MACHINE
+A simpler model - called the Moore machine - without the connection between the input (I) and the output logic (g) is often preferred as it provides safer (more robust) design.
+[Diagram Description: Block diagram where "Inputs" (I) feed into combinatorial logic block "f" alongside the output of the state register "D-Q". The output of "f" updates the register. Only the state register output feeds into the output logic block "g" to produce the output (O). Inputs do not connect directly to "g".]
+Spikes present in I are blocked from reaching g.
+HEURISTICS FOR STATE ALLOCATIONS
+First, all those states that have the same next state for the same input should be given adjacent state assignments.
+Second, the next states of a state produced by applying adjacent input conditions should be given adjacent state assignments.
+Third, maximise the number of 1s in the Karnaugh maps.
+4-BIT SERIAL TO PARALLEL CONVERTER
+[Diagram Description: A series of four D flip-flops chained together. Serial input goes into the first D input. Each Q output goes to the D input of the next flip flop. A common Clock signal connects to all flip flops. The Q outputs of all four flip flops serve as parallel outputs b3, b2, b1, b0. Below the circuit are idealized clock and serial data waveforms.]
+COLUMN 5
+PARALLEL TO SERIAL CONVERTER
+[Diagram Description: Four D flip-flops arranged in a chain. There are parallel inputs b3, b2, b1, b0. Each stage has a multiplexer that selects between the parallel input or the output from the previous flip-flop, controlled by a "Parallel In" signal. The output of the final flip-flop is the "Serial out". A common Clock connects to all flip-flops.]
+MULTIPLEXER
+Control=0: Output follows A
+Control=1: Output follows B
+[Diagram Description: Logic diagram of a 2-to-1 multiplexer. Input A and inverted Control go to an AND gate. Input B and Control go to another AND gate. The outputs of both AND gates go into an OR gate to produce the Output.]
+4-BIT SHIFT REGISTER
+[Diagram Description: Block diagram showing four D flip-flops (D3, D2, D1, D0). Serial In goes through a multiplexer into D3. Each subsequent flip flop receives input from the previous one via multiplexers. The multiplexers are controlled by a "Load/Shift" line. Parallel Inputs (PI 3, PI 2, PI 1, PI 0) can be loaded into the flip flops. Parallel Outputs (PO 3, PO 2, PO 1, PO 0) and a Serial Out are produced.]
+BINARY TO UNARY DECODER
+[Diagram Description: Logic diagram taking two binary inputs B1, B0. They are passed through inverters to provide both normal and inverted signals. These feed into four AND gates to produce four unary outputs: U3, U2, U1, U0, corresponding to the four possible states of the 2-bit input.]
+FOUR-WAY MULTIPLEXER
+[Diagram Description: Logic diagram showing four data inputs (A, B, C, D) and two control inputs (B1, B0). A "Binary to Unary Converter" block decodes B1, B0 into four selection lines (U3, U2, U1, U0). Each selection line and one data input feed into an AND gate (four AND gates total). The outputs of all four AND gates feed into a single OR gate to produce the Output.]
+CLOCK DIVIDER
+Synchronous divide by 2 is done as follows:
+[Diagram Description: A D flip flop where the inverted output ($\overline{Q}$) is fed back directly into its own D input. The Clock signal drives the flip-flop. Waveforms to the right show the high-frequency Clock and the resulting Q output, which toggles at exactly half the frequency.]
+RIPPLE THROUGH COUNTER
+[Diagram Description: Three D flip-flops connected in sequence. The inverted output ($\overline{Q}$) of each flip-flop connects to its own D input (divide-by-2 configuration). The regular Q output of the first flip flop acts as the clock for the second. The Q output of the second acts as the clock for the third. A main clock (clk) drives the first flip flop. Outputs b0, b1, and b2 are taken from the Q outputs.]
