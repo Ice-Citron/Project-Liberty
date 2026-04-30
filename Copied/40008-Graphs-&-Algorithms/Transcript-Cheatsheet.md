@@ -311,148 +311,201 @@ Suppose that $G$ has an HP $x_1, \dots, x_n$. Then $f(G)$ has an HP $y, x, x_1, 
 
 
 
----
+# SJFS
 
-### **Left Column: Searching and Orders**
 
-**SEARCHING A LIST**
-*   **Searching an unordered list L:** For x: if x in L return k such that L[k] = x; if x not in L return "not found"
-*   **Linear Search:** Inspect L[0], L[1], ..., L[n - 1] in turn. Stop and return index if x found. Otherwise return "not found". **W(n) = n**
+Here is a detailed transcription of the content in the image, organized by its major sections. Descriptions of the diagrams have been provided where applicable.
+
+### SEARCHING A LIST
+*   **Searching an unordered list L:** For $x$: if $x$ in $L$ return $k$ such that $L[k] = x$; if $x$ not in $L$ return "not found".
+*   **Linear Search:** Inspect $L[0], L[1], \dots, L[n - 1]$ in turn. Stop and return index if $x$ found. Otherwise return "not found". $W(n) = n$
 *   **Searching an ordered list L**
-*   **Modified Linear Search (left):** decision tree for n=4; **W(n) = n**
-    *   *Diagram Description (Modified Linear Search):* A skewed decision tree where each right branch compares a target $x$ against elements $L[0]$, $L[1]$, etc. Each left branch immediately terminates in a "fail" node. Below the tree, it notes: W(4) = 4 (look at depth of tree).
-*   **Binary Search (right):** decision tree for n=8; **$W(n) = 1 + \lfloor \log n \rfloor$**
-    *   *Diagram Description (Binary Search):* A perfectly balanced binary decision tree. The root compares $x < L[3]$. Left and right paths lead to further comparisons, eventually terminating at leaf nodes representing indices 0 through 7, plus a few "fail" states. Below the tree, it notes: W(8) = 4 (e.g. when x = L[7]).
+    *   **Modified Linear Search (left):** decision tree for $n=4$; $W(n) = n$
+    *   **Binary Search (right):** decision tree for $n=8$; $W(n) = 1 + \lfloor \log n \rfloor$
 
-**ORDERS**
-*   **Hierarchy of Orders:**
-    1. Polynomials + Logs: $1, \log n, n, n \log n, n^2, n^2 \log n, \dots$
-    2. Exponentials: $2^n, 3^n, 4^n \dots$
-    3. Factorials: $n!$
-*   Let $f, g : \mathbb{N} \rightarrow \mathbb{R}^+$
-    1. $f$ is $O(g)$ iff $\exists m \in \mathbb{N}$ $\exists c \in \mathbb{R}^+$ such that $\forall n \ge m \quad f(n) \le c . g(n)$
-    2. $f$ is $\Theta(g)$ iff $f$ is $O(g)$ and $g$ is $O(f)$.
-
-**Orders Example Problem:** Let $f(n) = 6n^2 - n + 5$, and $g(n) = n^2/4 + 13n - 2$. Show that $g \in O(f)$, $f \in O(g)$.
-*   Clearly $13n \le n^2$ for $n \ge 13$.
-*   Hence $g(n) = \frac{n^2}{4} + 13n - 2 \le \frac{n^2}{4} + n^2 = \frac{5n^2}{4}$ for $n \ge 13$.
-*   Also, $f(n) = 6n^2 - n + 5 \ge 5n^2$ for $n \ge 1$.
-*   Thus, for $n \ge 13$, $g(n) \le \frac{5}{4}n^2 \le 5n^2 \le f(n)$ so $g \in O(f)$.
-*   Now, $-n + 5 \le 5$ for all $n \ge 0$, so $f(n) \le 6n^2 + 5 \le 7n^2$ for $n \ge 2$.
-*   Also, $g(n) \ge \frac{n^2}{4}$ for $n \ge 1$.
-*   Thus, for $n \ge 2$, $7n^2 \le 28g(n) \implies f(n) \le 28g(n)$ so $f \in O(g)$.
-
-**Recurrence:** Solve the following recurrence relation: $F(1) = 5$; $F(n) = 3 + F(\lfloor n/2 \rfloor)$
-*   $F(n) = 3 + F(\lfloor n/2 \rfloor)$
-*   $= 3 + 3 + F(\lfloor n/4 \rfloor)$
-*   $\dots$
-*   $= 3 + 3 + \dots + 3 + F(1)$
-*   $= 3\lfloor \log(n) \rfloor + 5$
+> **Diagram Description (Binary Search Decision Tree):**
+> A binary tree mapping the steps of a binary search for $n=8$. The root node compares the target $x$ with $L[3]$. 
+> *   The left branch ($x < L[3]$) leads to a node checking $x$ against $L[1]$, which further splits into comparing against $L[0]$ or $L[2]$.
+> *   The right branch ($x > L[3]$) leads to a node checking $x$ against $L[5]$, splitting into $L[4]$ and $L[6]$, with $L[6]$ further splitting to $L[7]$. 
+> 
+> The leaf nodes represent either finding the value at an index (e.g., $x=L[0]$) or a "fail" state. Below the tree, it notes $W(4) = 4$ (look at depth of tree) and $W(8) = 4$ (e.g., when $x = L[7]$).
 
 ---
 
-### **Middle Column: Strassen's Algorithm and Lower Bounds**
+### ORDERS
+**Hierarchy of Orders:**
+1. **Polynomials + Logs:** $1, \log n, n, n \log n, n^2, n^2 \log n, \dots$
+2. **Exponentials:** $2^n, 3^n, 4^n \dots$
+3. **Factorials:** $n!$
 
-**STRASSEN'S ALGORITHM**
-*   Assume we are multiplying two $n \times n$ matrices: $AB = C$
-*   Start with $n = 2$.
-*   Then $$C = \begin{pmatrix} a_{11}b_{11} + a_{12}b_{21} & a_{11}b_{12} + a_{12}b_{22} \\ a_{21}b_{11} + a_{22}b_{21} & a_{21}b_{12} + a_{22}b_{22} \end{pmatrix}$$
-*   This takes 8 multiplications (and 4 additions).
-*   Strassen: can do $n = 2$ in only 7 multiplications (and 18 additions).
-*   $$C = \begin{pmatrix} x_1 + x_4 - x_5 + x_7 & x_3 + x_5 \\ x_2 + x_4 & x_1 + x_3 - x_2 + x_6 \end{pmatrix}$$
-*   where:
-    *   $x_1 = (a_{11} + a_{22}) * (b_{11} + b_{22})$
-    *   $x_2 = (a_{21} + a_{22}) * b_{11}$
-    *   $x_3 = a_{11} * (b_{12} - b_{22})$
-    *   $x_4 = a_{22} * (b_{21} - b_{11})$
-    *   $x_5 = (a_{11} + a_{12}) * b_{22}$
-    *   $x_6 = (a_{21} - a_{11}) * (b_{11} + b_{12})$
-    *   $x_7 = (a_{12} - a_{22}) * (b_{21} + b_{22})$
-*   Note that commutativity of multiplication is not used. Hence we can generalise to matrices.
-*   Suppose that $n = 2^k$. Divide up matrices into four quadrants each $n/2 \times n/2$:
-    $$\begin{pmatrix} A_{11} & A_{12} \\ A_{21} & A_{22} \end{pmatrix} \begin{pmatrix} B_{11} & B_{12} \\ B_{21} & B_{22} \end{pmatrix} = \begin{pmatrix} C_{11} & C_{12} \\ C_{21} & C_{22} \end{pmatrix}$$
-*   Compute $C_{ij}$ using the formulas for $c_{ij}$. Recursively compute each multiplication by further subdivision until bottom out at $n = 2$.
-*   **Strassen's algorithm:** splits matrices into $n/2 \times n/2$ blocks, does 7 recursive multiplications and 18 additions/subtractions. The recurrence is $A(1) = 1; A(n) = 7A(n/2) + 18(n/2)^2$, solving to $O(n^{\log 7}) \approx O(n^{2.807})$. If n isn't a power of 2, pad with zeros to make it even.
+Let $f, g : \mathbb{N} \to \mathbb{R}^+$
+1. $f$ is $O(g)$ iff $\exists m \in \mathbb{N} \ \exists c \in \mathbb{R}^+$ such that $\forall n \ge m \ f(n) \le c.g(n)$
+2. $f$ is $\Theta(g)$ iff $f$ is $O(g)$ and $g$ is $O(f)$.
 
-**LOWER BOUNDS**
-*   Idea: express sorting algorithm as decision tree.
-*   The **internal** nodes are the comparisons.
-*   The **leaves** are the results (the rearranged lists).
-*   *Diagram Description (Generic Decision Tree):* A small visual showing a single "internal" node splitting into two paths that lead to two terminal "leaf" nodes.
-*   We then argue that to have a certain number of leaves, the tree must have sufficient depth.
-*   Depth = worst-case number of comparisons
-*   For example: 3-Sort Algorithm. For the root node, if item 1 is smaller than item 2, go down left path, otherwise go down right path. Then compare item 2 and 3.
-*   *Diagram Description (3-Sort Decision Tree):* A binary tree mapping all permutations of sorting 3 items. The root compares elements 1 and 2. The subsequent layers compare 2 and 3, or 1 and 3. The bottom layer consists of 6 leaf nodes containing all final sorted permutations (e.g., [1,2,3], [1,3,2], [3,1,2] etc.).
-*   **If a binary tree has depth d then it has $\le 2^d$ leaves.**
-*   Any decision tree for sorting a list of length 3 must have $3! = 6$ leaves. Cannot have depth $\le 2$, as all binary trees of depth $\le 2$ have $\le 4$ leaves. So depth at least 3. Worst-case number of comparisons at least 3. Hence 3-Sort (and Insertion Sort) are optimal for $n = 3$.
-*   Decision tree has $\ge n!$ leaves and depth d.
-*   So $2^d \ge n! \implies d \ge \log(n!) \implies d \ge \lceil \log(n!) \rceil$
-*   **Lower bound for sorting in worst case:** Any algorithm for sorting by comparisons must perform at least $\lceil \log(n!) \rceil$ comparisons in worst case.
+**Orders Example:** Let $f(n) = 6n^2 - n + 5$, and $g(n) = n^2/4 + 13n - 2$.
+Show that $g \in O(f), f \in O(g)$.
+Clearly $13n \le n^2$ for $n \ge 13$.
+Hence 
+$$g(n) = \frac{n^2}{4} + 13n - 2 \le \frac{n^2}{4} + n^2 = \frac{5n^2}{4}$$
+for $n \ge 13$.
+Also, $f(n) = 6n^2 - n + 5 \ge 5n^2$ for $n \ge 1$.
+Thus, for $n \ge 13$, 
+$$g(n) \le \frac{5}{4}n^2 \le 5n^2 \le f(n)$$
+so $g \in O(f)$.
+
+Now, $-n + 5 \le 5$ for all $n \ge 0$, so
+$$f(n) \le 6n^2 + 5 \le 7n^2$$
+for $n \ge 2$.
+Also, $g(n) \ge \frac{n^2}{4}$ for $n \ge 1$.
+Thus, for $n \ge 2$, 
+$$7n^2 \le 28g(n) \implies f(n) \le 28g(n)$$
+so $f \in O(g)$.
+
+**Recurrence:** Solve the following recurrence relation:
+$F(1) = 5; \quad F(n) = 3+F(\lfloor n/2 \rfloor)$
+$$F(n) = 3 + F(\lfloor n/2 \rfloor)$$
+$$= 3 + 3 + F(\lfloor n/4 \rfloor)$$
+$$\dots$$
+$$= 3 + 3 + \dots + 3 + F(1)$$
+$$= 3 \lfloor \log(n) \rfloor + 5$$
 
 ---
 
-### **Right Column: Sorting Algorithms and Master Theorem**
+### STRASSEN'S ALGORITHM
+Assume we are multiplying two $n \times n$ matrices:
+$$AB = C$$
 
-**SORTING ALGORITHMS**
+Start with $n = 2$. Then
+$$C = \begin{pmatrix} a_{11}b_{11} + a_{12}b_{21} & a_{11}b_{12} + a_{12}b_{22} \\ a_{21}b_{11} + a_{22}b_{21} & a_{21}b_{12} + a_{22}b_{22} \end{pmatrix}$$
+This takes 8 multiplications (and 4 additions).
+
+Strassen: can do $n = 2$ in only 7 multiplications (and 18 additions).
+$$C = \begin{pmatrix} x_1 + x_4 - x_5 + x_7 & x_3 + x_5 \\ x_2 + x_4 & x_1 + x_3 - x_2 + x_6 \end{pmatrix}$$
+where
+$x_1 = (a_{11} + a_{22}) * (b_{11} + b_{22})$
+$x_2 = (a_{21} + a_{22}) * b_{11}$
+$x_3 = a_{11} * (b_{12} - b_{22})$
+$x_4 = a_{22} * (b_{21} - b_{11})$
+$x_5 = (a_{11} + a_{12}) * b_{22}$
+$x_6 = (a_{21} - a_{11}) * (b_{11} + b_{12})$
+$x_7 = (a_{12} - a_{22}) * (b_{21} + b_{22})$
+
+Note that commutativity of multiplication is not used. Hence we can generalise to matrices.
+Suppose that $n = 2^k$. Divide up matrices into four quadrants each $n/2 \times n/2$:
+$$\begin{pmatrix} A_{11} & A_{12} \\ A_{21} & A_{22} \end{pmatrix} \begin{pmatrix} B_{11} & B_{12} \\ B_{21} & B_{22} \end{pmatrix} = \begin{pmatrix} C_{11} & C_{12} \\ C_{21} & C_{22} \end{pmatrix}$$
+Compute $C_{ij}$ using the formulas for $c_{ij}$. Recursively compute each multiplication by further subdivision until bottom out at $n=2$.
+
+*   **Strassen's algorithm:** splits matrices into $n/2 \times n/2$ blocks, does 7 recursive multiplications and 18 additions/subtractions. The recurrence is $A(n) = 7A(n/2) + 18(n/2)^2$, solving to $\Theta(n^{\log 7}) \approx \Theta(n^{2.807})$. If $n$ isn't a power of 2, pad with zeros to make it even.
+
+---
+
+### SORTING ALGORITHMS
 *   **Insertion Sort** - $W(n)$ is $\Theta(n^2)$
-    *   *Diagram Description:* A horizontal bar graph representing an array. The left side is marked $0$ to $i-1$ and labeled "sorted". The right side is marked $i$ to $n-1$ and labeled "unsorted".
-    *   Insert L[i] into L[0 .. i-1] in correct position. Then L[0 .. i] is sorted. Insertion performed by letting L[i] filter downwards by successive swaps. This takes between 1 and i comparisons. Worst case when L[i] below L[0].
+    > **Diagram Description:** A horizontal bar representing an array divided into two sections: a "sorted" section from index $0$ to $i-1$, and an "unsorted" section from index $i$ to $n-1$. An arrow points from the unsorted section into the sorted section.
+
+    Insert $L[i]$ into $L[0 \dots i-1]$ in correct position. Then $L[0 \dots i]$ is sorted. Insertion performed by letting $L[i]$ filter downwards by successive swaps. This takes between 1 and $i$ comparisons. Worst case when $L[i]$ below $L[0]$.
+
 *   **MergeSort** - $W(n) = 2W(n/2) + (n-1)$
-    *   *Diagram Description:* A horizontal bar graph representing an array split perfectly down the middle, visually demonstrating the divide-and-conquer strategy, split at index $\lfloor \frac{n-1}{2} \rfloor$. Below this is a handwritten math snippet showing two lists "2 5 6" and "1 8 3 0 4" being merged into a single ordered list "0 1 2 3 4 5 6 8".
-    *   1. Divide roughly into two. 2. Sort each half separately (by recursion). 3. Merge the two halves. We need to know how many comparisons must be done to merge the two halves. The merging will be done by comparing the current least elements of the lists, and outputting the smaller.
+    > **Diagram Description:** A horizontal array split exactly in half at index $\lfloor \frac{n-1}{2} \rfloor$. Below it, a hand-drawn example shows an array `[2, 5, 6, 1, 8, 3, 0, 4]` being split and merged.
+
+    1. Divide roughly into two.
+    2. Sort each half separately (by recursion).
+    3. Merge the two halves. We need to know how many comparisons must be done to merge the two halves. The merging will be done by comparing the current least elements of the lists, and outputting the smaller.
+
 *   **QuickSort**
-    *   Split the list around the first element. e.g. L = [7, 2, 10, 12, 3, 1, 8]
-    *   Split around 7. Get [3, 2, 1, 7, 12, 8, 10]
-    *   Now sort the two sides recursively. The list is then sorted: [1, 2, 3, 7, 8, 10, 12]
-    *   Clearly split takes $n - 1$ comparisons. QuickSort may well not split L evenly.
+    Split the list around the first element. e.g.
+    $L = [7, 2, 10, 12, 3, 1, 8]$
+    Split around 7. Get
+    $[3, 2, 1, 7, 12, 8, 10]$
+    Now sort the two sides recursively. The list is then sorted:
+    $[1, 2, 3, 7, 8, 10, 12]$
+    *   Clearly split takes $n-1$ comparisons. QuickSort may well not split L evenly.
     *   $W(n) = \Theta(n^2)$ (same as insertion). $A(n) = \Theta(n \log n)$ (quite good in practice).
 
-**HEAPSORT (and more on trees)**
+---
+
+### LOWER BOUNDS
+Idea: express sorting algorithm as decision tree.
+The internal nodes are the comparisons.
+The leaves are the results (the rearranged lists).
+We then argue that to have a certain number of leaves, the tree must have sufficient depth.
+Depth = worst-case number of comparisons
+
+**For example: 3-Sort Algorithm**
+For the root node, if Item 1 is smaller than item 2, go down left path, otherwise go down right path.
+Then compare item 2 and 3.
+
+> **Diagram Description (3-Sort Decision Tree):**
+> A color-coded tree diagram mapping the paths to sort 3 items. Internal nodes (red) represent boolean comparisons like `(1,2)` or `(2,3)`. The leaf nodes (green) show all $3! = 6$ possible sorted permutations of an array: `[1,2,3]`, `[1,3,2]`, `[3,1,2]`, `[2,1,3]`, `[2,3,1]`. 
+
+*   If a binary tree has depth $d$ then it has $\le 2^d$ leaves.
+*   Any decision tree for sorting a list of length 3 must have $3! = 6$ leaves.
+*   Cannot have depth $\le 2$, as all binary trees of depth $\le 2$ have $\le 4$ leaves.
+*   So depth at least 3. Worst-case number of comparisons at least 3.
+*   Hence 3-Sort (and Insertion Sort) are optimal for $n = 3$.
+
+Decision tree has $\ge n!$ leaves and depth $d$.
+So 
+$2^d \ge n!$
+$d \ge \log(n!)$
+$d \ge \lceil \log(n!) \rceil$
+
+**Lower bound for sorting in worst case:**
+Any algorithm for sorting by comparisons must perform at least $\lceil \log(n!) \rceil$ comparisons in worst case.
+
+---
+
+### HEAPSORT (and more on trees)
 *   **Total Path Length:** The total path length of a tree is the sum of the depths of all leaf nodes.
-*   **Balanced Trees:** A tree of depth d is balanced if every leaf is at depth d or $d - 1$.
+*   **Balanced Trees:** A tree of depth $d$ is balanced if every leaf is at depth $d$ or $d - 1$.
 *   **Heap Structure:** is a left-complete binary tree.
-*   **Left-complete:** means that if the tree has depth d then (1) all nodes are present at depth 0, 1, ..., d - 1 and (2) at depth d no node is missing to the left of a node which is present.
-*   *Diagram Description (Min Heap):* A tree visualization representing a min-heap structure. The root is 3. Below it is an array representation: `[3, 9, 13, 0, 12, 4, 8, 16, 7, 1, 5, 6, 2]` with corresponding indices 1 through 13.
+*   **Left-complete:** means that if the tree has depth $d$ then (1) all nodes are present at depth $0, 1, \dots, d - 1$ and (2) at depth $d$ no node is missing to the left of a node which is present.
+
+> **Diagram Descriptions (Tree Structures):**
+> *   **Tree 1:** Shows a left-complete binary tree mapping to an array. The root is 3. Its children are 9 and 13. This continues down level by level, filling from left to right. Below the tree is the corresponding array: `[3, 9, 13, 0, 12, 4, 8, 16, 7, 1, 5, 6, 2]` mapped to indices 1 through 13.
+> *   **Tree 2 (Min Heap):** A tree illustrating the "minimising partial order tree" property. The root is 0, and every parent node is smaller than its children (e.g., 0 has children 16 and 9).
+> *   **Tree 3 (Max Heap):** A tree illustrating the "maximising partial order tree" property. The root is 16, and every parent node is larger than its children (e.g., 16 has children 12 and 13).
+
 *   A tree T is a **minimising partial order tree** if the key at any node $\le$ the keys at each child node (if any).
 *   A **min heap** is a heap structure with the min partial order tree property.
 *   A tree T is a **maximising partial order tree** if the key at any node $\ge$ the keys at each child node (if any).
 *   A **max heap** is a heap structure with the max partial order tree property.
-*   *Diagram Description (Max Heap):* A tree visualization representing a max-heap structure. The root is 16, and child values progressively decrease down the branches.
 
-**Heapsort Pseudo-code Blocks:**
-```text
-Heapsort scheme
-Build max heap H out of an array L of elements
-for i = n to 1:
-  max = getMax(H)
-  deleteMax(H)
-  L[i] = max
-getMax(H) - just read the root node of H
-
-buildMaxHeap(H) scheme
-if H not a leaf:
-  buildMaxHeap(left subtree of H)
-  buildMaxHeap(right subtree of H)
-  fixMaxHeap(H)
-
-deleteMax(H) scheme
-copy element at last node into root node
-remove last node
-fixMaxHeap(H)
-
-fixMaxHeap(H) scheme
-if H not a leaf:
-  largerSubHeap = the left or right subheap with the larger root
-  if root(H).key < root(largerSubHeap).key:
+**Pseudocode Blocks:**
+*   **Heapsort scheme**
+    Build max heap H out of an array E of elements
+    for $i = n$ to $1$:
+    max = getMax(H)
+    deleteMax(H)
+    E[i] = max
+*   **getMax(H)** - just read the root node of H
+*   **deleteMax(H) scheme**
+    copy element at last node into root node
+    remove last node
+    fixMaxHeap(H)
+*   **buildMaxHeap(H) scheme**
+    if H not a leaf:
+    buildMaxHeap(left subtree of H)
+    buildMaxHeap(right subtree of H)
+    fixMaxHeap(H)
+*   **fixMaxHeap(H) scheme**
+    if H not a leaf:
+    largerSubHeap = the left or right subheap with the larger root
+    if root(H).key < root(largerSubHeap).key:
     swap elements at root(H) and root(largerSubHeap)
     fixMaxHeap(largerSubHeap)
-```
 
-**MASTER THEOREM**
-*   $T(n) = aT(n/b) + f(n)$ has solutions as follows, where $E = \log_b a$ is the critical exponent:
-    1. If $n^{E+\epsilon} = O(f(n))$ for some $\epsilon > 0$ then $T(n) = \Theta(f(n))$.
-    2. If $f(n) = \Theta(n^E)$ then $T(n) = \Theta(f(n) \log n)$.
-    3. If $f(n) = O(n^{E-\epsilon})$ for some $\epsilon > 0$ then $T(n) = \Theta(n^E)$.
-*   For each of the following recurrence relations, use the Master Theorem to obtain a solution up to $\Theta$. In each case state the critical exponent E and explain your answer briefly.
-    *   (a) $T1(n) = 4T1(n/2) + 8n$
-    *   (a) $a = 4$, $b = 2$, $f(n) = 8n$. $E = \log_b a = \log_2 4 = 2$. Clearly $f(n) = O(n^{2-\epsilon})$ (taking $\epsilon = 1/2$) and so $T1(n) = \Theta(n^2)$.
+---
+
+### MASTER THEOREM
+Let $T(n) = aT(n/b) + f(n)$
+has solutions as follows,
+where $E = \log a / \log b$ is the critical exponent:
+1. If $n^{E+\epsilon} = O(f(n))$ for some $\epsilon > 0$ then $T(n) = \Theta(f(n))$.
+2. If $f(n) = \Theta(n^E)$ then $T(n) = \Theta(f(n) \log n)$.
+3. If $f(n) = O(n^{E-\epsilon})$ for some $\epsilon > 0$ then $T(n) = \Theta(n^E)$.
+
+For each of the following recurrence relations, use the Master Theorem to obtain a solution up to $\Theta$. In each case state the critical exponent E and explain your answer briefly.
+**(a) $T_1(n) = 4T_1(n/2) + 8n$**
+(a) $a = 4$, $b = 2$, $f(n) = 8n$, $E = \log a / \log b = \log 4 / \log 2 = 2$.
+Clearly $f(n) = O(n^{2-\epsilon})$ (taking $\epsilon = 1/2$) and so $T_1(n) = \Theta(n^2)$.
