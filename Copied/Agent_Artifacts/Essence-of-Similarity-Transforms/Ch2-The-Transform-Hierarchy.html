@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch2 · The Transform Hierarchy</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .slider-row.off .slider-label { opacity: 0.45; }
+    input[type="range"]:disabled { opacity: 0.3; }
+    .checks strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks li { line-height: 1.5; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of Similarity Transforms · Chapter 2</div>
+        <h1>The Transform Hierarchy</h1>
+        <p class="lead">
+          Five families of maps, nested like Russian dolls. Which one is the last to keep
+          a circle a circle? Pick a family, move a slider, and watch what survives between
+          the two sheets.
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>template sheet x<sub>t</sub></span>
+        <span class="legend"><span class="dot query"></span>query sheet x<sub>q</sub> = M x<sub>t</sub></span>
+        <span class="legend"><span class="dot probe"></span>probe vectors u, v</span><br>
+        Drag to orbit. Scroll to zoom. Dashed lines join corresponding house corners.
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch1-Grid-Lands-Somewhere.html">← Ch1</a>
+        <span>Chapter 2 of 5 · <a href="index.html">Index</a></span>
+        <a href="Ch3-Anatomy-Of-A-Similarity.html">Ch3 →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Family</div>
+          <div id="familyGrid" class="preset-grid"></div>
+          <div class="body">
+            Each family owns some sliders. The rest lock at their neutral value.
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">What survives</div>
+          <ul id="checks" class="checks"></ul>
+        </section>
+        <section class="section">
+          <div class="section-title">Parameters</div>
+          <div id="slidersHost" class="toggle-grid"></div>
+          <div class="action-grid">
+            <button id="randomBtn">Random inside this family</button>
+            <button id="resetParamsBtn">Reset parameters</button>
+            <button id="resetViewBtn">Reset view</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Current map, live</div>
+          <div id="matrixM" class="matrix-display"></div>
+          <div id="matrixA" class="matrix-display"></div>
+          <div id="matrixG" class="matrix-display"></div>
+          <div id="sigma" class="kv"></div>
+          <div class="body">
+            A similarity has <em>AᵀA = s²I</em> and equal singular values.
+            Shear or anisotropy splits σ₁ from σ₂. Perspective lives in the bottom row of M.
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Degrees of freedom</div>
+          <table class="dof">
+            <tr><th>Family</th><th>DoF</th><th>Min. correspondences</th></tr>
+            <tr><td>Rotation SO(2)</td><td><strong>1</strong></td><td>1 (2 equations, 1 unknown)</td></tr>
+            <tr><td>Rigid SE(2)</td><td><strong>3</strong></td><td>2</td></tr>
+            <tr><td>Similarity Sim(2)</td><td><strong>4</strong></td><td>2</td></tr>
+            <tr><td>Affine Aff(2)</td><td><strong>6</strong></td><td>3</td></tr>
+            <tr><td>Projective PGL(3)</td><td><strong>8</strong></td><td>4</td></tr>
+            <tr><td>GigaPose</td><td><strong>4</strong></td><td>1: s and α predicted per patch, so one match fixes t</td></tr>
+          </table>
+          <div class="body">
+            One 2D point correspondence gives two equations, one per coordinate.
+            Divide the DoF by two and round up.
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence">
+            Rotation ⊂ Rigid ⊂ Similarity ⊂ Affine ⊂ Projective.
+            Each step outward adds freedom and drops an invariant.
+            Read the checklist top to bottom and you read the hierarchy.
+          </div>
+          <div class="essence">
+            Similarity is the last family in which a circle stays a circle and angles survive.
+            Shapes keep their shape. Only size, heading and position change.
+          </div>
+          <div class="essence">
+            Affine keeps parallel lines and one area factor, but bends squares into parallelograms.
+            Projective keeps only straightness, so parallel lines may meet.
+          </div>
+          <div class="essence">
+            More degrees of freedom means more correspondences per hypothesis
+            and more ways for RANSAC to fit noise. A tighter family is a stronger prior.
+          </div>
+          <div class="essence">
+            "In GigaPose, the mapping M<sub>t→q</sub> from template coordinates x<sub>t</sub>
+            to query coordinates x<sub>q</sub> is constrained to a similarity transform:
+            a rigid rotation, uniform scaling, and translation without shearing."
+            A shear or an anisotropic stretch in the image would mean the viewpoint changed.
+            That change belongs to the choice of template, not to M<sub>t→q</sub>.
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Names</div>
+          <div class="body">
+            <em>SO(2)</em> rotations. <em>SE(2)</em> rigid motions. <em>Sim(2)</em> similarities.
+            <em>Aff(2)</em> affine maps. <em>PGL(3)</em> projective maps of the plane, also called homographies.
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== CHAPTER 2: THE TRANSFORM HIERARCHY =====================
+    const LAYER_T = -1.4;
+    const LAYER_Q = 1.4;
+    const RANGE = 3;
+    const W = (p, y) => [p[0], y, p[1]];
+
+    const house = [[-2.3, -0.9], [-0.3, -0.9], [-0.3, 0.4], [-0.9, 1.3], [-2.3, 0.4]];
+    const circleCentre = [1.5, 0.9];
+    const circlePts = Array.from({ length: 48 }, (_, i) => {
+      const a = (i / 48) * Math.PI * 2;
+      return [circleCentre[0] + Math.cos(a), circleCentre[1] + Math.sin(a)];
+    });
+    const probeBase = [0.6, -2.0];
+    const probeU = [1.4, 0.3];
+    const probeV = [0.3, 1.1];
+    const unitSquare = [[0, 0], [1, 0], [1, 1], [0, 1]];
+
+    const randSigned = (lo, hi) => (Math.random() < 0.5 ? -1 : 1) * (lo + Math.random() * (hi - lo));
+    const round = (v, d) => Number(v.toFixed(d));
+
+    const PARAMS = {
+      alpha: { label: 'α · rotation', min: -180, max: 180, step: 1, neutral: 0,
+        format: (v) => v.toFixed(0) + '°', rand: () => Math.round(randSigned(20, 80)) },
+      s: { label: 's · uniform scale', min: 0.4, max: 2, step: 0.01, neutral: 1,
+        format: (v) => v.toFixed(2), rand: () => round(1 + randSigned(0.2, 0.55), 2) },
+      tx: { label: 'tx · translation x', min: -1.5, max: 1.5, step: 0.01, neutral: 0,
+        format: (v) => v.toFixed(2), rand: () => round(randSigned(0.2, 1), 2) },
+      ty: { label: 'ty · translation y', min: -1.5, max: 1.5, step: 0.01, neutral: 0,
+        format: (v) => v.toFixed(2), rand: () => round(randSigned(0.2, 1), 2) },
+      k: { label: 'k · shear', min: -1, max: 1, step: 0.01, neutral: 0,
+        format: (v) => v.toFixed(2), rand: () => round(randSigned(0.25, 0.7), 2) },
+      e: { label: 'e · anisotropy', min: -0.5, max: 0.5, step: 0.01, neutral: 0,
+        format: (v) => v.toFixed(2), rand: () => round(randSigned(0.1, 0.35), 2) },
+      p1: { label: 'p₁ · perspective x', min: -0.25, max: 0.25, step: 0.005, neutral: 0,
+        format: (v) => v.toFixed(3), rand: () => round(randSigned(0.04, 0.12), 3) },
+      p2: { label: 'p₂ · perspective y', min: -0.25, max: 0.25, step: 0.005, neutral: 0,
+        format: (v) => v.toFixed(3), rand: () => round(randSigned(0.04, 0.12), 3) },
+    };
+
+    const families = [
+      { value: 'rot', label: 'Rotation SO(2)', dof: 1, owns: ['alpha'], badge: 'good',
+        story: 'One number, α. Every length, angle and area survives. Only the heading changes.' },
+      { value: 'rigid', label: 'Rigid SE(2)', dof: 3, owns: ['alpha', 'tx', 'ty'], badge: 'good',
+        story: 'Rotate, then slide. Every distance between two points stays exactly the same.' },
+      { value: 'sim', label: 'Similarity Sim(2)', dof: 4, owns: ['s', 'alpha', 'tx', 'ty'], badge: 'good',
+        story: 'One scale factor joins in. All lengths change by s, so angles and ratios survive. A circle stays a circle.' },
+      { value: 'aff', label: 'Affine Aff(2)', dof: 6, owns: ['s', 'alpha', 'tx', 'ty', 'k', 'e'], badge: 'warn',
+        story: 'Shear or anisotropy entered. Angles bend and the circle becomes an ellipse, yet parallel lines stay parallel.' },
+      { value: 'proj', label: 'Projective PGL(3)', dof: 8, owns: ['s', 'alpha', 'tx', 'ty', 'k', 'e', 'p1', 'p2'], badge: 'bad',
+        story: 'Perspective entered. Parallel lines now meet. Only straightness and cross-ratio survive.' },
+    ];
+
+    const params = Object.fromEntries(Object.entries(PARAMS).map(([k, d]) => [k, d.neutral]));
+    let family = families[2];
+    let M = h3.I();
+
+    const familyGrid = document.getElementById('familyGrid');
+    const slidersHost = document.getElementById('slidersHost');
+    const checksEl = document.getElementById('checks');
+    const matrixM = document.getElementById('matrixM');
+    const matrixA = document.getElementById('matrixA');
+    const matrixG = document.getElementById('matrixG');
+    const sigmaEl = document.getElementById('sigma');
+
+    function buildM() {
+      const D = [[1 + params.e, params.k], [0, 1 - params.e]];
+      const A = m2.mul(m2.scale(params.s, params.s), m2.mul(m2.rot(rad(params.alpha)), D));
+      const Maff = h3.fromAffine(A, [params.tx, params.ty]);
+      const Pm = [[1, 0, 0], [0, 1, 0], [params.p1, params.p2, 1]];
+      return h3.mul(Pm, Maff);
+    }
+    function mapW(H, p) {
+      return [
+        H[0][0] * p[0] + H[0][1] * p[1] + H[0][2],
+        H[1][0] * p[0] + H[1][1] * p[1] + H[1][2],
+        H[2][0] * p[0] + H[2][1] * p[1] + H[2][2],
+      ];
+    }
+    function mapPt(H, p) {
+      const [x, y, w] = mapW(H, p);
+      const ww = Math.max(w, 0.05);
+      return [x / ww, y / ww];
+    }
+    function polyArea(pts) {
+      let a = 0;
+      for (let i = 0; i < pts.length; i += 1) {
+        const p = pts[i];
+        const q = pts[(i + 1) % pts.length];
+        a += p[0] * q[1] - q[0] * p[1];
+      }
+      return Math.abs(a) / 2;
+    }
+    function centroid(pts) {
+      const s = pts.reduce((acc, p) => v2.add(acc, p), [0, 0]);
+      return v2.scale(s, 1 / pts.length);
+    }
+    const foldAngle = (a) => (a > 90 ? 180 - a : a);
+
+    function measure() {
+      const mp = (p) => mapPt(M, p);
+      const b1 = mp(probeBase);
+      const u1 = v2.sub(mp(v2.add(probeBase, probeU)), b1);
+      const v1 = v2.sub(mp(v2.add(probeBase, probeV)), b1);
+      const lenU = [v2.len(probeU), v2.len(u1)];
+      const lenV = [v2.len(probeV), v2.len(v1)];
+      const ang = [Math.abs(deg(v2.angle(probeU, probeV))), Math.abs(deg(v2.angle(u1, v1)))];
+      const ratio = [lenU[0] / lenV[0], lenU[1] / lenV[1]];
+      const hQ = house.map(mp);
+      const wallL = v2.sub(hQ[4], hQ[0]);
+      const wallR = v2.sub(hQ[2], hQ[1]);
+      const parAngle = foldAngle(Math.abs(deg(v2.angle(wallL, wallR))));
+      const areaHouse = polyArea(hQ) / polyArea(house);
+      const areaSquare = polyArea(unitSquare.map(mp));
+      const circ = circlePts.map(mp);
+      const c = centroid(circ);
+      const radii = circ.map((p) => v2.len(v2.sub(p, c)));
+      const circRatio = Math.max(...radii) / Math.min(...radii);
+      const near = (a, b, tol) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
+      return {
+        lengths: { ok: near(lenU[0], lenU[1], 1e-3) && near(lenV[0], lenV[1], 1e-3), lenU, lenV },
+        angle: { ok: Math.abs(ang[0] - ang[1]) < 0.05, ang },
+        ratio: { ok: near(ratio[0], ratio[1], 1e-3), ratio },
+        parallel: { ok: parAngle < 0.05, parAngle },
+        area: { ok: near(areaHouse, areaSquare, 1e-3), areaHouse, areaSquare },
+        circle: { ok: circRatio < 1.001, circRatio },
+      };
+    }
+
+    function paramSummary() {
+      return `α ${params.alpha}°, s ${fmt(params.s)}, t (${fmt(params.tx)}, ${fmt(params.ty)}), ` +
+        `k ${fmt(params.k)}, e ${fmt(params.e)}, p (${fmt(params.p1, 3)}, ${fmt(params.p2, 3)})`;
+    }
+
+    function updateText() {
+      M = buildM();
+      const A = h3.linear(M);
+      const G = m2.mul(m2.T(A), A);
+      const sv = m2.singularValues(A);
+      const m = measure();
+      const items = [
+        [m.lengths.ok, 'Lengths preserved',
+          `|u| ${fmt(m.lengths.lenU[0])} → ${fmt(m.lengths.lenU[1])}, |v| ${fmt(m.lengths.lenV[0])} → ${fmt(m.lengths.lenV[1])}`],
+        [m.angle.ok, 'Angle between u and v', `${fmt(m.angle.ang[0], 1)}° → ${fmt(m.angle.ang[1], 1)}°`],
+        [m.ratio.ok, 'Length ratio |u| / |v|', `${fmt(m.ratio.ratio[0])} → ${fmt(m.ratio.ratio[1])}`],
+        [m.parallel.ok, 'Parallel walls stay parallel', `angle between walls ${fmt(m.parallel.parAngle, 2)}°`],
+        [true, 'Straight lines stay straight', 'true in every family here'],
+        [m.area.ok, 'One area factor for every shape',
+          `house ×${fmt(m.area.areaHouse)}, unit square ×${fmt(m.area.areaSquare)}`],
+        [m.circle.ok, 'Circle stays a circle', `max / min radius ${fmt(m.circle.circRatio, 3)}`],
+      ];
+      checksEl.innerHTML = items
+        .map(([ok, label, detail]) => `<li class="${ok ? 'ok' : 'no'}">${label} · <strong>${detail}</strong></li>`)
+        .join('');
+      matrixM.textContent = fmtMatrix(M, 'M  (3×3 homogeneous) =', 3);
+      matrixA.textContent = fmtMatrix(A, 'A  (linear part) =', 3);
+      matrixG.textContent = fmtMatrix(G, 'AᵀA  (s²I for a similarity) =', 3);
+      sigmaEl.innerHTML =
+        `<span>σ₁, σ₂</span><strong>${fmt(sv[0], 3)}, ${fmt(sv[1], 3)}</strong>` +
+        `<span>det A</span><strong>${fmt(m2.det(A), 3)}</strong>` +
+        `<span>params</span><strong>${paramSummary()}</strong>`;
+      const badge = `<span class="badge ${family.badge}">${family.label} · ${family.dof} DoF</span>`;
+      setCaption(`${badge} ${family.story} Circle axis ratio <strong>${fmt(m.circle.circRatio, 3)}</strong>. ` +
+        `Probe angle <strong>${fmt(m.angle.ang[0], 1)}° → ${fmt(m.angle.ang[1], 1)}°</strong>.`);
+    }
+
+    // ---- drawing ----
+    const COL_T = {
+      sheet: 'rgba(90, 166, 255, 0.05)', edge: 'rgba(90, 166, 255, 0.25)',
+      grid: 'rgba(110, 156, 224, 0.22)', axis: 'rgba(134, 212, 255, 0.6)',
+      line: '#5aa6ff', fill: 'rgba(90, 166, 255, 0.18)', dot: '#86d4ff',
+    };
+    const COL_Q = {
+      sheet: 'rgba(240, 143, 60, 0.05)', edge: 'rgba(240, 143, 60, 0.25)',
+      grid: 'rgba(211, 163, 95, 0.22)', axis: 'rgba(240, 143, 60, 0.6)',
+      line: '#f08f3c', fill: 'rgba(240, 143, 60, 0.18)', dot: '#f08f3c',
+    };
+
+    function strokeSegs(segs, y, vp, color, width) {
+      if (!segs.length) return;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      segs.forEach(([a, b]) => {
+        const pa = project(W(a, y), vp);
+        const pb = project(W(b, y), vp);
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Sample each grid line and skip pieces that cross the projective horizon.
+    function drawLayerGrid(vp, y, H, col) {
+      const N = 24;
+      const axis = [];
+      const grid = [];
+      for (let i = -RANGE; i <= RANGE; i += 1) {
+        const bucket = i === 0 ? axis : grid;
+        for (let dir = 0; dir < 2; dir += 1) {
+          let prev = null;
+          for (let n = 0; n <= N; n += 1) {
+            const t = -RANGE + (2 * RANGE * n) / N;
+            const [x, yy, w] = mapW(H, dir === 0 ? [i, t] : [t, i]);
+            const cur = w > 0.12 ? [x / w, yy / w] : null;
+            if (prev && cur) bucket.push([prev, cur]);
+            prev = cur;
+          }
+        }
+      }
+      strokeSegs(grid, y, vp, col.grid, 1);
+      strokeSegs(axis, y, vp, col.axis, 1.6);
+    }
+    function drawLayer(vp, y, H, col, title) {
+      const mp = (p) => mapPt(H, p);
+      const sheet = [[-RANGE, -RANGE], [RANGE, -RANGE], [RANGE, RANGE], [-RANGE, RANGE]];
+      polyline3(sheet.map((p) => W(p, y)), vp, { close: true, fill: col.sheet, color: col.edge, width: 1 });
+      drawLayerGrid(vp, y, H, col);
+      polyline3(circlePts.map((p) => W(mp(p), y)), vp, { close: true, color: col.line, width: 1.4, alpha: 0.9 });
+      const h = house.map(mp);
+      polyline3(h.map((p) => W(p, y)), vp, { close: true, fill: col.fill, color: col.line, width: 2 });
+      const b = mp(probeBase);
+      arrow3(W(b, y), W(mp(v2.add(probeBase, probeU)), y), vp, { color: '#a0e7a0', width: 2.2, label: 'u', glow: 6 });
+      arrow3(W(b, y), W(mp(v2.add(probeBase, probeV)), y), vp, { color: '#a0e7a0', width: 2.2, label: 'v', glow: 6 });
+      h.forEach((p, i) => dot3(W(p, y), vp, { color: col.dot, r: 4, label: String(i + 1), glow: 8 }));
+      text3(W([-RANGE, RANGE], y), vp, title, { color: col.line, font: '600 13px Inter, sans-serif', dy: -10 });
+      return h;
+    }
+
+    app.mainViewport = () => viewport(
+      canvas.clientWidth * 0.5,
+      canvas.clientHeight * 0.55,
+      Math.min(canvas.clientWidth, canvas.clientHeight) / 10.5,
+    );
+    app.draw = () => {
+      background();
+      const vp = app.mainViewport();
+      const hT = drawLayer(vp, LAYER_T, h3.I(), COL_T, 'Template sheet · x_t');
+      const hQ = drawLayer(vp, LAYER_Q, M, COL_Q, 'Query sheet · x_q = M x_t');
+      hT.forEach((p, i) => line3(W(p, LAYER_T), W(hQ[i], LAYER_Q), vp,
+        { color: 'rgba(138, 161, 192, 0.45)', width: 1, dash: [4, 5] }));
+    };
+
+    // ---- controls ----
+    const sliders = {};
+    Object.entries(PARAMS).forEach(([key, def]) => {
+      sliders[key] = makeSlider(slidersHost, {
+        label: def.label, min: def.min, max: def.max, step: def.step, value: params[key],
+        format: def.format,
+        onInput: (v) => { params[key] = v; updateText(); },
+      });
+    });
+    const familyGroup = makeButtonGroup(
+      familyGrid,
+      families.map((f) => ({ label: f.label, value: f.value })),
+      (value) => setFamily(families.find((f) => f.value === value)),
+    );
+    function setFamily(fam) {
+      family = fam;
+      Object.keys(PARAMS).forEach((key) => {
+        const owned = fam.owns.includes(key);
+        if (!owned) {
+          params[key] = PARAMS[key].neutral;
+          sliders[key].set(params[key]);
+        }
+        sliders[key].input.disabled = !owned;
+        sliders[key].input.parentElement.classList.toggle('off', !owned);
+      });
+      familyGroup.setActive(fam.value);
+      updateText();
+    }
+    document.getElementById('randomBtn').addEventListener('click', () => {
+      family.owns.forEach((key) => {
+        params[key] = PARAMS[key].rand();
+        sliders[key].set(params[key]);
+      });
+      updateText();
+    });
+    document.getElementById('resetParamsBtn').addEventListener('click', () => {
+      Object.keys(PARAMS).forEach((key) => {
+        params[key] = PARAMS[key].neutral;
+        sliders[key].set(params[key]);
+      });
+      updateText();
+    });
+    document.getElementById('resetViewBtn').addEventListener('click', resetView);
+
+    view.home = { yaw: -0.6, pitch: 0.5 };
+    resetView();
+    params.alpha = 25;
+    params.s = 1.3;
+    params.tx = 0.4;
+    params.ty = 0.2;
+    Object.keys(params).forEach((key) => sliders[key].set(params[key]));
+    setFamily(families[2]);
+
+    // Optional state in the URL hash, e.g. #family=aff&k=0.6&tab=math
+    (function loadHash() {
+      const hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+      const fam = families.find((f) => f.value === hash.get('family'));
+      if (fam) setFamily(fam);
+      Object.keys(PARAMS).forEach((key) => {
+        if (!hash.has(key) || !family.owns.includes(key)) return;
+        params[key] = clamp(Number(hash.get(key)), PARAMS[key].min, PARAMS[key].max);
+        sliders[key].set(params[key]);
+      });
+      updateText();
+      const tab = document.querySelector('[data-tab-button="' + hash.get('tab') + '"]');
+      if (tab) tab.click();
+    })();
+  </script>
+</body>
+</html>

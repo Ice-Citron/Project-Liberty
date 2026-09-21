@@ -1,0 +1,1702 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch3 · VSD: Only What the Camera Sees</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .formula {
+      font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; font-size: 13px; }
+  </style>
+
+</head>
+<body>
+  <style>
+    table.vgrid { width: 100%; border-collapse: separate; border-spacing: 2px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+    table.vgrid th { font-weight: 600; text-align: center; padding: 0 1px; white-space: nowrap; }
+    table.vgrid td { height: 14px; border-radius: 2px; }
+    table.vgrid td.ok { background: rgba(120, 220, 130, 0.85); }
+    table.vgrid td.no { background: rgba(255, 110, 110, 0.7); }
+    table.vgrid tr.cur th { color: var(--ink); }
+    table.vgrid tr.cur td { outline: 1px solid rgba(235, 242, 255, 0.95); }
+    .fact { font-family: var(--mono); font-size: 12px; color: var(--ink); }
+    /* Letters with a bar or a hat only render cleanly in the mono face. */
+    .sym { font-family: var(--mono); font-size: 0.95em; color: var(--ink); }
+    .preset-grid.steps button { font-size: 13px; }
+  </style>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of BOP Pose Errors · Chapter 3</div>
+        <h1>VSD: Only What the Camera Sees</h1>
+        <p class="lead">
+          Take two depth photos of the model: one at the <strong>true pose</strong>, one at the <strong>estimate</strong>.
+          Every pixel where the object is really visible gets a ballot.
+          Which ballots say "fine", and what share do not?
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>true pose</span>
+        <span class="legend"><span class="dot query"></span>estimated pose</span>
+        <span class="legend"><span class="dot" style="background:#9aa7ba"></span>occluder</span>
+        <span class="legend"><span class="dot" style="background:#ebf2ff"></span>probe pixel and its ray</span><br>
+        Drag to orbit. Scroll to zoom. Click any inset to move the probe pixel.
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch2-MSPD-Same-Question-In-Pixels.html">← Ch 2 MSPD</a>
+        <span>Chapter 3 of 4 · <a href="index.html">Index</a></span>
+        <a href="Ch4-One-Pose-Three-Verdicts.html">Ch 4 →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">The vote, step by step</div>
+          <div id="stepGrid" class="preset-grid steps"></div>
+          <div class="body">Each step lights up the insets it uses and repaints the image plane in the 3D scene.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Scenarios</div>
+          <div id="presetGrid" class="preset-grid"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and test it.</div>
+          <details class="predict">
+            <summary>The handle points away from the camera in both poses, 50° apart. What does VSD say?</summary>
+            <div class="answer" id="answer1"></div>
+            <button id="setup1">Set it up</button>
+          </details>
+          <details class="predict">
+            <summary>Slide the estimate 30 mm along the viewing ray. Compare τ = 20% and τ = 30% of the diameter.</summary>
+            <div class="answer" id="answer2"></div>
+            <button id="setup2">Set it up, then move τ</button>
+          </details>
+          <details class="predict">
+            <summary>The handle is visible and the spin is wrong by 50°. Now an occluder slides over the handle. Does VSD rise or fall?</summary>
+            <div class="answer" id="answer3"></div>
+            <button id="setup3">Set it up, then slide the occluder to 50 mm</button>
+          </details>
+        </section>
+        <section class="section">
+          <div class="section-title">Tolerances</div>
+          <div id="tauHost"></div>
+          <div class="body">τ decides whether two distances "agree". <span class="fact">δ = 15 mm</span> is fixed.
+            It decides whether a pixel is visible at all.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Pose error of the estimate</div>
+          <div id="errHost"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">True pose</div>
+          <div id="gtHost"></div>
+          <div class="body">0° puts the handle to the camera's right. Near −90° the mug body hides it.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Occluder</div>
+          <label class="checkbox"><input id="occToggle" type="checkbox"> Put a board between camera and mug</label>
+          <div id="occHost"></div>
+          <div class="body">The simulated sensor sees the real mug, the board and a back wall at 1.5 m. That picture is D<sub>I</sub>.</div>
+          <div class="action-grid"><button id="resetBtn">Reset view</button></div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The formula</div>
+          <div class="formula">e_VSD = average over p ∈ V̂ ∪ V̄ of
+
+  0   if p ∈ V̂ ∩ V̄
+      and |D̂(p) − D̄(p)| &lt; τ
+  1   otherwise</div>
+          <div class="body"><span class="sym">D̂</span> and <span class="sym">D̄</span> are <strong>distance maps</strong>: distance from the camera centre, not z-depth.
+            They come from rendering the model at the estimate and at the true pose. An empty union gives e = 1.</div>
+          <div class="formula">p ∈ V̄  when  D̄(p) &gt; 0  and
+        ( D̄(p) − D_I(p) ≤ δ
+          or D_I(p) = 0 )
+V̂ : the same test on D̂,
+    plus every p ∈ V̄ with D̂(p) &gt; 0
+δ = 15 mm</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Ballot count · live</div>
+          <div id="counts" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Probe pixel · live</div>
+          <div id="probeKv" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">All 100 settings · live</div>
+          <div id="gridHost"></div>
+          <div class="body">Rows: τ from 5% to 50% of the diameter. Columns: θ from 0.05 to 0.5. Green means e<sub>VSD</sub>(τ) &lt; θ.</div>
+          <div id="gridLine" class="body"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Why two visibility rules</div>
+          <div class="body">Suppose the estimate sits 40 mm behind the real surface. The plain test would call it "occluded by the real object", and it would escape the vote.
+            So every pixel of <span class="sym">V̄</span> where the estimate renders also joins <span class="sym">V̂</span>. There the distances get compared, and the pixel fails.</div>
+          <div id="secondRule" class="body"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">For contrast · live</div>
+          <div id="contrast" class="kv"></div>
+          <div class="src">Source: Hodaň et al., BOP Challenge 2020 on 6D Object Localization, Sec. 2.2 to 2.4; Hodaň et al., On Evaluation of 6D Object Pose Estimation, ECCVW 2016; bop_toolkit pose_error.py and visibility.py</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence">VSD compares two rendered distance maps, pixel by pixel. It looks only where the object is visible in the test image.</div>
+          <div class="essence">A pixel votes "fine" when both poses show the object there and the distances agree within τ.
+            A pixel seen in only one pose is not fine. <strong>e<sub>VSD</sub> is the share that is not fine.</strong></div>
+          <div class="essence">Differences the camera cannot see cost nothing: a hidden handle, a symmetric turn, an occluded part.
+            No symmetry list is needed. BOP: VSD "treats poses that are indistinguishable in shape … as equivalent".</div>
+          <div class="essence">The test depth image has one job. It decides which pixels are visible, with tolerance δ = 15 mm. It never enters the distance comparison.</div>
+          <div class="essence">Each vote is all-or-nothing, since 2017. So VSD measures <strong>how much</strong> of the visible surface is misaligned, not by how many millimetres.</div>
+          <div class="essence">VSD needs a depth image, and it does punish depth error. MSPD does neither. That is why BOP keeps both.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body">Colour is ignored. Two poses that differ only in texture are the same pose to VSD.
+            A small part is a small share: a wrong handle costs little, because the handle covers few pixels.
+            This page votes on a 128 × 96 window. BOP votes on the full image, so its numbers are finer.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">How BOP scores it</div>
+          <div class="body">A pose is correct when e<sub>VSD</sub> &lt; θ. AR<sub>VSD</sub> is the average recall over ten values of τ and ten values of θ.
+            Then AR = (AR<sub>VSD</sub> + AR<sub>MSSD</sub> + AR<sub>MSPD</sub>) / 3.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== BOP KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Units: millimetres. Camera frame: x right, y up,
+    // z forward. The camera centre is the origin. Follows bop_toolkit
+    // (pose_error.py, visibility.py) and BOP Challenge 2020, Sec. 2.2-2.4.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+    };
+    // A pose maps model coordinates to camera coordinates: X = R x + t.
+    const pose = {
+      apply: (P, x) => v3.add(m3.apply(P.R, x), P.t),
+      // P composed with a model-frame symmetry S: x -> P(S x).
+      withSym: (P, S) => ({ R: m3.mul(P.R, S.R), t: v3.add(m3.apply(P.R, S.t), P.t) }),
+    };
+
+    // ---- pinhole camera. BOP reference width is 640 px, so r = w / 640. ----
+    function makeCamera(width = 640) {
+      const r = width / 640;
+      return { w: 640 * r, h: 480 * r, f: 600 * r, cx: 320 * r, cy: 240 * r, r };
+    }
+    function projectPx(X, cam) {
+      return [cam.cx + cam.f * X[0] / X[2], cam.cy - cam.f * X[1] / X[2]];
+    }
+
+    // ---- object models: primitives (for ray casting), vertices V_M, symmetries S_M ----
+    function cylinderVerts(r, h, nAround = 24, levels = [-1, -0.5, 0, 0.5, 1]) {
+      const out = [[0, h, 0], [0, -h, 0]];
+      levels.forEach((k) => {
+        for (let i = 0; i < nAround; i += 1) {
+          const a = (i / nAround) * Math.PI * 2;
+          out.push([r * Math.cos(a), h * k, r * Math.sin(a)]);
+        }
+      });
+      return out;
+    }
+    function boxSurfaceVerts(c, half, n = [2, 2, 2]) {
+      const out = [];
+      for (let i = 0; i <= n[0]; i += 1) {
+        for (let j = 0; j <= n[1]; j += 1) {
+          for (let k = 0; k <= n[2]; k += 1) {
+            const onSurface = i === 0 || i === n[0] || j === 0 || j === n[1] || k === 0 || k === n[2];
+            if (!onSurface) continue;
+            out.push([
+              c[0] + half[0] * (2 * i / n[0] - 1),
+              c[1] + half[1] * (2 * j / n[1] - 1),
+              c[2] + half[2] * (2 * k / n[2] - 1),
+            ]);
+          }
+        }
+      }
+      return out;
+    }
+    function cylinderWire(r, h, seg = 32, nVertical = 8) {
+      const out = [];
+      for (let i = 0; i < seg; i += 1) {
+        const a = (i / seg) * Math.PI * 2;
+        const b = ((i + 1) / seg) * Math.PI * 2;
+        [h, -h].forEach((y) => out.push([[r * Math.cos(a), y, r * Math.sin(a)], [r * Math.cos(b), y, r * Math.sin(b)]]));
+      }
+      for (let i = 0; i < nVertical; i += 1) {
+        const a = (i / nVertical) * Math.PI * 2;
+        out.push([[r * Math.cos(a), h, r * Math.sin(a)], [r * Math.cos(a), -h, r * Math.sin(a)]]);
+      }
+      return out;
+    }
+    function boxWire(c, half) {
+      const p = (sx, sy, sz) => [c[0] + sx * half[0], c[1] + sy * half[1], c[2] + sz * half[2]];
+      const out = [];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        out.push([p(-1, a, b), p(1, a, b)]);
+        out.push([p(a, -1, b), p(a, 1, b)]);
+        out.push([p(a, b, -1), p(a, b, 1)]);
+      }));
+      return out;
+    }
+    // The 24 proper rotations of a cube (signed permutation matrices, det +1).
+    function cubeRotations() {
+      const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const out = [];
+      perms.forEach((p) => {
+        for (let s = 0; s < 8; s += 1) {
+          const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+          for (let i = 0; i < 3; i += 1) R[i][p[i]] = (s >> i) & 1 ? -1 : 1;
+          if (Math.abs(m3.det(R) - 1) < 1e-9) out.push(R);
+        }
+      });
+      return out;
+    }
+    // Rotations that map a centred box with these half sizes onto itself.
+    function boxSymmetries(half) {
+      const keep = cubeRotations().filter((R) => {
+        const mapped = m3.apply(R.map((row) => row.map(Math.abs)), half);
+        return mapped.every((x, i) => Math.abs(x - half[i]) < 1e-9);
+      });
+      keep.sort((A, B) => (B[0][0] + B[1][1] + B[2][2]) - (A[0][0] + A[1][1] + A[2][2]));  // identity first
+      return keep.map((R) => ({ R, t: [0, 0, 0] }));
+    }
+    // BOP rule for a continuous symmetry: the vertex furthest from the axis
+    // travels at most 1% of the object diameter between consecutive steps.
+    function axisSymmetries(rMax, diameter, withFlip) {
+      const n = Math.ceil((2 * Math.PI * rMax) / (0.01 * diameter));
+      const out = [];
+      for (let k = 0; k < n; k += 1) out.push({ R: m3.rotY((k / n) * Math.PI * 2), t: [0, 0, 0] });
+      if (withFlip) {
+        for (let k = 0; k < n; k += 1) out.push({ R: m3.mul(m3.rotX(Math.PI), m3.rotY((k / n) * Math.PI * 2)), t: [0, 0, 0] });
+      }
+      return out;
+    }
+    function modelDiameter(verts) {
+      let d = 0;
+      for (let i = 0; i < verts.length; i += 1) {
+        for (let j = i + 1; j < verts.length; j += 1) d = Math.max(d, v3.dist(verts[i], verts[j]));
+      }
+      return d;
+    }
+    // kinds: 'mug' (no symmetry), 'can' (continuous axis + flip),
+    // 'box' (4 rotations), 'rod' (8 rotations). Model axis is y.
+    function makeModel(kind) {
+      const m = { kind };
+      if (kind === 'mug') {
+        m.label = 'Mug';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }, { type: 'box', c: [50, 0, 0], half: [10, 20, 6] }];
+        m.verts = cylinderVerts(40, 45).concat(boxSurfaceVerts([50, 0, 0], [10, 20, 6]));
+        m.wire = cylinderWire(40, 45).concat(boxWire([50, 0, 0], [10, 20, 6]));
+        m.symNote = 'No symmetry. The handle breaks it. S_M = { identity }.';
+      } else if (kind === 'can') {
+        m.label = 'Can';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }];
+        m.verts = cylinderVerts(40, 45);
+        m.wire = cylinderWire(40, 45);
+        m.symNote = 'Continuous symmetry about its axis, sampled in 1%-of-diameter steps, plus the top-bottom flip.';
+      } else if (kind === 'box') {
+        m.label = 'Box';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [50, 30, 20] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [50, 30, 20], [4, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [50, 30, 20]);
+        m.symNote = 'Three different side lengths. 4 rotations map it onto itself.';
+      } else {
+        m.kind = 'rod';
+        m.label = 'Rod';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [90, 10, 10] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [90, 10, 10], [8, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [90, 10, 10]);
+        m.symNote = 'Square cross-section. 8 rotations map it onto itself.';
+      }
+      m.diameter = modelDiameter(m.verts);
+      if (m.kind === 'mug') m.syms = [{ R: m3.I(), t: [0, 0, 0] }];
+      else if (m.kind === 'can') m.syms = axisSymmetries(40, m.diameter, true);
+      else m.syms = boxSymmetries(m.prims[0].half);
+      return m;
+    }
+
+    // ---- poses ----
+    // az: spin about the model axis (0 = handle to camera right, -90deg = handle
+    // points away from the camera). tilt > 0 tips the top towards the camera.
+    function gtPose(o) {
+      return { R: m3.mul(m3.rotX(-(o.tilt || 0)), m3.rotY(o.az || 0)), t: [o.x || 0, o.y || 0, o.z || 600] };
+    }
+    // Pose error e: spin (about the model axis), tilt (about camera x), roll
+    // (about camera z), all through the object centre. dx, dy in the image
+    // directions, ray = slide along the viewing ray through the object centre.
+    function perturb(Pg, e) {
+      const R = m3.mul(m3.rotZ(e.roll || 0), m3.mul(m3.rotX(e.tilt || 0), m3.mul(Pg.R, m3.rotY(e.spin || 0))));
+      const dir = v3.norm(Pg.t);
+      const t = v3.add(v3.add(Pg.t, [e.dx || 0, e.dy || 0, 0]), v3.scale(dir, e.ray || 0));
+      return { R, t };
+    }
+
+    // ---- MSSD and MSPD: min over S of max over x ----
+    // Returns both errors, the arg-min symmetry and arg-max vertex of each, the
+    // per-symmetry maxima, and ADD (mean distance, no symmetry) for contrast.
+    function surfaceErrors(Pe, Pg, model, cam, useSym = true) {
+      const est = model.verts.map((x) => pose.apply(Pe, x));
+      const estPx = est.map((X) => projectPx(X, cam));
+      const syms = useSym ? model.syms : [model.syms[0]];
+      const perSymMssd = [];
+      const perSymMspd = [];
+      let mssd = null;
+      let mspd = null;
+      syms.forEach((S, si) => {
+        const Pgs = pose.withSym(Pg, S);
+        let max3 = -1;
+        let arg3 = -1;
+        let max2 = -1;
+        let arg2 = -1;
+        model.verts.forEach((x, i) => {
+          const G = pose.apply(Pgs, x);
+          const d3 = v3.dist(est[i], G);
+          if (d3 > max3) { max3 = d3; arg3 = i; }
+          const g = projectPx(G, cam);
+          const d2 = Math.hypot(estPx[i][0] - g[0], estPx[i][1] - g[1]);
+          if (d2 > max2) { max2 = d2; arg2 = i; }
+        });
+        perSymMssd.push(max3);
+        perSymMspd.push(max2);
+        if (!mssd || max3 < mssd.value) mssd = { value: max3, sym: si, vert: arg3 };
+        if (!mspd || max2 < mspd.value) mspd = { value: max2, sym: si, vert: arg2 };
+      });
+      let sum = 0;
+      model.verts.forEach((x, i) => { sum += v3.dist(est[i], pose.apply(Pg, x)); });
+      return { mssd, mspd, perSymMssd, perSymMspd, add: sum / model.verts.length };
+    }
+    // Matched point pairs (camera frame) under symmetry index si: est = P^ x, gt = P- S x.
+    function matchedPairs(Pe, Pg, model, si) {
+      const Pgs = pose.withSym(Pg, model.syms[si]);
+      return model.verts.map((x) => ({ est: pose.apply(Pe, x), gt: pose.apply(Pgs, x) }));
+    }
+
+    // ---- ray casting: distance maps (distance from the camera centre, 0 = no hit) ----
+    function rayPrim(o, d, prim) {
+      const ox = o[0] - prim.c[0];
+      const oy = o[1] - prim.c[1];
+      const oz = o[2] - prim.c[2];
+      let best = Infinity;
+      if (prim.type === 'box') {
+        let tmin = -Infinity;
+        let tmax = Infinity;
+        const oo = [ox, oy, oz];
+        for (let k = 0; k < 3; k += 1) {
+          if (Math.abs(d[k]) < 1e-12) {
+            if (Math.abs(oo[k]) > prim.half[k]) return Infinity;
+          } else {
+            const t1 = (-prim.half[k] - oo[k]) / d[k];
+            const t2 = (prim.half[k] - oo[k]) / d[k];
+            tmin = Math.max(tmin, Math.min(t1, t2));
+            tmax = Math.min(tmax, Math.max(t1, t2));
+          }
+        }
+        if (tmax >= Math.max(tmin, 0)) best = tmin > 0 ? tmin : tmax;
+        return best;
+      }
+      const a = d[0] * d[0] + d[2] * d[2];
+      if (a > 1e-12) {
+        const b = 2 * (ox * d[0] + oz * d[2]);
+        const c = ox * ox + oz * oz - prim.r * prim.r;
+        const disc = b * b - 4 * a * c;
+        if (disc >= 0) {
+          const t = (-b - Math.sqrt(disc)) / (2 * a);
+          if (t > 0 && Math.abs(oy + t * d[1]) <= prim.h) best = t;
+        }
+      }
+      if (Math.abs(d[1]) > 1e-12) {
+        [prim.h, -prim.h].forEach((yc) => {
+          const t = (yc - oy) / d[1];
+          if (t > 0 && t < best) {
+            const x = ox + t * d[0];
+            const z = oz + t * d[2];
+            if (x * x + z * z <= prim.r * prim.r) best = t;
+          }
+        });
+      }
+      return best;
+    }
+    // Maps may cover a zoomed window (roi, in image pixels) instead of the full
+    // image, so the pixel grid is large enough to read. VSD only needs the
+    // window to contain both silhouettes.
+    function fullRoi(cam) {
+      return { u0: 0, v0: 0, w: cam.w, h: cam.h };
+    }
+    function roiAround(px, w, h) {
+      return { u0: px[0] - w / 2, v0: px[1] - h / 2, w, h };
+    }
+    // Image pixel (u, v) at the centre of map cell (i, j).
+    function mapCellToImagePx(i, j, W, H, roi) {
+      return [roi.u0 + (i + 0.5) * roi.w / W, roi.v0 + (j + 0.5) * roi.h / H];
+    }
+    const rayCache = { key: '', rays: null };
+    function pixelRays(cam, W, H, roi) {
+      const q = roi || fullRoi(cam);
+      const key = [cam.w, W, H, q.u0, q.v0, q.w, q.h].map((x) => Math.round(x * 100)).join(':');
+      if (rayCache.key !== key) {
+        const rays = [];
+        for (let j = 0; j < H; j += 1) {
+          for (let i = 0; i < W; i += 1) {
+            const [u, v] = mapCellToImagePx(i, j, W, H, q);
+            rays.push(v3.norm([(u - cam.cx) / cam.f, -(v - cam.cy) / cam.f, 1]));
+          }
+        }
+        rayCache.key = key;
+        rayCache.rays = rays;
+      }
+      return rayCache.rays;
+    }
+    // Distance map of primitives placed by pose P (P = null: already in camera frame).
+    function renderDistance(prims, P, cam, W, H, roi) {
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      const Rt = P ? m3.T(P.R) : null;
+      const o = P ? m3.apply(Rt, v3.scale(P.t, -1)) : [0, 0, 0];
+      for (let n = 0; n < rays.length; n += 1) {
+        const d = P ? m3.apply(Rt, rays[n]) : rays[n];
+        let best = Infinity;
+        for (let k = 0; k < prims.length; k += 1) best = Math.min(best, rayPrim(o, d, prims[k]));
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+    // The test image D_I: what a depth sensor sees. Real object + occluders + back wall.
+    function sceneDistance(dGt, occluderPrims, cam, W, H, wallZ = 1500, roi) {
+      const dOcc = occluderPrims && occluderPrims.length ? renderDistance(occluderPrims, null, cam, W, H, roi) : null;
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      for (let n = 0; n < out.length; n += 1) {
+        let best = wallZ ? wallZ / rays[n][2] : Infinity;
+        if (dGt[n] > 0) best = Math.min(best, dGt[n]);
+        if (dOcc && dOcc[n] > 0) best = Math.min(best, dOcc[n]);
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+
+    // ---- VSD, as in bop_toolkit: visib_mode 'bop19', cost_type 'step' ----
+    const VSD_DELTA = 15;  // mm, visibility tolerance
+    function visibMask(dTest, dModel, delta = VSD_DELTA) {
+      const out = new Uint8Array(dModel.length);
+      for (let n = 0; n < out.length; n += 1) {
+        out[n] = dModel[n] > 0 && (dTest[n] === 0 || dModel[n] - dTest[n] <= delta) ? 1 : 0;
+      }
+      return out;
+    }
+    // labels: 0 outside the union, 1 match, 2 both visible but |dD| >= tau,
+    // 3 visible only in the GT pose, 4 visible only in the estimated pose.
+    function vsd(dEst, dGt, dTest, tau, delta = VSD_DELTA) {
+      const visGt = visibMask(dTest, dGt, delta);
+      const visEst = visibMask(dTest, dEst, delta);
+      for (let n = 0; n < visEst.length; n += 1) if (visGt[n] && dEst[n] > 0) visEst[n] = 1;
+      const labels = new Uint8Array(dEst.length);
+      const count = [0, 0, 0, 0, 0];
+      for (let n = 0; n < labels.length; n += 1) {
+        let l = 0;
+        if (visGt[n] && visEst[n]) l = Math.abs(dEst[n] - dGt[n]) < tau ? 1 : 2;
+        else if (visGt[n]) l = 3;
+        else if (visEst[n]) l = 4;
+        labels[n] = l;
+        count[l] += 1;
+      }
+      const nUnion = count[1] + count[2] + count[3] + count[4];
+      const e = nUnion === 0 ? 1 : (count[2] + count[3] + count[4]) / nUnion;
+      return { e, labels, visGt, visEst, nUnion, nInter: count[1] + count[2], nMatch: count[1], nMismatch: count[2], nGtOnly: count[3], nEstOnly: count[4] };
+    }
+
+    // ---- BOP thresholds and the per-pose share of Average Recall ----
+    const FRACS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+    const mssdThresholds = (diameter) => FRACS.map((k) => k * diameter);        // mm
+    const mspdThresholds = (cam) => FRACS.map((k) => k * 100 * cam.r);          // 5r .. 50r px
+    const passes = (e, thresholds) => thresholds.map((th) => e < th);           // correct iff e < theta
+    const share = (flags) => flags.filter(Boolean).length / flags.length;
+    // 10 x 10 grid: tau = 5%..50% of the diameter (rows), theta = 0.05..0.5 (columns).
+    function vsdGrid(dEst, dGt, dTest, diameter, delta = VSD_DELTA) {
+      const errors = FRACS.map((k) => vsd(dEst, dGt, dTest, k * diameter, delta).e);
+      const grid = errors.map((e) => FRACS.map((theta) => e < theta));
+      return { errors, grid, score: share(grid.flat()) };
+    }
+    // ===================== END BOP KIT =====================
+
+    // ===================== BOP DRAW (copy verbatim) =====================
+    // Browser-side helpers. Camera-frame millimetres -> orbit-view units.
+    const SCENE = { pivot: [0, 0, 380], scale: 0.01 };
+    const toView = (X) => [
+      (X[0] - SCENE.pivot[0]) * SCENE.scale,
+      (X[1] - SCENE.pivot[1]) * SCENE.scale,
+      (X[2] - SCENE.pivot[2]) * SCENE.scale,
+    ];
+    function drawWire(model, P, vp, o = {}) {
+      model.wire.forEach(([a, b]) => line3(toView(pose.apply(P, a)), toView(pose.apply(P, b)), vp, o));
+    }
+    function drawBoxPrim(prim, vp, o = {}) {
+      boxWire(prim.c, prim.half).forEach(([a, b]) => line3(toView(a), toView(b), vp, o));
+    }
+    // Camera-frame 3D point on the drawn image plane for pixel (u, v).
+    function imagePlanePoint(px, cam, zPlane) {
+      return [(px[0] - cam.cx) / cam.f * zPlane, -(px[1] - cam.cy) / cam.f * zPlane, zPlane];
+    }
+    function drawFrustum(cam, vp, zPlane = 170, o = {}) {
+      const corners = [[0, 0], [cam.w, 0], [cam.w, cam.h], [0, cam.h]].map((p) => imagePlanePoint(p, cam, zPlane));
+      polyline3(corners.map(toView), vp, { close: true, color: o.color || 'rgba(182, 206, 245, 0.55)', fill: o.fill || 'rgba(90, 166, 255, 0.05)', width: 1.2 });
+      corners.forEach((c) => line3(toView([0, 0, 0]), toView(v3.scale(c, o.reach || 4.2)), vp, { color: 'rgba(182, 206, 245, 0.16)', dash: [4, 6] }));
+      dot3(toView([0, 0, 0]), vp, { color: '#ebf2ff', r: 4, label: o.label ?? 'camera' });
+      return corners;
+    }
+    // Low-resolution map (distance map, mask, label map) drawn as a crisp inset.
+    const insetCanvases = new Map();
+    function drawMapInset(key, x, y, w, h, title, W, H, colorFn, o = {}) {
+      let off = insetCanvases.get(key);
+      if (!off || off.width !== W || off.height !== H) {
+        off = document.createElement('canvas');
+        off.width = W;
+        off.height = H;
+        insetCanvases.set(key, off);
+      }
+      const octx = off.getContext('2d');
+      const img = octx.createImageData(W, H);
+      for (let n = 0; n < W * H; n += 1) {
+        const c = colorFn(n);
+        img.data[4 * n] = c[0];
+        img.data[4 * n + 1] = c[1];
+        img.data[4 * n + 2] = c[2];
+        img.data[4 * n + 3] = 255;
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, x, y, w, h);
+      ctx.strokeStyle = o.border || 'rgba(132, 160, 202, 0.55)';
+      ctx.lineWidth = o.borderWidth || 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+      ctx.fillStyle = 'rgba(7, 17, 31, 0.78)';
+      ctx.fillRect(x + 1, y + 1, ctx.measureText(title).width + 22, 17);
+      ctx.fillStyle = o.titleColor || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.fillText(title, x + 6, y + 13);
+      ctx.restore();
+    }
+    const EMPTY_RGB = [9, 16, 28];
+    // Near = bright, far = dark. 0 (no hit) = empty.
+    function distShade(d, near, far, tint = [134, 212, 255]) {
+      if (!(d > 0)) return EMPTY_RGB;
+      const k = 0.22 + 0.78 * clamp((far - d) / (far - near), 0, 1);
+      return [tint[0] * k, tint[1] * k, tint[2] * k];
+    }
+    // VSD label colours: 1 match, 2 too far apart, 3 GT only, 4 estimate only.
+    const LABEL_RGB = [EMPTY_RGB, [120, 220, 130], [255, 110, 110], [90, 166, 255], [240, 143, 60]];
+    // A row of pass/fail chips for one error function. Returns the height used.
+    function drawLadder(x, y, w, title, valueText, flags, firstLabel, lastLabel) {
+      const n = flags.length;
+      const gap = 3;
+      const cw = (w - gap * (n - 1)) / n;
+      ctx.save();
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(235, 242, 255, 0.92)';
+      ctx.fillText(title, x, y + 11);
+      ctx.textAlign = 'right';
+      ctx.font = '600 12px ui-monospace, Menlo, monospace';
+      ctx.fillText(valueText, x + w, y + 11);
+      flags.forEach((ok, i) => {
+        ctx.fillStyle = ok ? 'rgba(120, 220, 130, 0.85)' : 'rgba(255, 110, 110, 0.75)';
+        ctx.fillRect(x + i * (cw + gap), y + 18, cw, 12);
+      });
+      ctx.font = '10px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+      ctx.textAlign = 'left';
+      ctx.fillText(firstLabel, x, y + 43);
+      ctx.textAlign = 'right';
+      ctx.fillText(lastLabel, x + w, y + 43);
+      ctx.textAlign = 'center';
+      ctx.fillText(`passes ${flags.filter(Boolean).length} of ${n}`, x + w / 2, y + 43);
+      ctx.restore();
+      return 50;
+    }
+    // ===================== END BOP DRAW =====================
+
+    // ===================== CHAPTER 3: VSD =====================
+    const cam = makeCamera(640);
+    const MAP_W = 128;
+    const MAP_H = 96;
+    const Z_PLANE = 200;
+    const OCC_Z = 330;
+    const OCC_HALF = [35, 80, 10];
+    const GT_DEPTH = 450;
+    const mug = makeModel('mug');
+    SCENE.pivot = [0, 0, 260];
+    SCENE.scale = 0.014;
+    view.home = { yaw: -0.8, pitch: 0.3 };
+    resetView();
+
+    const BLUE = [90, 166, 255];
+    const WARM = [240, 143, 60];
+    const BOTH = [190, 172, 232];
+    const HIDDEN = [58, 66, 80];
+    const VOTE_NAMES = ['no ballot', 'fine', 'too far apart', 'true pose only', 'estimate only'];
+
+    // Angles in degrees, lengths in mm. One flat object keeps sliders easy to sync.
+    const BASE = { az: 20, gtTilt: 15, spin: 0, dx: 0, ray: 0, tilt: 0, occOn: false, occX: 120, tauPct: 20 };
+    const state = { ...BASE, step: 4, probe: { i: MAP_W / 2, j: MAP_H / 2 } };
+    let dirty = true;
+    let R = null;
+
+    // The whole VSD pipeline for one scenario. Pure: it does not touch `state`.
+    function evaluate(s) {
+      const Pg = gtPose({ az: rad(s.az), tilt: rad(s.gtTilt), z: GT_DEPTH });
+      const Pe = perturb(Pg, { spin: rad(s.spin), tilt: rad(s.tilt), dx: s.dx, ray: s.ray });
+      const roi = roiAround(projectPx(Pg.t, cam), 320, 240);
+      const dGt = renderDistance(mug.prims, Pg, cam, MAP_W, MAP_H, roi);
+      const dEst = renderDistance(mug.prims, Pe, cam, MAP_W, MAP_H, roi);
+      const occ = s.occOn ? [{ type: 'box', c: [s.occX, 0, OCC_Z], half: OCC_HALF }] : [];
+      const dTest = sceneDistance(dGt, occ, cam, MAP_W, MAP_H, 1500, roi);
+      const tau = (s.tauPct / 100) * mug.diameter;
+      const v = vsd(dEst, dGt, dTest, tau);
+      const grid = vsdGrid(dEst, dGt, dTest, mug.diameter);
+      const errs = surfaceErrors(Pe, Pg, mug, cam);
+      // Pixels that enter V^ only through the second rule (p in V-bar and D^(p) > 0).
+      const plain = visibMask(dTest, dEst);
+      let nSecondRule = 0;
+      for (let n = 0; n < plain.length; n += 1) if (v.visEst[n] && !plain[n]) nSecondRule += 1;
+      return { Pg, Pe, roi, dGt, dEst, dTest, occ, tau, v, grid, errs, nSecondRule };
+    }
+
+    // ---- controls ----
+    const ui = {};
+    function touch() {
+      dirty = true;
+      presetGroup.setActive(null);
+    }
+    ui.tauPct = makeSlider(document.getElementById('tauHost'), {
+      label: 'Misalignment tolerance τ', min: 5, max: 50, step: 5, value: BASE.tauPct,
+      format: (v) => `${v}% d = ${fmt((v / 100) * mug.diameter, 1)} mm`,
+      onInput: (v) => { state.tauPct = v; dirty = true; },
+    });
+    const errHost = document.getElementById('errHost');
+    ui.spin = makeSlider(errHost, { label: 'Spin about the mug axis', min: -180, max: 180, step: 1, value: 0, format: (v) => v + '°', onInput: (v) => { state.spin = v; touch(); } });
+    ui.dx = makeSlider(errHost, { label: 'Slide sideways', min: -40, max: 40, step: 1, value: 0, format: (v) => v + ' mm', onInput: (v) => { state.dx = v; touch(); } });
+    ui.ray = makeSlider(errHost, { label: 'Slide along the viewing ray', min: -120, max: 120, step: 1, value: 0, format: (v) => v + ' mm', onInput: (v) => { state.ray = v; touch(); } });
+    ui.tilt = makeSlider(errHost, { label: 'Tilt about the camera x axis', min: -30, max: 30, step: 1, value: 0, format: (v) => v + '°', onInput: (v) => { state.tilt = v; touch(); } });
+    ui.az = makeSlider(document.getElementById('gtHost'), { label: 'Handle azimuth of the true pose', min: -180, max: 180, step: 1, value: BASE.az, format: (v) => v + '°', onInput: (v) => { state.az = v; touch(); } });
+    ui.occX = makeSlider(document.getElementById('occHost'), { label: 'Board position x', min: -120, max: 120, step: 1, value: BASE.occX, format: (v) => v + ' mm', onInput: (v) => { state.occX = v; touch(); } });
+    const occToggle = document.getElementById('occToggle');
+    occToggle.addEventListener('change', () => { state.occOn = occToggle.checked; touch(); });
+
+    const steps = [
+      { label: '1 Render', value: 1, lit: ['dgt', 'dest'] },
+      { label: '2 Visibility', value: 2, lit: ['di', 'vgt', 'vest'] },
+      { label: '3 Vote', value: 3, lit: ['votes'] },
+      { label: '4 Score', value: 4, lit: ['votes'] },
+    ];
+    makeButtonGroup(document.getElementById('stepGrid'), steps, (value) => { state.step = value; dirty = true; }, { active: 4 });
+
+    const presets = [
+      { label: 'Perfect', value: 'perfect', s: {} },
+      { label: 'Hidden handle, spin 50°', value: 'hidden', s: { az: -115, gtTilt: 12, spin: 50 } },
+      { label: 'Visible handle, spin 50°', value: 'visible', s: { spin: 50 } },
+      { label: 'Too deep by 100 mm', value: 'deep', s: { ray: 100 } },
+      { label: 'Sideways 15 mm', value: 'side', s: { dx: 15 } },
+      { label: 'Board hides handle, spin 50°', value: 'occ', s: { spin: 50, occOn: true, occX: 50 } },
+    ];
+    function applyScenario(s) {
+      Object.assign(state, BASE, s);
+      state.probe = { i: MAP_W / 2, j: MAP_H / 2 };
+      ['tauPct', 'spin', 'dx', 'ray', 'tilt', 'az', 'occX'].forEach((k) => ui[k].set(state[k]));
+      occToggle.checked = state.occOn;
+      dirty = true;
+    }
+    const presetGroup = makeButtonGroup(document.getElementById('presetGrid'), presets,
+      (value, item) => applyScenario(item.s), { active: 'perfect' });
+    document.getElementById('resetBtn').addEventListener('click', resetView);
+
+    // ---- predict-first cards: every number in an answer comes from the kit ----
+    const hiddenCase = { ...BASE, ...presets[1].s };
+    const rayCase = { ...BASE, ray: 30 };
+    const visibleCase = { ...BASE, spin: 50 };
+    const boardCase = { ...BASE, spin: 50, occOn: true, occX: 50 };
+    function fillAnswers() {
+      const pct = (r) => fmt((100 * r.errs.mssd.value) / mug.diameter, 0);
+      const h = evaluate(hiddenCase);
+      document.getElementById('answer1').innerHTML =
+        `<strong>About zero: e = ${fmt(h.v.e, 2)}.</strong> The body hides the handle in both poses, so both depth photos are the same photo. ` +
+        `VSD needed no symmetry list to know that. MSSD says the opposite: <strong>${fmt(h.errs.mssd.value, 0)} mm, ${pct(h)}% of the diameter</strong>.`;
+      const r20 = evaluate({ ...rayCase, tauPct: 20 });
+      const r30 = evaluate({ ...rayCase, tauPct: 30 });
+      document.getElementById('answer2').innerHTML =
+        `At τ = 20% (${fmt(r20.tau, 0)} mm) the 30 mm gap is too big: <strong>e = ${fmt(r20.v.e, 2)}</strong>. ` +
+        `At τ = 30% (${fmt(r30.tau, 0)} mm) the same gap is fine: <strong>e = ${fmt(r30.v.e, 2)}</strong>. ` +
+        'Almost every shared pixel flips at once, because each vote is all-or-nothing. ' +
+        'The share that stays red and blue is the rim: a farther mug looks smaller.';
+      const open = evaluate(visibleCase);
+      const board = evaluate(boardCase);
+      document.getElementById('answer3').innerHTML =
+        `<strong>It falls: e = ${fmt(open.v.e, 2)} drops to ${fmt(board.v.e, 2)}.</strong> Pixels behind the board lose their ballot. ` +
+        'The error judges only what the sensor could see. ' +
+        `Note the first number too. The handle is a small share of the visible surface, so even a 50° spin costs only ${fmt(100 * open.v.e, 0)}% of the ballots.`;
+    }
+    document.getElementById('setup1').addEventListener('click', () => { applyScenario(presets[1].s); presetGroup.setActive('hidden'); });
+    document.getElementById('setup2').addEventListener('click', () => { applyScenario({ ray: 30 }); presetGroup.setActive(null); });
+    document.getElementById('setup3').addEventListener('click', () => { applyScenario({ spin: 50, occOn: true, occX: 120 }); presetGroup.setActive(null); });
+
+    // ---- Math tab: 10 x 10 table, built once ----
+    const gridCells = [];
+    const gridRows = [];
+    (function buildGridTable() {
+      const table = document.createElement('table');
+      table.className = 'vgrid';
+      const head = document.createElement('tr');
+      head.appendChild(document.createElement('th')).textContent = 'τ \\ θ';
+      FRACS.forEach((theta) => { head.appendChild(document.createElement('th')).textContent = theta.toFixed(2).slice(1); });
+      table.appendChild(head);
+      FRACS.forEach((k) => {
+        const tr = document.createElement('tr');
+        tr.appendChild(document.createElement('th')).textContent = Math.round(k * 100) + '%';
+        const row = FRACS.map(() => tr.appendChild(document.createElement('td')));
+        gridCells.push(row);
+        gridRows.push(tr);
+        table.appendChild(tr);
+      });
+      document.getElementById('gridHost').appendChild(table);
+    })();
+
+    // ---- probe pixel ----
+    function probeIndex() {
+      return state.probe.j * MAP_W + state.probe.i;
+    }
+    function probeRay() {
+      const [u, v] = mapCellToImagePx(state.probe.i, state.probe.j, MAP_W, MAP_H, R.roi);
+      return { px: [u, v], dir: v3.norm([(u - cam.cx) / cam.f, -(v - cam.cy) / cam.f, 1]) };
+    }
+    function probeVerdict() {
+      const n = probeIndex();
+      const label = R.v.labels[n];
+      const gap = Math.abs(R.dEst[n] - R.dGt[n]);
+      if (label === 1) return { label, text: `fine: |D̂ − D̄| = ${fmt(gap, 1)} mm < τ = ${fmt(R.tau, 1)} mm` };
+      if (label === 2) return { label, text: `not fine: |D̂ − D̄| = ${fmt(gap, 1)} mm ≥ τ = ${fmt(R.tau, 1)} mm` };
+      if (label === 3) return { label, text: 'not fine: only the true pose is visible here' };
+      if (label === 4) return { label, text: 'not fine: only the estimate is visible here' };
+      if (R.dGt[n] > 0 || R.dEst[n] > 0) return { label, text: 'no ballot: the sensor saw something closer, so the model is occluded here' };
+      return { label, text: 'no ballot: neither pose puts the object here' };
+    }
+
+    // ---- image-plane texture for the 3D scene ----
+    const planeTex = document.createElement('canvas');
+    planeTex.width = MAP_W;
+    planeTex.height = MAP_H;
+    function planeColor(n) {
+      if (state.step === 1) {
+        const g = R.dGt[n] > 0;
+        const e = R.dEst[n] > 0;
+        return g && e ? BOTH : g ? BLUE : e ? WARM : null;
+      }
+      if (state.step === 2) {
+        const g = R.v.visGt[n];
+        const e = R.v.visEst[n];
+        if (g && e) return BOTH;
+        if (g) return BLUE;
+        if (e) return WARM;
+        return R.dGt[n] > 0 || R.dEst[n] > 0 ? HIDDEN : null;
+      }
+      return R.v.labels[n] ? LABEL_RGB[R.v.labels[n]] : null;
+    }
+    function buildPlaneTexture() {
+      const pctx = planeTex.getContext('2d');
+      const img = pctx.createImageData(MAP_W, MAP_H);
+      for (let n = 0; n < MAP_W * MAP_H; n += 1) {
+        const c = planeColor(n);
+        if (!c) continue;
+        img.data[4 * n] = c[0];
+        img.data[4 * n + 1] = c[1];
+        img.data[4 * n + 2] = c[2];
+        img.data[4 * n + 3] = 235;
+      }
+      pctx.putImageData(img, 0, 0);
+    }
+    function roiCorner(a, b) {
+      return imagePlanePoint([R.roi.u0 + a * R.roi.w, R.roi.v0 + b * R.roi.h], cam, Z_PLANE);
+    }
+    // The window is small, so an affine map from three corners is accurate enough.
+    function drawPlaneTexture(vp) {
+      const tl = project(toView(roiCorner(0, 0)), vp);
+      const tr = project(toView(roiCorner(1, 0)), vp);
+      const bl = project(toView(roiCorner(0, 1)), vp);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.transform((tr.x - tl.x) / MAP_W, (tr.y - tl.y) / MAP_W, (bl.x - tl.x) / MAP_H, (bl.y - tl.y) / MAP_H, tl.x, tl.y);
+      ctx.drawImage(planeTex, 0, 0);
+      ctx.restore();
+      const ring = [roiCorner(0, 0), roiCorner(1, 0), roiCorner(1, 1), roiCorner(0, 1)].map(toView);
+      polyline3(ring, vp, { close: true, color: 'rgba(235, 242, 255, 0.55)', dash: [4, 4], width: 1 });
+      text3(toView(roiCorner(0, 1)), vp, 'zoom window = the insets', { color: 'rgba(138, 161, 192, 0.95)', font: '11px Inter, sans-serif', dy: 14 });
+    }
+
+    // ---- refresh: runs only when something changed ----
+    function badgeHtml() {
+      const e = R.v.e;
+      const k = passes(e, FRACS).filter(Boolean).length;
+      if (e < FRACS[0]) return '<span class="badge good">correct for every θ</span>';
+      if (k === 0) return '<span class="badge bad">wrong for every θ</span>';
+      return `<span class="badge warn">correct for ${k} of 10 θ</span>`;
+    }
+    function captionHtml() {
+      const v = R.v;
+      const fail = v.nUnion - v.nMatch;
+      const nGt = v.visGt.reduce((a, b) => a + b, 0);
+      const nEst = v.visEst.reduce((a, b) => a + b, 0);
+      if (state.step === 1) {
+        return `${badgeHtml()} <strong>Step 1.</strong> Render the model twice: at the true pose (<span class="sym">D̄</span>) and at the estimate (<span class="sym">D̂</span>). ` +
+          'Each pixel stores the distance from the camera centre to the surface it hits.';
+      }
+      if (state.step === 2) {
+        return `${badgeHtml()} <strong>Step 2.</strong> Compare each render with the sensor map D<sub>I</sub>. ` +
+          `A pixel keeps its ballot only if the model lies at most δ = 15 mm behind what the sensor measured: <span class="sym">|V̄|</span> = <strong>${nGt}</strong>, <span class="sym">|V̂|</span> = <strong>${nEst}</strong>.`;
+      }
+      if (v.nUnion === 0) {
+        return `${badgeHtml()} No pixel holds a ballot, because nothing of the object is visible. BOP sets e<sub>VSD</sub> = 1 in that case.`;
+      }
+      if (state.step === 3) {
+        return `${badgeHtml()} <strong>Step 3.</strong> <strong>${v.nUnion}</strong> pixels hold a ballot. <strong>${v.nMatch}</strong> say fine: ` +
+          `both poses are visible there and <span class="sym">|D̂ − D̄|</span> &lt; τ = ${fmt(R.tau, 1)} mm. The other <strong>${fail}</strong> do not.`;
+      }
+      return `${badgeHtml()} <strong>${fail}</strong> of <strong>${v.nUnion}</strong> ballots are not fine, so e<sub>VSD</sub> = <strong>${fmt(v.e, 3)}</strong> at τ = ${state.tauPct}% d. ` +
+        `For contrast, MSSD reads <strong>${fmt(R.errs.mssd.value, 1)} mm</strong> (${fmt((100 * R.errs.mssd.value) / mug.diameter, 0)}% d).`;
+    }
+    function refresh() {
+      R = evaluate(state);
+      buildPlaneTexture();
+      const v = R.v;
+      const n = probeIndex();
+      const nGt = v.visGt.reduce((a, b) => a + b, 0);
+      const nEst = v.visEst.reduce((a, b) => a + b, 0);
+      document.getElementById('counts').innerHTML =
+        `<span><span class="sym">|V̄|</span> visible, true pose</span><strong>${nGt}</strong>` +
+        `<span><span class="sym">|V̂|</span> visible, estimate</span><strong>${nEst}</strong>` +
+        `<span>… of those, added by the second rule</span><strong>${R.nSecondRule}</strong>` +
+        `<span><span class="sym">|V̂ ∩ V̄|</span></span><strong>${v.nInter}</strong>` +
+        `<span><span class="sym">|V̂ ∪ V̄|</span> ballots</span><strong>${v.nUnion}</strong>` +
+        `<span class="good">fine</span><strong>${v.nMatch}</strong>` +
+        `<span class="bad">too far apart</span><strong>${v.nMismatch}</strong>` +
+        `<span style="color:#5aa6ff">true pose only</span><strong>${v.nGtOnly}</strong>` +
+        `<span class="warn">estimate only</span><strong>${v.nEstOnly}</strong>` +
+        `<span>τ</span><strong>${state.tauPct}% d = ${fmt(R.tau, 1)} mm</strong>` +
+        `<span>e_VSD</span><strong>${v.nUnion ? `${v.nUnion - v.nMatch} / ${v.nUnion} = ${fmt(v.e, 3)}` : '1 (empty union)'}</strong>`;
+      const mm = (d) => (d > 0 ? fmt(d, 1) + ' mm' : 'no hit');
+      document.getElementById('probeKv').innerHTML =
+        `<span>cell (column, row)</span><strong>${state.probe.i}, ${state.probe.j}</strong>` +
+        `<span>D_I sensor</span><strong>${mm(R.dTest[n])}</strong>` +
+        `<span><span class="sym">D̄</span> true pose</span><strong>${mm(R.dGt[n])}</strong>` +
+        `<span><span class="sym">D̂</span> estimate</span><strong>${mm(R.dEst[n])}</strong>` +
+        `<span>in <span class="sym">V̄</span> / in <span class="sym">V̂</span></span><strong>${v.visGt[n] ? 'yes' : 'no'} / ${v.visEst[n] ? 'yes' : 'no'}</strong>` +
+        `<span>vote</span><strong>${probeVerdict().text}</strong>`;
+      R.grid.grid.forEach((row, a) => {
+        row.forEach((ok, b) => { gridCells[a][b].className = ok ? 'ok' : 'no'; });
+        gridRows[a].className = Math.round(FRACS[a] * 100) === state.tauPct ? 'cur' : '';
+      });
+      const nPass = R.grid.grid.flat().filter(Boolean).length;
+      document.getElementById('gridLine').innerHTML =
+        `This pose passes <strong>${nPass} of 100</strong> settings. AR<sub>VSD</sub> averages recall over exactly these 100 settings. The outlined row is the current τ.`;
+      document.getElementById('secondRule').innerHTML = R.nSecondRule
+        ? `Right now the second rule adds <strong>${R.nSecondRule}</strong> pixels to <span class="sym">V̂</span>. Without it they would hold no ballot.`
+        : 'Right now the second rule adds no pixel. Try the scenario "Too deep by 100 mm".';
+      document.getElementById('contrast').innerHTML =
+        `<span>diameter d</span><strong>${fmt(mug.diameter, 1)} mm</strong>` +
+        `<span>MSSD</span><strong>${fmt(R.errs.mssd.value, 1)} mm = ${fmt((100 * R.errs.mssd.value) / mug.diameter, 0)}% d</strong>` +
+        `<span>MSPD</span><strong>${fmt(R.errs.mspd.value, 1)} px</strong>` +
+        `<span>VSD at current τ</span><strong>${fmt(v.e, 3)}</strong>`;
+      setCaption(captionHtml());
+      dirty = false;
+    }
+
+    // ---- insets ----
+    function insetLayout() {
+      const w = canvas.clientWidth;
+      const iw = clamp(Math.floor((w * 0.47 - 16) / 3), 96, 150);
+      const ih = Math.round(iw * 0.75);
+      const gap = 8;
+      const width = 3 * iw + 2 * gap;
+      const x0 = w - 16 - width;
+      const keys = ['di', 'dgt', 'dest', 'vgt', 'vest', 'votes'];
+      const rects = keys.map((key, k) => ({ key, x: x0 + (k % 3) * (iw + gap), y: 16 + Math.floor(k / 3) * (ih + gap), w: iw, h: ih }));
+      return { rects, x0, width, bottom: 16 + 2 * ih + gap };
+    }
+    const insetSpec = {
+      di: { title: 'D_I  test image', color: (n) => distShade(R.dTest[n], 300, 560, [176, 190, 210]) },
+      dgt: { title: 'D̄  true pose', color: (n) => distShade(R.dGt[n], 380, 520, [110, 180, 255]) },
+      dest: { title: 'D̂  estimate', color: (n) => distShade(R.dEst[n], 380, 520, WARM) },
+      vgt: { title: 'V̄  visible, true', color: (n) => (R.v.visGt[n] ? BLUE : R.dGt[n] > 0 ? HIDDEN : EMPTY_RGB) },
+      vest: { title: 'V̂  visible, estimate', color: (n) => (R.v.visEst[n] ? WARM : R.dEst[n] > 0 ? HIDDEN : EMPTY_RGB) },
+      votes: { title: 'votes', color: (n) => LABEL_RGB[R.v.labels[n]] },
+    };
+    function drawInsets(layout) {
+      const lit = steps[state.step - 1].lit;
+      layout.rects.forEach((r) => {
+        const on = lit.includes(r.key);
+        const spec = insetSpec[r.key];
+        drawMapInset(r.key, r.x, r.y, r.w, r.h, spec.title, MAP_W, MAP_H, spec.color,
+          on ? { border: '#ebf2ff', borderWidth: 2 } : {});
+        ctx.save();
+        if (!on && state.step < 4) {
+          ctx.fillStyle = 'rgba(7, 17, 31, 0.55)';
+          ctx.fillRect(r.x, r.y, r.w, r.h);
+        }
+        const cx = r.x + ((state.probe.i + 0.5) / MAP_W) * r.w;
+        const cy = r.y + ((state.probe.j + 0.5) / MAP_H) * r.h;
+        ctx.strokeStyle = '#ebf2ff';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(cx - 4, cy - 4, 8, 8);
+        ctx.restore();
+      });
+    }
+    function drawMiniRow(x, y, w, title, valueText, flags) {
+      const gap = 3;
+      const cw = (w - gap * (flags.length - 1)) / flags.length;
+      ctx.save();
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(235, 242, 255, 0.92)';
+      ctx.fillText(title, x, y + 11);
+      ctx.textAlign = 'right';
+      ctx.font = '600 12px ui-monospace, Menlo, monospace';
+      ctx.fillText(valueText, x + w, y + 11);
+      flags.forEach((ok, k) => {
+        ctx.fillStyle = ok ? 'rgba(120, 220, 130, 0.85)' : 'rgba(255, 110, 110, 0.75)';
+        ctx.fillRect(x + k * (cw + gap), y + 17, cw, 5);
+      });
+      ctx.restore();
+      return 30;
+    }
+    function drawReadouts(layout) {
+      const x = layout.x0;
+      const w = layout.width;
+      let y = layout.bottom + 10;
+      ctx.save();
+      ctx.font = '11px Inter, sans-serif';
+      [1, 2, 3, 4].forEach((label, k) => {
+        const kx = x + k * (w / 4);
+        const c = LABEL_RGB[label];
+        ctx.fillStyle = `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+        ctx.fillRect(kx, y, 10, 10);
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.98)';
+        ctx.fillText(VOTE_NAMES[label], kx + 15, y + 9);
+      });
+      y += 22;
+      const verdict = probeVerdict();
+      const pc = verdict.label ? LABEL_RGB[verdict.label] : [138, 161, 192];
+      ctx.fillStyle = `rgb(${pc[0]}, ${pc[1]}, ${pc[2]})`;
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillText('probe pixel → ' + verdict.text, x, y + 9);
+      ctx.restore();
+      y += 22;
+      const v = R.v;
+      const score = v.nUnion ? `${v.nUnion - v.nMatch} / ${v.nUnion} = ${fmt(v.e, 3)}` : 'empty union → 1';
+      y += drawLadder(x, y, w, `VSD at τ = ${state.tauPct}% d`, score, passes(v.e, FRACS), 'θ 0.05', 'θ 0.5') + 6;
+      const d = mug.diameter;
+      y += drawMiniRow(x, y, w, 'MSSD, for contrast', `${fmt(R.errs.mssd.value, 1)} mm = ${fmt((100 * R.errs.mssd.value) / d, 0)}% d`, passes(R.errs.mssd.value, mssdThresholds(d)));
+      drawMiniRow(x, y, w, 'MSPD, for contrast', `${fmt(R.errs.mspd.value, 1)} px`, passes(R.errs.mspd.value, mspdThresholds(cam)));
+    }
+
+    // Click or drag inside any inset to move the probe pixel.
+    function cellFromScreen(s, rect) {
+      const r = rect || insetLayout().rects.find((q) => s[0] >= q.x && s[0] <= q.x + q.w && s[1] >= q.y && s[1] <= q.y + q.h);
+      if (!r) return null;
+      return {
+        rect: r,
+        i: clamp(Math.floor(((s[0] - r.x) / r.w) * MAP_W), 0, MAP_W - 1),
+        j: clamp(Math.floor(((s[1] - r.y) / r.h) * MAP_H), 0, MAP_H - 1),
+      };
+    }
+    function moveProbe(cell) {
+      state.probe = { i: cell.i, j: cell.j };
+      dirty = true;
+    }
+    app.hitTest = (planePt, s) => {
+      const cell = cellFromScreen(s);
+      if (!cell) return null;
+      moveProbe(cell);
+      return { rect: cell.rect };
+    };
+    app.onDrag = (handle, planePt, s) => moveProbe(cellFromScreen(s, handle.rect));
+    app.mainViewport = () => viewport(canvas.clientWidth * 0.4, canvas.clientHeight * 0.64,
+      Math.min(canvas.clientWidth, canvas.clientHeight) / 9);
+
+    // ---- 3D scene ----
+    function drawProbeRay(vp) {
+      const n = probeIndex();
+      const { px, dir } = probeRay();
+      const hits = [R.dGt[n], R.dEst[n]].filter((d) => d > 0);
+      const reach = hits.length ? Math.max(...hits) + 45 : 560;
+      line3(toView([0, 0, 0]), toView(v3.scale(dir, reach)), vp, { color: 'rgba(235, 242, 255, 0.8)', width: 1.3 });
+      dot3(toView(imagePlanePoint(px, cam, Z_PLANE)), vp, { color: '#ebf2ff', r: 3, glow: 6 });
+      const sensorFirst = R.dTest[n] > 0 && R.dTest[n] < 1400 && hits.length && R.dTest[n] < Math.min(...hits) - VSD_DELTA;
+      if (sensorFirst) dot3(toView(v3.scale(dir, R.dTest[n])), vp, { color: '#9aa7ba', r: 4, label: `D_I ${fmt(R.dTest[n], 0)}` });
+      if (R.dGt[n] > 0) {
+        const at = toView(v3.scale(dir, R.dGt[n]));
+        dot3(at, vp, { color: '#5aa6ff', r: 4.5 });
+        text3(at, vp, `D̄ ${fmt(R.dGt[n], 0)} mm`, { color: '#86d4ff', font: '600 12px Inter, sans-serif', dx: 9, dy: -9 });
+      }
+      if (R.dEst[n] > 0) {
+        const at = toView(v3.scale(dir, R.dEst[n]));
+        dot3(at, vp, { color: '#f08f3c', r: 4.5 });
+        text3(at, vp, `D̂ ${fmt(R.dEst[n], 0)} mm`, { color: '#f08f3c', font: '600 12px Inter, sans-serif', dx: 9, dy: 18 });
+      }
+    }
+    app.draw = () => {
+      if (dirty) refresh();
+      background();
+      const vp = app.mainViewport();
+      const corners = drawFrustum(cam, vp, Z_PLANE, { reach: 2.6 });
+      text3(toView(corners[0]), vp, 'image plane', { color: 'rgba(138, 161, 192, 0.95)', font: '11px Inter, sans-serif', dy: -6 });
+      drawPlaneTexture(vp);
+      drawWire(mug, R.Pg, vp, { color: '#5aa6ff', width: 1.4, alpha: 0.9 });
+      drawWire(mug, R.Pe, vp, { color: '#f08f3c', width: 1.4, alpha: 0.9 });
+      if (R.occ.length) {
+        drawBoxPrim(R.occ[0], vp, { color: 'rgba(154, 167, 186, 0.9)', width: 1.3 });
+        text3(toView([R.occ[0].c[0], OCC_HALF[1] + 8, OCC_Z]), vp, 'board', { color: 'rgba(154, 167, 186, 0.95)', font: '11px Inter, sans-serif', align: 'center' });
+      }
+      drawProbeRay(vp);
+      const layout = insetLayout();
+      drawInsets(layout);
+      drawReadouts(layout);
+    };
+
+    fillAnswers();
+    // Optional deep link, e.g. #preset=hidden&step=2&tab=math&tau=30
+    (function openFromHash() {
+      const q = new URLSearchParams(location.hash.slice(1));
+      const preset = presets.find((x) => x.value === (q.get('preset') || 'visible'));
+      applyScenario(preset.s);
+      presetGroup.setActive(preset.value);
+      const step = Number(q.get('step'));
+      if (step >= 1 && step <= 4) document.querySelectorAll('#stepGrid button')[step - 1].click();
+      const tau = Number(q.get('tau'));
+      if (tau >= 5 && tau <= 50) { state.tauPct = tau; ui.tauPct.set(tau); dirty = true; }
+      if (q.get('tab')) document.querySelector(`[data-tab-button="${q.get('tab')}"]`)?.click();
+    })();
+  </script>
+</body>
+</html>

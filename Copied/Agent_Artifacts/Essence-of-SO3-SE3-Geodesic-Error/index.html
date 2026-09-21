@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of Rotations and Rigid Motions</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f; --bg-2: #0a1627; --ink: #ebf2ff; --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24); --blue-1: #86d4ff; --blue-2: #5aa6ff;
+      --warm-1: #d3a35f; --warm-2: #f08f3c; --green: #a0e7a0; --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.86); --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    canvas#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    .page { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+    .eyebrow { color: var(--blue-1); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { margin: 10px 0 0; font-size: clamp(34px, 5vw, 60px); line-height: 1; }
+    .lead { margin-top: 14px; max-width: 40rem; color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    h2 { margin: 44px 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue-1); }
+    .rulers { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 22px; }
+    .ruler { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); border-left: 3px solid var(--warm-2); background: var(--panel); backdrop-filter: blur(12px); display: grid; gap: 6px; }
+    .ruler .name { font-size: 18px; font-weight: 700; }
+    .ruler .long { color: var(--muted); font-size: 12px; }
+    .ruler .pic { font-size: 14px; line-height: 1.5; }
+    .ruler .f { font-family: var(--mono); font-size: 12px; color: var(--blue-1); line-height: 1.5; overflow-x: auto; white-space: nowrap; }
+    .ruler .unit { font-size: 12px; color: var(--muted); }
+    .ruler .unit strong { color: var(--green); font-weight: 600; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    a.card {
+      display: grid; gap: 8px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--panel); backdrop-filter: blur(12px); color: var(--ink); text-decoration: none;
+      transition: transform 0.14s ease, border-color 0.14s ease;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: rgba(134, 212, 255, 0.8); }
+    .card .num { font-family: var(--mono); font-size: 12px; color: var(--warm-1); }
+    .card .title { font-size: 19px; font-weight: 700; line-height: 1.15; }
+    .card .hook { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .card .after { font-size: 13px; line-height: 1.5; color: var(--ink); }
+    .card .after::before { content: "After this you can say: "; color: var(--green); font-weight: 600; }
+    .card.core { border-color: rgba(240, 143, 60, 0.55); }
+    .how { color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 46rem; }
+    .how strong { color: var(--ink); }
+    .how a { color: var(--blue-1); }
+    .checklist { display: grid; gap: 8px; max-width: 50rem; }
+    .checklist label {
+      display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--panel); color: var(--muted); font-size: 14px; line-height: 1.45; cursor: pointer;
+    }
+    .checklist input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--blue-2); flex: none; }
+    .checklist label.done { color: var(--ink); border-color: rgba(160, 231, 160, 0.45); }
+    .checklist .ch { font-family: var(--mono); font-size: 11px; color: var(--warm-1); margin-left: auto; white-space: nowrap; }
+    .score { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .score strong { color: var(--green); font-family: var(--mono); }
+    .src { margin-top: 28px; color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 50rem; }
+    .state { position: fixed; right: 18px; bottom: 14px; z-index: 1; color: var(--muted); font-size: 12px; font-family: var(--mono); pointer-events: none; }
+    .state strong { color: var(--danger); font-weight: 600; }
+      .state strong.g { color: var(--green); }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div class="page">
+    <div class="eyebrow">Interactive notes · geometry before algebra</div>
+    <h1>Essence of Rotations and Rigid Motions</h1>
+    <p class="lead">
+      <strong>SO(3)</strong>, <strong>SE(3)</strong>, and what a <strong>geodesic error</strong> really measures.
+      Each chapter gives you one physical picture, lets you break it on purpose, and only then writes the formula.
+      Every number comes from one shared implementation that passes 30 unit tests.
+    </p>
+
+    <div class="rulers">
+      <div class="ruler">
+        <span class="name">SO(3)</span>
+        <span class="long">Special Orthogonal group · pure 3D rotations</span>
+        <span class="pic">A rigid bracket of three unit sticks at right angles. Any way of <strong>holding the bracket</strong> is a rotation. The columns of R are where the sticks point.</span>
+        <span class="f">RᵀR = I, det R = +1</span>
+        <span class="unit"><strong>3 degrees of freedom.</strong> Says which way it points.</span>
+      </div>
+      <div class="ruler">
+        <span class="name">SE(3)</span>
+        <span class="long">Special Euclidean group · rigid-body motions</span>
+        <span class="pic">A two-step instruction: <strong>turn</strong> the bracket, then <strong>carry</strong> it to its place.</span>
+        <span class="f">T = [ R t ; 0 1 ], p_cam = R p_obj + t</span>
+        <span class="unit"><strong>6 degrees of freedom.</strong> Says where it points and where it is.</span>
+      </div>
+      <div class="ruler">
+        <span class="name">Geodesic error</span>
+        <span class="long">Shortest path inside the group</span>
+        <span class="pic">Stick tips live on a globe. <strong>Walk along the surface</strong>. Do not tunnel through it. The walk is one turn about one axis.</span>
+        <span class="f">θ = arccos( (Tr(R_est R_gtᵀ) − 1) / 2 )</span>
+        <span class="unit"><strong>One angle in [0, π].</strong> Unchanged by any choice of frames.</span>
+      </div>
+    </div>
+
+    <h2>Chapters</h2>
+    <div class="cards">
+      <a class="card" href="Ch1-SO3-A-Frame-That-Stayed-Rigid.html">
+        <span class="num">Chapter 1 · about 10 min</span>
+        <span class="title">SO(3): a frame that stayed rigid</span>
+        <span class="hook">Stretch a stick, bend a stick, mirror a stick. Watch six constraints light up or fail, and see why a mirror image is orthogonal yet not a rotation.</span>
+        <span class="after">RᵀR = I is three unit lengths and three right angles; 9 − 6 = 3 freedoms; det +1 forbids the mirror.</span>
+      </a>
+      <a class="card" href="Ch2-Axis-Angle-Exp-And-Log.html">
+        <span class="num">Chapter 2 · about 12 min</span>
+        <span class="title">One skewer, one twist: axis-angle, Exp and Log</span>
+        <span class="hook">Every rotation is a point in a solid ball of radius π. Dial 350° and watch Log hand back 10° about the opposite axis.</span>
+        <span class="after">Tr R = 1 + 2 cos θ, because the skewer direction stays put and the other two directions each contribute cos θ.</span>
+      </a>
+      <a class="card core" href="Ch3-Geodesic-Error-The-Arc-Not-The-Chord.html">
+        <span class="num">Chapter 3 · about 15 min · the centrepiece</span>
+        <span class="title">Geodesic error: the arc, not the chord</span>
+        <span class="hook">Walk on the globe or dig the tunnel. The tunnel leaves the world of rotations half-way, and its length saturates while the arc keeps growing.</span>
+        <span class="after">the Frobenius distance is 2√2 sin(θ/2); the geodesic angle is bi-invariant.</span>
+      </a>
+      <a class="card" href="Ch4-SE3-A-Rotation-Plus-A-Place.html">
+        <span class="num">Chapter 4 · about 12 min</span>
+        <span class="title">SE(3): a rotation plus a place</span>
+        <span class="hook">Follow one point from object coordinates to camera coordinates. Then turn the plane about its nose and watch t change during a "pure" rotation.</span>
+        <span class="after">t is where the object's origin lands; the inverse is (Rᵀ, −Rᵀt); composing turns the second translation.</span>
+      </a>
+      <a class="card" href="Ch5-Pose-Error-On-SE3.html">
+        <span class="num">Chapter 5 · about 15 min</span>
+        <span class="title">Pose error on SE(3): two rulers, or one screw</span>
+        <span class="hook">Move the model's origin and the translation error changes while nothing physical moves. Move the camera and nothing changes. Then pick a lever arm L.</span>
+        <span class="after">no metric on SE(3) is blind to both choices, so every single-number error hides a length scale.</span>
+      </a>
+    </div>
+
+    <h2>How to use these pages</h2>
+    <p class="how">
+      <strong>Drag</strong> to orbit the scene. <strong>Scroll</strong> to zoom.
+      Open a <strong>Predict first</strong> card, commit to an answer, then press its button and check yourself.
+      Every number in the <strong>Math</strong> tab is computed live from the picture.
+      Blue is the true pose. Warm is the estimate. Green is the geodesic. Red marks a chord, a trap, or something broken.
+      Companion sets: <a href="../Essence-of-Similarity-Transforms/index.html">Essence of Similarity Transforms</a>
+      and <a href="../Essence-of-BOP-Pose-Errors/index.html">Essence of BOP Pose Errors</a>.
+    </p>
+
+    <h2>Mental picture checklist</h2>
+    <div id="checklist" class="checklist"></div>
+    <div id="score" class="score"></div>
+
+    <p class="src">
+      Sources: Solà, Deray, Atchuthan, "A micro Lie theory for state estimation in robotics" (2018, arXiv 1812.01537).
+      Huynh, "Metrics for 3D Rotations: Comparison and Analysis", J. Math. Imaging and Vision 35(2), 2009.
+      Park, "Distance Metrics on the Rigid-Body Motions with Applications to Mechanism Design", ASME J. Mechanical Design 117(1), 1995.
+    </p>
+  </div>
+  <div id="state" class="state"></div>
+
+  <script>
+    const items = [
+      ['The columns of R are where the object\'s x, y and z sticks point.', 'Ch 1'],
+      ['RᵀR = I is six constraints: three unit lengths and three right angles. Nine entries minus six leaves 3 degrees of freedom.', 'Ch 1'],
+      ['det R = +1 excludes mirror images. A mirror is orthogonal with det −1, and no amount of turning reaches it.', 'Ch 1'],
+      ['R⁻¹ = Rᵀ, and rotations do not commute: x-then-y differs from y-then-x.', 'Ch 1'],
+      ['Every rotation is one axis and one angle. The rotation vector θ·n̂ lives in a ball of radius π whose opposite skin points are the same rotation.', 'Ch 2'],
+      ['Tr R = 1 + 2 cos θ. The axis direction contributes 1. Each of the two turning directions contributes cos θ.', 'Ch 2'],
+      ['Log returns the shortest twist: 350° about +y comes back as 10° about −y.', 'Ch 2'],
+      ['The geodesic error θ = arccos((Tr(R_est R_gtᵀ) − 1) / 2) is the smallest single turn between the two frames, in [0, π].', 'Ch 3'],
+      ['‖R_est − R_gt‖_F = 2√2 sin(θ/2). It is the tunnel through matrix space. It matches √2·θ for small errors and saturates for large ones.', 'Ch 3'],
+      ['A straight blend of two rotation matrices is not a rotation in between. Only the geodesic stays inside SO(3).', 'Ch 3'],
+      ['θ is bi-invariant. A new camera frame or re-labelled object axes cannot change it. R_est R_gtᵀ and R_gtᵀ R_est give the same θ.', 'Ch 3'],
+      ['T = (R, t) maps p_cam = R p_obj + t. The object\'s origin lands at t. Composition gives R_A R_B and R_A t_B + t_A. The inverse is (Rᵀ, −Rᵀt).', 'Ch 4'],
+      ['A pose error has two units, so pipelines report θ and ‖Δt‖ separately, or one twist norm √(‖ρ‖² + L²θ²) with a length scale L.', 'Ch 5'],
+      ['Moving the camera changes neither θ nor ‖Δt‖. Moving the model\'s origin changes ‖Δt‖ whenever the orientation is off. No SE(3) metric is blind to both (Park 1995).', 'Ch 5'],
+      ['L is a lever arm: a point at distance L moves about L·θ. L = 57.3 mm makes 1° worth 1 mm.', 'Ch 5'],
+    ];
+    const KEY = 'essence-so3-se3-checklist';
+    let done = {};
+    try { done = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { done = {}; }
+    const list = document.getElementById('checklist');
+    const score = document.getElementById('score');
+    function renderScore() {
+      const n = items.filter((_, i) => done[i]).length;
+      score.innerHTML = `Confirmed <strong>${n} / ${items.length}</strong> statements. Ticks are saved in this browser only.`;
+    }
+    items.forEach(([text, ch], i) => {
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = Boolean(done[i]);
+      label.classList.toggle('done', box.checked);
+      const span = document.createElement('span');
+      span.textContent = text;
+      const tag = document.createElement('span');
+      tag.className = 'ch';
+      tag.textContent = ch;
+      box.addEventListener('change', () => {
+        done[i] = box.checked;
+        label.classList.toggle('done', box.checked);
+        try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* private mode */ }
+        renderScore();
+      });
+      label.append(box, span, tag);
+      list.appendChild(label);
+    });
+    renderScore();
+
+    // ===================== LIE KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Rotations are 3x3 arrays, vectors are [x, y, z].
+    // Conventions follow Sola et al., "A micro Lie theory for state estimation
+    // in robotics" (2018): Exp / Log map between R^3 (or R^6) and the group.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      add: (A, B) => A.map((row, i) => row.map((x, j) => x + B[i][j])),
+      sub: (A, B) => A.map((row, i) => row.map((x, j) => x - B[i][j])),
+      scale: (A, s) => A.map((row) => row.map((x) => x * s)),
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => x + (B[i][j] - x) * t)),
+      trace: (A) => A[0][0] + A[1][1] + A[2][2],
+      frob: (A) => Math.sqrt(A.flat().reduce((s, x) => s + x * x, 0)),
+      col: (A, j) => [A[0][j], A[1][j], A[2][j]],
+      fromCols: (a, b, c) => [[a[0], b[0], c[0]], [a[1], b[1], c[1]], [a[2], b[2], c[2]]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+    };
+
+    // ---- so(3): hat, vee, Exp (Rodrigues), Log ----
+    const hat = (w) => [[0, -w[2], w[1]], [w[2], 0, -w[0]], [-w[1], w[0], 0]];
+    const vee = (K) => [K[2][1], K[0][2], K[1][0]];
+    // Rotation vector w = theta * axis  ->  rotation matrix.
+    function expSO3(w) {
+      const th = v3.len(w);
+      if (th < 1e-10) return m3.add(m3.I(), hat(w));
+      const K = hat(v3.scale(w, 1 / th));
+      return m3.add(m3.I(), m3.add(m3.scale(K, Math.sin(th)), m3.scale(m3.mul(K, K), 1 - Math.cos(th))));
+    }
+    // Angle of a rotation matrix, in [0, pi]. The atan2 form stays accurate
+    // near 0, where arccos((tr - 1) / 2) loses precision.
+    function rotAngle(R) {
+      const s = v3.len(vee(m3.sub(R, m3.T(R)))) / 2;  // = sin(theta)
+      const c = (m3.trace(R) - 1) / 2;                 // = cos(theta)
+      return Math.atan2(s, c);
+    }
+    // Rotation matrix -> rotation vector with angle in [0, pi].
+    function logSO3(R) {
+      const sv = v3.scale(vee(m3.sub(R, m3.T(R))), 0.5);  // sin(theta) * axis
+      const th = rotAngle(R);
+      if (th < 1e-8) return sv;
+      if (Math.PI - th < 1e-4) {
+        // Near pi the skew part vanishes. Read the axis from the symmetric part:
+        // (R + R^T) / 2 = cos I + (1 - cos) n n^T.
+        const c = Math.cos(th);
+        const M = m3.scale(m3.sub(m3.scale(m3.add(R, m3.T(R)), 0.5), m3.scale(m3.I(), c)), 1 / (1 - c));
+        let k = 0;
+        if (M[1][1] > M[k][k]) k = 1;
+        if (M[2][2] > M[k][k]) k = 2;
+        const nk = Math.sqrt(Math.max(M[k][k], 0));
+        let n = [M[0][k] / nk, M[1][k] / nk, M[2][k] / nk];
+        if (v3.dot(n, sv) < 0) n = v3.scale(n, -1);
+        return v3.scale(v3.norm(n), th);
+      }
+      return v3.scale(sv, th / Math.sin(th));
+    }
+    const axisAngle = (axis, th) => expSO3(v3.scale(v3.norm(axis), th));
+    // Unit direction from azimuth (about y, from +x towards +z) and elevation. y is up.
+    const dirFromAzEl = (az, el) => [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+
+    // ---- distances between rotations ----
+    // Geodesic: the angle of dR = R_est R_gt^T. (R_gt^T R_est has the same angle.)
+    const deltaR = (Re, Rg) => m3.mul(Re, m3.T(Rg));
+    const geodesicAngle = (Re, Rg) => rotAngle(deltaR(Re, Rg));
+    // Chordal: straight line through the 9-D space of matrices.
+    const chordalDist = (Re, Rg) => m3.frob(m3.sub(Re, Rg));
+    // Walk from R_gt to R_est along the geodesic (s in [0, 1]).
+    const slerpR = (Rg, Re, s) => m3.mul(expSO3(v3.scale(logSO3(deltaR(Re, Rg)), s)), Rg);
+    // Straight blend of the matrices. It leaves SO(3) on the way.
+    const lerpR = (Rg, Re, s) => m3.lerp(Rg, Re, s);
+    // How far a 3x3 matrix is from being a rotation.
+    function rotationCheck(R, tol = 1e-6) {
+      const G = m3.mul(m3.T(R), R);
+      const orthoError = m3.frob(m3.sub(G, m3.I()));
+      const det = m3.det(R);
+      const orthogonal = orthoError < tol;
+      const inSO3 = orthogonal && det > 0;
+      let name = 'not orthogonal: the sticks are bent or stretched';
+      if (inSO3) name = 'a rotation, in SO(3)';
+      else if (orthogonal) name = 'orthogonal with det -1: a mirror image, in O(3) but not SO(3)';
+      return { G, orthoError, det, orthogonal, inSO3, name, colLengths: [0, 1, 2].map((j) => v3.len(m3.col(R, j))) };
+    }
+
+    // ---- SE(3): T = (R, t), p_cam = R p_obj + t ----
+    const se3 = {
+      I: () => ({ R: m3.I(), t: [0, 0, 0] }),
+      apply: (T, p) => v3.add(m3.apply(T.R, p), T.t),
+      // compose(A, B) applies B first, then A.
+      compose: (A, B) => ({ R: m3.mul(A.R, B.R), t: v3.add(m3.apply(A.R, B.t), A.t) }),
+      inv: (T) => { const Rt = m3.T(T.R); return { R: Rt, t: v3.scale(m3.apply(Rt, T.t), -1) }; },
+      toMatrix: (T) => [[...T.R[0], T.t[0]], [...T.R[1], T.t[1]], [...T.R[2], T.t[2]], [0, 0, 0, 1]],
+    };
+    // Left Jacobian V of SO(3) and its inverse: t = V(w) rho.
+    function leftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, 0.5), m3.scale(K2, 1 / 6)));
+      return m3.add(m3.I(), m3.add(m3.scale(K, (1 - Math.cos(th)) / (th * th)), m3.scale(K2, (th - Math.sin(th)) / (th * th * th))));
+    }
+    function invLeftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, 1 / 12)));
+      const k = 1 / (th * th) - 1 / (2 * th * Math.tan(th / 2));
+      return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, k)));
+    }
+    // Twist xi = { rho, w } in R^6  <->  rigid motion. Exp traces a screw.
+    const expSE3 = (xi) => ({ R: expSO3(xi.w), t: m3.apply(leftJacobian(xi.w), xi.rho) });
+    function logSE3(T) {
+      const w = logSO3(T.R);
+      return { w, rho: m3.apply(invLeftJacobian(w), T.t) };
+    }
+    // The estimate as seen from the true object frame: T_gt^-1 T_est.
+    const relativePose = (Te, Tg) => se3.compose(se3.inv(Tg), Te);
+    // Two ways to walk from T_gt to T_est.
+    const screwInterp = (Tg, Te, s) => {
+      const xi = logSE3(relativePose(Te, Tg));
+      return se3.compose(Tg, expSE3({ rho: v3.scale(xi.rho, s), w: v3.scale(xi.w, s) }));
+    };
+    const decoupledInterp = (Tg, Te, s) => ({ R: slerpR(Tg.R, Te.R, s), t: v3.lerp(Tg.t, Te.t, s) });
+    // Move the model's origin to the model point c. Same physical object pose.
+    const shiftOrigin = (T, c) => ({ R: T.R, t: se3.apply(T, c) });
+    // All the error numbers. L is the characteristic length (same unit as t).
+    function poseErrors(Te, Tg, L) {
+      const theta = geodesicAngle(Te.R, Tg.R);
+      const dt = v3.dist(Te.t, Tg.t);
+      const xi = logSE3(relativePose(Te, Tg));
+      const rho = v3.len(xi.rho);
+      return { theta, dt, xi, rho, twist: Math.hypot(rho, L * theta), decoupledCombined: Math.hypot(dt, L * theta) };
+    }
+    // ===================== END LIE KIT =====================
+
+
+    // ---- ambient background: two frames, the arcs between them, and the chords ----
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    const stateEl = document.getElementById('state');
+    const Rg = m3.mul(m3.rotY(0.35), m3.rotX(-0.26));
+    const axis = v3.norm([0.4, 0.8, 0.45]);
+    let yaw = -0.6;
+    const pitch = 0.3;
+    function rotateView([x, y, z]) {
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      return [x1, cp * y + sp * z1, -sp * y + cp * z1];
+    }
+    function toScreen(X, cx, cy, px) {
+      const r = rotateView([X[0] * 2.4, X[1] * 2.4, X[2] * 2.4]);
+      const f = px * 10 / (10 + r[2]);
+      return [cx + r[0] * f, cy - r[1] * f];
+    }
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(innerWidth * dpr);
+      canvas.height = Math.round(innerHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function path(fn, n, color, width, cx, cy, px, dash) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.setLineDash(dash || []);
+      ctx.beginPath();
+      for (let i = 0; i <= n; i += 1) {
+        const p = toScreen(fn(i / n), cx, cy, px);
+        if (i === 0) ctx.moveTo(p[0], p[1]); else ctx.lineTo(p[0], p[1]);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    function draw(ts) {
+      const w = innerWidth, h = innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      yaw = -0.6 + 0.4 * Math.sin(ts / 11000);
+      const theta = (85 + 65 * Math.sin(ts / 3800)) * Math.PI / 180;
+      const Re = m3.mul(axisAngle(axis, theta), Rg);
+      const cx = w * 0.83, cy = h * 0.3, px = Math.min(w, h) / 13;
+      ctx.globalAlpha = 0.5;
+      const ring = (f) => path((s) => f(s * Math.PI * 2), 64, 'rgba(132, 160, 202, 0.35)', 1, cx, cy, px);
+      ring((a) => [Math.cos(a), 0, Math.sin(a)]);
+      ring((a) => [Math.cos(a), Math.sin(a), 0]);
+      ring((a) => [0, Math.sin(a), Math.cos(a)]);
+      for (let j = 0; j < 3; j += 1) {
+        path((s) => m3.col(slerpR(Rg, Re, s), j), 40, '#a0e7a0', 1.8, cx, cy, px);
+        path((s) => v3.lerp(m3.col(Rg, j), m3.col(Re, j), s), 1, '#ff8a8a', 1.2, cx, cy, px, [4, 4]);
+        path((s) => v3.scale(m3.col(Rg, j), s), 1, '#5aa6ff', 2.2, cx, cy, px);
+        path((s) => v3.scale(m3.col(Re, j), s), 1, '#f08f3c', 2.2, cx, cy, px);
+      }
+      ctx.globalAlpha = 1;
+      const th = geodesicAngle(Re, Rg);
+      stateEl.innerHTML = `background: arc θ = <strong class="g">${(th * 180 / Math.PI).toFixed(1)}° = ${th.toFixed(3)} rad</strong> · chord ÷ √2 = <strong>${(chordalDist(Re, Rg) / Math.SQRT2).toFixed(3)}</strong>`;
+      requestAnimationFrame(draw);
+    }
+    addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

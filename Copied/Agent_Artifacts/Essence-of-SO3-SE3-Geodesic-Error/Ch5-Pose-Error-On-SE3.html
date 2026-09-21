@@ -1,0 +1,1519 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch5 · Pose Error on SE(3): Two Rulers or One Screw</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .formula {
+      font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; font-size: 13px; }
+  </style>
+
+</head>
+<body>
+  <style>
+    .mini { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    .mini th, .mini td { text-align: right; padding: 4px 6px; border-bottom: 1px solid var(--line); font-family: var(--mono); white-space: nowrap; }
+    .mini th:first-child, .mini td:first-child { text-align: left; font-family: inherit; }
+    .mini th { color: var(--blue-1); font-weight: 700; font-family: inherit; }
+    .mini tr.active td { color: var(--ink); background: rgba(19, 52, 92, 0.55); }
+    .mini td.same { color: var(--green); }
+    .mini td.diff { color: var(--danger); }
+    .chip {
+      display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+      border: 1px solid rgba(160, 231, 160, 0.5); color: var(--green); font-family: var(--mono);
+    }
+    .dot.rot { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.trap { background: #ff8a8a; box-shadow: 0 0 12px rgba(255, 138, 138, 0.8); }
+    .dot.ghost { background: #ebf2ff; box-shadow: 0 0 12px rgba(235, 242, 255, 0.7); }
+    .sym { font-family: var(--mono); }
+    .essence a { color: var(--blue-1); }
+  </style>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of Rotations and Rigid Motions · Chapter 5</div>
+        <h1>Pose Error on SE(3): Two Rulers, or One Screw</h1>
+        <p class="lead">
+          A <strong>protractor</strong> reads the rotation error in degrees.
+          A <strong>tape measure</strong> reads the translation error in millimetres.
+          How do you turn two units into one honest number?
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>true pose</span>
+        <span class="legend"><span class="dot query"></span>estimate</span>
+        <span class="legend"><span class="dot rot"></span>protractor: θ, lever arm L</span>
+        <span class="legend"><span class="dot trap"></span>tape measure: Δt</span>
+        <span class="legend"><span class="dot ghost"></span>walker</span><br>
+        Drag to orbit. Scroll to zoom. The round markers are the model's origin in each pose.
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch4-SE3-A-Rotation-Plus-A-Place.html">← Ch 4</a>
+        <span>Chapter 5 of 5</span>
+        <a href="index.html">Index →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Presets</div>
+          <div id="presetGrid" class="preset-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then press the button and test it.</div>
+          <details class="predict" id="predict1">
+            <summary>1 · Move the model's origin from the plane's centre to its nose. The planes stay where they are. Does θ change? Does ‖Δt‖ change?</summary>
+            <div class="answer">
+              <strong>θ stays. ‖Δt‖ changes.</strong>
+              Here θ is <strong id="p1Theta"></strong> for both origins.
+              ‖Δt‖ is <strong id="p1Centre"></strong> at the centre and <strong id="p1Nose"></strong> at the nose.
+              Δt is the gap between the two origin markers. A rotated plane carries its nose somewhere else.
+            </div>
+            <button id="setup1">Set it up: origin at the centre. Then press Nose.</button>
+          </details>
+          <details class="predict" id="predict2">
+            <summary>2 · Keep the origin. Move the camera instead. Do the errors change?</summary>
+            <div class="answer">
+              <strong>No.</strong> θ stays at <strong id="p2Theta"></strong>, ‖Δt‖ at <strong id="p2Dt"></strong> and ‖ρ‖ at <strong id="p2Rho"></strong>.
+              The camera's motion multiplies both poses on the left, and it cancels. These errors are left-invariant.
+              No metric on SE(3) can ignore both the camera and the origin. That is Park's result.
+            </div>
+            <button id="setup2">Set it up. Then press Move the camera.</button>
+          </details>
+          <details class="predict" id="predict3">
+            <summary>3 · Which L makes one degree cost the same as one millimetre?</summary>
+            <div class="answer">
+              <strong><span id="p3L"></span> mm.</strong>
+              One degree is π/180 radians, so L·π/180 must equal 1 mm.
+              With L = 0 the rotation is free. With a huge L the translation hardly matters.
+            </div>
+            <button id="setup3">Set it up: 1° of pure rotation at this L</button>
+          </details>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Experiment 1 · move the model's origin</div>
+          <div class="body">The origin of a model is a modelling choice. Pick another point on the same plane.
+            The planes stay put. Watch the tape measure.</div>
+          <div id="originGrid" class="preset-grid three"></div>
+          <table class="mini">
+            <thead><tr><th>origin at</th><th>θ</th><th>‖Δt‖ mm</th><th>‖ρ‖ mm</th><th>d mm</th></tr></thead>
+            <tbody id="originRows"></tbody>
+          </table>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Experiment 2 · move the camera</div>
+          <div class="body">Now keep the origin and move the camera. Both poses get new coordinates. Watch which numbers care.</div>
+          <div class="preset-grid">
+            <button id="moveCamBtn">Move the camera</button>
+            <button id="resetCamBtn">Reset the camera</button>
+          </div>
+          <table class="mini">
+            <thead><tr><th></th><th>before</th><th>now</th></tr></thead>
+            <tbody id="cameraRows"></tbody>
+          </table>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Experiment 3 · the exchange rate L</div>
+          <div class="body">To merge the two rulers, price one radian in millimetres. That price is a length L.
+            It is a lever arm. A point at distance L from the error axis moves about L·θ.</div>
+          <div id="lHost"></div>
+          <div id="lGrid" class="preset-grid"></div>
+          <div><span id="lChip" class="chip"></span></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Walk from the true pose to the estimate</div>
+          <div class="body">Two rulers: turn steadily while the origin slides straight.
+            One screw: turn about one fixed axis and slide along it. Same start. Same end.</div>
+          <div id="modeGrid" class="preset-grid"></div>
+          <div id="walkHost"></div>
+          <div class="action-grid">
+            <button id="playBtn">Play the walk</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Error of the estimate</div>
+          <div class="body">Turn the estimate about an axis through its origin. Then shift it along the camera axes.</div>
+          <div id="errHost"></div>
+          <div class="action-grid">
+            <button id="resetViewBtn">Reset view</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Two ways to score a pose</div>
+          <div class="formula">(a) two rulers
+  ΔR  = R_est · R_gtᵀ
+  θ   = arccos((tr ΔR − 1) / 2)     rad
+  e_t = ‖t_est − t_gt‖₂             mm
+
+(b) one screw
+  ξ = Log(T_gt⁻¹ · T_est) = (ρ, ω)
+  ‖ω‖ = θ
+  d = √(‖ρ‖² + L² θ²)               mm</div>
+          <div class="body">Option (a) keeps both units. Option (b) needs the length L to convert radians to millimetres.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Live poses</div>
+          <div id="poseDisplay" class="matrix-display"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Live errors</div>
+          <div id="errKv" class="kv"></div>
+          <div class="body"><span class="sym">ξ</span> comes from <span class="sym">T_gt⁻¹ T_est</span>.
+            That is the estimate seen from the true object's frame. So the camera cannot influence it.
+            Its rotation part <span class="sym">ω</span> has exactly the angle θ of Chapter 3.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">ρ is not Δt</div>
+          <div class="formula">t_rel = R_gtᵀ (t_est − t_gt)
+‖t_rel‖ = ‖Δt‖
+t_rel = V(ω) · ρ
+ρ     = V(ω)⁻¹ · t_rel</div>
+          <div id="rhoKv" class="kv"></div>
+          <div class="body">Exp turns a twist into a screw motion. The slide ρ bends into t_rel on the way. The two agree when θ = 0.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">The origin trap, in one line</div>
+          <div class="formula">new origin at the model point c:
+Δt′ = Δt + (R_est − R_gt) · c</div>
+          <div id="trapKv" class="kv"></div>
+          <div class="body">The extra term vanishes only when the two rotations agree. θ never contains c, so it stays.</div>
+        </section>
+        <section class="section">
+          <div class="src">Sources: Solà, Deray, Atchuthan, A micro Lie theory for state estimation in robotics (2018).
+            Huynh, Metrics for 3D Rotations: Comparison and Analysis, JMIV 2009.
+            Park, Distance Metrics on the Rigid-Body Motions with Applications to Mechanism Design, J. Mech. Design 1995.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Two units, so no natural single number.</strong>
+            The protractor reads radians. The tape measure reads millimetres. Nothing in SE(3) says how to add them.</div>
+          <div class="essence"><strong>Option one: report two numbers.</strong>
+            Give the geodesic angle θ and the distance ‖t_est − t_gt‖. It is simple and it is the standard.</div>
+          <div class="essence"><strong>The camera cannot change them. The origin can.</strong>
+            Moving the camera changes neither ruler. Moving the model's origin changes ‖Δt‖ whenever the orientation is off.</div>
+          <div class="essence"><strong>Option two: one number, but you must pick L.</strong>
+            L is a lever arm. It says how far a point at distance L moves per radian. Then d = √(‖ρ‖² + L²θ²).</div>
+          <div class="essence"><strong>Park, 1995.</strong>
+            No bi-invariant distance metric exists on SE(3). Every metric hides a length scale. So the choice of L is yours, and you must state it.</div>
+          <div class="essence"><strong>BOP's MSSD is the geometry-aware answer.</strong>
+            It measures in millimetres how far the object's own surface points move. The shape supplies the lever arm, and no origin has to be chosen.
+            See <a href="../Essence-of-BOP-Pose-Errors/Ch1-MSSD-Worst-Point-Best-Symmetry.html">MSSD, Chapter 1</a>.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== LIE KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Rotations are 3x3 arrays, vectors are [x, y, z].
+    // Conventions follow Sola et al., "A micro Lie theory for state estimation
+    // in robotics" (2018): Exp / Log map between R^3 (or R^6) and the group.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      add: (A, B) => A.map((row, i) => row.map((x, j) => x + B[i][j])),
+      sub: (A, B) => A.map((row, i) => row.map((x, j) => x - B[i][j])),
+      scale: (A, s) => A.map((row) => row.map((x) => x * s)),
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => x + (B[i][j] - x) * t)),
+      trace: (A) => A[0][0] + A[1][1] + A[2][2],
+      frob: (A) => Math.sqrt(A.flat().reduce((s, x) => s + x * x, 0)),
+      col: (A, j) => [A[0][j], A[1][j], A[2][j]],
+      fromCols: (a, b, c) => [[a[0], b[0], c[0]], [a[1], b[1], c[1]], [a[2], b[2], c[2]]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+    };
+
+    // ---- so(3): hat, vee, Exp (Rodrigues), Log ----
+    const hat = (w) => [[0, -w[2], w[1]], [w[2], 0, -w[0]], [-w[1], w[0], 0]];
+    const vee = (K) => [K[2][1], K[0][2], K[1][0]];
+    // Rotation vector w = theta * axis  ->  rotation matrix.
+    function expSO3(w) {
+      const th = v3.len(w);
+      if (th < 1e-10) return m3.add(m3.I(), hat(w));
+      const K = hat(v3.scale(w, 1 / th));
+      return m3.add(m3.I(), m3.add(m3.scale(K, Math.sin(th)), m3.scale(m3.mul(K, K), 1 - Math.cos(th))));
+    }
+    // Angle of a rotation matrix, in [0, pi]. The atan2 form stays accurate
+    // near 0, where arccos((tr - 1) / 2) loses precision.
+    function rotAngle(R) {
+      const s = v3.len(vee(m3.sub(R, m3.T(R)))) / 2;  // = sin(theta)
+      const c = (m3.trace(R) - 1) / 2;                 // = cos(theta)
+      return Math.atan2(s, c);
+    }
+    // Rotation matrix -> rotation vector with angle in [0, pi].
+    function logSO3(R) {
+      const sv = v3.scale(vee(m3.sub(R, m3.T(R))), 0.5);  // sin(theta) * axis
+      const th = rotAngle(R);
+      if (th < 1e-8) return sv;
+      if (Math.PI - th < 1e-4) {
+        // Near pi the skew part vanishes. Read the axis from the symmetric part:
+        // (R + R^T) / 2 = cos I + (1 - cos) n n^T.
+        const c = Math.cos(th);
+        const M = m3.scale(m3.sub(m3.scale(m3.add(R, m3.T(R)), 0.5), m3.scale(m3.I(), c)), 1 / (1 - c));
+        let k = 0;
+        if (M[1][1] > M[k][k]) k = 1;
+        if (M[2][2] > M[k][k]) k = 2;
+        const nk = Math.sqrt(Math.max(M[k][k], 0));
+        let n = [M[0][k] / nk, M[1][k] / nk, M[2][k] / nk];
+        if (v3.dot(n, sv) < 0) n = v3.scale(n, -1);
+        return v3.scale(v3.norm(n), th);
+      }
+      return v3.scale(sv, th / Math.sin(th));
+    }
+    const axisAngle = (axis, th) => expSO3(v3.scale(v3.norm(axis), th));
+    // Unit direction from azimuth (about y, from +x towards +z) and elevation. y is up.
+    const dirFromAzEl = (az, el) => [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+
+    // ---- distances between rotations ----
+    // Geodesic: the angle of dR = R_est R_gt^T. (R_gt^T R_est has the same angle.)
+    const deltaR = (Re, Rg) => m3.mul(Re, m3.T(Rg));
+    const geodesicAngle = (Re, Rg) => rotAngle(deltaR(Re, Rg));
+    // Chordal: straight line through the 9-D space of matrices.
+    const chordalDist = (Re, Rg) => m3.frob(m3.sub(Re, Rg));
+    // Walk from R_gt to R_est along the geodesic (s in [0, 1]).
+    const slerpR = (Rg, Re, s) => m3.mul(expSO3(v3.scale(logSO3(deltaR(Re, Rg)), s)), Rg);
+    // Straight blend of the matrices. It leaves SO(3) on the way.
+    const lerpR = (Rg, Re, s) => m3.lerp(Rg, Re, s);
+    // How far a 3x3 matrix is from being a rotation.
+    function rotationCheck(R, tol = 1e-6) {
+      const G = m3.mul(m3.T(R), R);
+      const orthoError = m3.frob(m3.sub(G, m3.I()));
+      const det = m3.det(R);
+      const orthogonal = orthoError < tol;
+      const inSO3 = orthogonal && det > 0;
+      let name = 'not orthogonal: the sticks are bent or stretched';
+      if (inSO3) name = 'a rotation, in SO(3)';
+      else if (orthogonal) name = 'orthogonal with det -1: a mirror image, in O(3) but not SO(3)';
+      return { G, orthoError, det, orthogonal, inSO3, name, colLengths: [0, 1, 2].map((j) => v3.len(m3.col(R, j))) };
+    }
+
+    // ---- SE(3): T = (R, t), p_cam = R p_obj + t ----
+    const se3 = {
+      I: () => ({ R: m3.I(), t: [0, 0, 0] }),
+      apply: (T, p) => v3.add(m3.apply(T.R, p), T.t),
+      // compose(A, B) applies B first, then A.
+      compose: (A, B) => ({ R: m3.mul(A.R, B.R), t: v3.add(m3.apply(A.R, B.t), A.t) }),
+      inv: (T) => { const Rt = m3.T(T.R); return { R: Rt, t: v3.scale(m3.apply(Rt, T.t), -1) }; },
+      toMatrix: (T) => [[...T.R[0], T.t[0]], [...T.R[1], T.t[1]], [...T.R[2], T.t[2]], [0, 0, 0, 1]],
+    };
+    // Left Jacobian V of SO(3) and its inverse: t = V(w) rho.
+    function leftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, 0.5), m3.scale(K2, 1 / 6)));
+      return m3.add(m3.I(), m3.add(m3.scale(K, (1 - Math.cos(th)) / (th * th)), m3.scale(K2, (th - Math.sin(th)) / (th * th * th))));
+    }
+    function invLeftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, 1 / 12)));
+      const k = 1 / (th * th) - 1 / (2 * th * Math.tan(th / 2));
+      return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, k)));
+    }
+    // Twist xi = { rho, w } in R^6  <->  rigid motion. Exp traces a screw.
+    const expSE3 = (xi) => ({ R: expSO3(xi.w), t: m3.apply(leftJacobian(xi.w), xi.rho) });
+    function logSE3(T) {
+      const w = logSO3(T.R);
+      return { w, rho: m3.apply(invLeftJacobian(w), T.t) };
+    }
+    // The estimate as seen from the true object frame: T_gt^-1 T_est.
+    const relativePose = (Te, Tg) => se3.compose(se3.inv(Tg), Te);
+    // Two ways to walk from T_gt to T_est.
+    const screwInterp = (Tg, Te, s) => {
+      const xi = logSE3(relativePose(Te, Tg));
+      return se3.compose(Tg, expSE3({ rho: v3.scale(xi.rho, s), w: v3.scale(xi.w, s) }));
+    };
+    const decoupledInterp = (Tg, Te, s) => ({ R: slerpR(Tg.R, Te.R, s), t: v3.lerp(Tg.t, Te.t, s) });
+    // Move the model's origin to the model point c. Same physical object pose.
+    const shiftOrigin = (T, c) => ({ R: T.R, t: se3.apply(T, c) });
+    // All the error numbers. L is the characteristic length (same unit as t).
+    function poseErrors(Te, Tg, L) {
+      const theta = geodesicAngle(Te.R, Tg.R);
+      const dt = v3.dist(Te.t, Tg.t);
+      const xi = logSE3(relativePose(Te, Tg));
+      const rho = v3.len(xi.rho);
+      return { theta, dt, xi, rho, twist: Math.hypot(rho, L * theta), decoupledCombined: Math.hypot(dt, L * theta) };
+    }
+    // ===================== END LIE KIT =====================
+
+    // ===================== LIE DRAW (copy verbatim) =====================
+    // World units -> orbit-view units. Chapters may change pivot and scale.
+    const SCENE = { pivot: [0, 0, 0], scale: 2.4 };
+    const toView = (X) => [
+      (X[0] - SCENE.pivot[0]) * SCENE.scale,
+      (X[1] - SCENE.pivot[1]) * SCENE.scale,
+      (X[2] - SCENE.pivot[2]) * SCENE.scale,
+    ];
+    const XYZ_COLORS = ['#ff8a8a', '#a0e7a0', '#86d4ff'];  // one frame: x red, y green, z blue
+    const GT_COLORS = ['#5aa6ff', '#5aa6ff', '#5aa6ff'];   // true frame: blue
+    const EST_COLORS = ['#f08f3c', '#f08f3c', '#f08f3c'];  // estimated frame: warm
+    // Three arrows: the columns of R, drawn from `origin`.
+    function drawTriad(R, origin, vp, o = {}) {
+      const len = o.len ?? 1;
+      const colors = o.colors || XYZ_COLORS;
+      const labels = o.labels || ['x', 'y', 'z'];
+      for (let j = 0; j < 3; j += 1) {
+        const tip = v3.add(origin, v3.scale(m3.col(R, j), len));
+        arrow3(toView(origin), toView(tip), vp, { color: colors[j], label: labels[j], alpha: o.alpha ?? 1, width: o.width ?? 2.6, glow: o.glow ?? 8 });
+      }
+    }
+    // Sample a path s -> point for s in [0, 1] and draw it.
+    function drawPath(fn, vp, o = {}) {
+      const n = o.samples || 48;
+      const pts = [];
+      for (let i = 0; i <= n; i += 1) pts.push(toView(fn(i / n)));
+      polyline3(pts, vp, o);
+    }
+    function drawSphereWire(center, radius, vp, o = {}) {
+      const color = o.color || 'rgba(132, 160, 202, 0.22)';
+      const ring = (f) => drawPath((s) => v3.add(center, v3.scale(f(s * Math.PI * 2), radius)), vp, { color, width: o.width || 1, samples: 64 });
+      ring((a) => [Math.cos(a), 0, Math.sin(a)]);
+      ring((a) => [Math.cos(a), Math.sin(a), 0]);
+      ring((a) => [0, Math.sin(a), Math.cos(a)]);
+      (o.latitudes || [-60, -30, 30, 60]).forEach((d) => {
+        const el = d * Math.PI / 180;
+        ring((a) => [Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)]);
+      });
+    }
+    // A toy plane: nose along +x, fin along +y. Green light on the +z wing tip,
+    // red light on the -z wing tip, so a mirror image is easy to spot.
+    const PLANE_WIRE = (() => {
+      const seg = [];
+      const h = [1.0, 0.12, 0.12];
+      const c = (sx, sy, sz) => [sx * h[0], sy * h[1], sz * h[2]];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        seg.push([c(-1, a, b), c(1, a, b)]);
+        seg.push([c(a, -1, b), c(a, 1, b)]);
+        seg.push([c(a, b, -1), c(a, b, 1)]);
+        seg.push([c(1, a, b), [1.5, 0, 0]]);
+      }));
+      [1, -1].forEach((s) => {
+        const w = [[0.3, 0, 0.12 * s], [-0.3, 0, 1.2 * s], [-0.6, 0, 1.2 * s], [-0.4, 0, 0.12 * s]];
+        for (let i = 0; i < 3; i += 1) seg.push([w[i], w[i + 1]]);
+      });
+      seg.push([[-1, 0.12, 0], [-1, 0.7, 0]], [[-1, 0.7, 0], [-0.6, 0.12, 0]]);
+      return seg;
+    })();
+    const PLANE_LIGHTS = [{ p: [-0.45, 0, 1.2], color: '#a0e7a0' }, { p: [-0.45, 0, -1.2], color: '#ff8a8a' }];
+    // Draw the plane with pose (R, t). o.size scales the model.
+    function drawPlane(R, t, vp, o = {}) {
+      const size = o.size ?? 1;
+      const at = (p) => toView(v3.add(m3.apply(R, v3.scale(p, size)), t));
+      PLANE_WIRE.forEach(([a, b]) => line3(at(a), at(b), vp, { color: o.color || '#ebf2ff', width: o.width || 1.3, alpha: o.alpha ?? 0.9 }));
+      if (o.lights !== false) PLANE_LIGHTS.forEach((l) => dot3(at(l.p), vp, { color: l.color, r: 3.2, alpha: o.alpha ?? 0.9 }));
+    }
+    // A small readout box on the canvas: rows of [label, value].
+    function drawReadout(x, y, w, title, rows, o = {}) {
+      const lineH = 17;
+      const hgt = 26 + rows.length * lineH;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.82)';
+      ctx.strokeStyle = o.border || 'rgba(132, 160, 202, 0.4)';
+      ctx.fillRect(x, y, w, hgt);
+      ctx.strokeRect(x + 0.5, y + 0.5, w, hgt);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = o.titleColor || '#86d4ff';
+      ctx.fillText(title, x + 10, y + 17);
+      rows.forEach(([label, value, color], i) => {
+        const yy = y + 36 + i * lineH;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + 10, yy);
+        ctx.font = '600 12px ui-monospace, Menlo, monospace';
+        ctx.fillStyle = color || 'rgba(235, 242, 255, 0.95)';
+        ctx.textAlign = 'right';
+        ctx.fillText(value, x + w - 10, yy);
+      });
+      ctx.restore();
+      return hgt;
+    }
+    // ===================== END LIE DRAW =====================
+
+    // ===================== CHAPTER 5: POSE ERROR ON SE(3) =====================
+    const SIZE = 80;  // mm per model unit of the toy plane
+    const ORIGINS = {
+      centre: { label: 'Centre', c: [0, 0, 0] },
+      nose: { label: 'Nose', c: [1.5 * SIZE, 0, 0] },
+      wing: { label: 'Green wing tip', c: [-0.45 * SIZE, 0, 1.2 * SIZE] },
+    };
+    const ORIGIN_KEYS = ['centre', 'nose', 'wing'];
+    // Largest distance of any model point from the model centre: the object radius.
+    const OBJECT_RADIUS = SIZE * Math.max(...PLANE_WIRE.flat().map((p) => v3.len(p)));
+    const ONE_DEG_ONE_MM = 180 / Math.PI;  // the L for which 1 degree costs 1 mm
+    const TG0 = { R: axisAngle([0.3, 1, 0.2], rad(25)), t: [40, -20, 500] };
+    const PRESETS = [
+      { label: 'Default', value: 'default', err: { az: -140, el: 60, angle: 12, dx: 8, dy: 5, dz: 20 } },
+      { label: 'Rotation only 15°', value: 'rot', err: { az: -140, el: 60, angle: 15, dx: 0, dy: 0, dz: 0 } },
+      { label: 'Translation only 20 mm', value: 'trans', err: { az: -140, el: 60, angle: 0, dx: 12, dy: 0, dz: 16 } },
+      { label: 'Big twist 45° + 30 mm', value: 'big', err: { az: 40, el: -60, angle: 45, dx: 10, dy: 20, dz: 20 } },
+      { label: 'Perfect', value: 'perfect', err: { az: -140, el: 60, angle: 0, dx: 0, dy: 0, dz: 0 } },
+    ];
+    const state = {
+      err: { ...PRESETS[0].err }, originKey: 'centre', c: [0, 0, 0], A: se3.I(),
+      L: OBJECT_RADIUS, s: 1, mode: 'decoupled', play: 0, action: 'default',
+      before: null, camBefore: null,
+    };
+    let tweenC = null;
+    let tweenA = null;
+    let dirty = true;
+    let calc = null;
+    const ease = (u) => u * u * (3 - 2 * u);
+    const byId = (id) => document.getElementById(id);
+
+    SCENE.scale = 0.017;
+    view.home = { yaw: -0.62, pitch: 0.58 };
+    resetView();
+    app.mainViewport = () => viewport(canvas.clientWidth * 0.48, canvas.clientHeight * 0.56,
+      Math.min(canvas.clientWidth, canvas.clientHeight) / 9);
+
+    // ---- poses: true and estimated, for a camera motion A and a model origin c ----
+    function buildPoses(c, err, A) {
+      const n = dirFromAzEl(rad(err.az), rad(err.el));
+      const TeBase = { R: m3.mul(axisAngle(n, rad(err.angle)), TG0.R), t: v3.add(TG0.t, [err.dx, err.dy, err.dz]) };
+      const Tg0 = se3.compose(A, TG0);
+      const Te0 = se3.compose(A, TeBase);
+      return { Tg0, Te0, Tg: shiftOrigin(Tg0, c), Te: shiftOrigin(Te0, c) };
+    }
+    function recompute() {
+      const ps = buildPoses(state.c, state.err, state.A);
+      const e = poseErrors(ps.Te, ps.Tg, state.L);
+      const table = ORIGIN_KEYS.map((key) => {
+        const q = buildPoses(ORIGINS[key].c, state.err, state.A);
+        return { key, ...poseErrors(q.Te, q.Tg, state.L) };
+      });
+      const dR = deltaR(ps.Te.R, ps.Tg.R);
+      const hasRot = e.theta > rad(0.05);
+      const nErr = hasRot ? v3.norm(logSO3(dR)) : [0, 1, 0];
+      const O = ps.Tg.t;
+      // A point at distance L from the error axis moves by 2 L sin(theta / 2).
+      const uAny = v3.norm(v3.cross(nErr, Math.abs(nErr[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0]));
+      const leverMove = v3.dist(v3.scale(uAny, state.L), v3.scale(m3.apply(dR, uAny), state.L));
+      let screw = null;
+      if (e.theta > rad(1)) {
+        const th2 = v3.dot(e.xi.w, e.xi.w);
+        const dirBody = v3.norm(e.xi.w);
+        const a = se3.apply(ps.Tg, v3.scale(v3.cross(e.xi.w, e.xi.rho), 1 / th2));
+        const dir = m3.apply(ps.Tg.R, dirBody);
+        const pc = v3.add(a, v3.scale(dir, v3.dot(v3.sub(ps.Tg0.t, a), dir)));
+        screw = { pc, dir, advance: v3.dot(dirBody, e.xi.rho), offAxis: v3.dist(pc, ps.Tg0.t) };
+      }
+      const pathScrew = [];
+      for (let i = 0; i <= 40; i += 1) pathScrew.push(screwInterp(ps.Tg, ps.Te, i / 40).t);
+      const gap = v3.dist(screwInterp(ps.Tg, ps.Te, 0.5).t, decoupledInterp(ps.Tg, ps.Te, 0.5).t);
+      const dtCentre = v3.sub(ps.Te0.t, ps.Tg0.t);
+      const predicted = v3.add(dtCentre, m3.apply(m3.sub(ps.Te.R, ps.Tg.R), state.c));
+      SCENE.pivot = ps.Tg0.t;
+      calc = { ps, e, table, dR, hasRot, nErr, O, leverMove,
+        screw, pathScrew, gap, dtCentre, predicted };
+    }
+    const snapshot = () => ({ theta: calc.e.theta, dt: calc.e.dt, rho: calc.e.rho, twist: calc.e.twist });
+    function touch(action) {
+      state.action = action;
+      dirty = true;
+    }
+
+    // ---- controls ----
+    const sl = {};
+    const presetGroup = makeButtonGroup(byId('presetGrid'), PRESETS, (value) => applyPreset(value), { active: 'default' });
+    function applyErr(err) {
+      state.err = { ...err };
+      Object.keys(sl).forEach((key) => sl[key].set(state.err[key]));
+    }
+    function applyPreset(value) {
+      const p = PRESETS.find((x) => x.value === value) || PRESETS[0];
+      applyErr(p.err);
+      presetGroup.setActive(p.value);
+      touch('preset');
+    }
+    const errDefs = [
+      ['angle', 'Rotation error angle', 0, 60, 0.5, (v) => fmt(v, 1) + '°'],
+      ['az', 'Error axis azimuth', -180, 180, 1, (v) => v + '°'],
+      ['el', 'Error axis elevation', -90, 90, 1, (v) => v + '°'],
+      ['dx', 'Shift along camera x', -60, 60, 0.5, (v) => fmt(v, 1) + ' mm'],
+      ['dy', 'Shift along camera y', -60, 60, 0.5, (v) => fmt(v, 1) + ' mm'],
+      ['dz', 'Shift along camera z', -60, 60, 0.5, (v) => fmt(v, 1) + ' mm'],
+    ];
+    errDefs.forEach(([key, label, min, max, step, format]) => {
+      sl[key] = makeSlider(byId('errHost'), {
+        label, min, max, step, value: state.err[key], format,
+        onInput: (v) => { state.err[key] = v; presetGroup.setActive(null); touch('error'); },
+      });
+    });
+
+    const originGroup = makeButtonGroup(byId('originGrid'), ORIGIN_KEYS.map((k) => ({ label: ORIGINS[k].label, value: k })),
+      (key) => setOrigin(key, true), { active: 'centre' });
+    function setOrigin(key, animate) {
+      if (!ORIGINS[key]) return;
+      if (calc) state.before = { ...snapshot(), label: ORIGINS[state.originKey].label };
+      state.originKey = key;
+      originGroup.setActive(key);
+      if (animate) tweenC = { from: state.c.slice(), to: ORIGINS[key].c, u: 0 };
+      else { tweenC = null; state.c = ORIGINS[key].c.slice(); }
+      touch('origin');
+    }
+
+    function randomCamera() {
+      const axis = v3.norm([Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5]);
+      return {
+        R: axisAngle(axis, rad(35 + Math.random() * 45)),
+        t: [(Math.random() - 0.5) * 300, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 300],
+      };
+    }
+    function moveCamera(target, animate = true) {
+      if (calc) state.camBefore = snapshot();
+      if (animate) tweenA = { from: state.A, to: target, u: 0 };
+      else { tweenA = null; state.A = target; }
+      touch('camera');
+    }
+    byId('moveCamBtn').addEventListener('click', () => moveCamera(randomCamera()));
+    byId('resetCamBtn').addEventListener('click', () => moveCamera(se3.I()));
+
+    const lSlider = makeSlider(byId('lHost'), {
+      label: 'Characteristic length L', min: 0, max: 300, step: 0.1, value: state.L,
+      format: (v) => fmt(v, 1) + ' mm',
+      onInput: (v) => { state.L = v; lGroup.setActive(null); touch('L'); },
+    });
+    const L_PRESETS = [
+      { label: 'L = 0', value: 0 },
+      { label: `${fmt(ONE_DEG_ONE_MM, 1)} mm · 1° = 1 mm`, value: ONE_DEG_ONE_MM },
+      { label: `Object radius ${fmt(OBJECT_RADIUS, 0)} mm`, value: OBJECT_RADIUS },
+      { label: 'L = 300 mm', value: 300 },
+    ];
+    const lGroup = makeButtonGroup(byId('lGrid'), L_PRESETS, (value) => setL(value), { active: OBJECT_RADIUS });
+    function setL(value) {
+      state.L = clamp(value, 0, 300);
+      lSlider.set(state.L);
+      lGroup.setActive(L_PRESETS.some((p) => p.value === value) ? value : null);
+      touch('L');
+    }
+
+    const modeGroup = makeButtonGroup(byId('modeGrid'), [
+      { label: 'Two rulers (decoupled)', value: 'decoupled' },
+      { label: 'One screw', value: 'screw' },
+    ], (value) => setMode(value), { active: 'decoupled' });
+    function setMode(value) {
+      state.mode = value === 'screw' ? 'screw' : 'decoupled';
+      modeGroup.setActive(state.mode);
+      if (state.s > 0.998 || state.s < 0.002) { state.s = 0.5; walkSlider.set(0.5); }
+      touch('walk');
+    }
+    const walkSlider = makeSlider(byId('walkHost'), {
+      label: 'Walk position s', min: 0, max: 1, step: 0.005, value: 1,
+      onInput: (v) => { state.s = v; state.play = 0; touch('walk'); },
+    });
+    byId('playBtn').addEventListener('click', () => {
+      state.s = 0;
+      state.play = 1;
+      touch('walk');
+    });
+    byId('resetViewBtn').addEventListener('click', resetView);
+
+    byId('setup1').addEventListener('click', () => {
+      applyPreset('default');
+      setOrigin('centre', false);
+      touch('preset');
+    });
+    byId('setup2').addEventListener('click', () => {
+      applyPreset('default');
+      setOrigin('centre', false);
+      moveCamera(se3.I(), false);
+      state.camBefore = null;
+      touch('preset');
+    });
+    byId('setup3').addEventListener('click', () => {
+      applyErr({ az: -140, el: 60, angle: 1, dx: 0, dy: 0, dz: 0 });
+      presetGroup.setActive(null);
+      setOrigin('centre', false);
+      setL(ONE_DEG_ONE_MM);
+    });
+
+    // ---- text ----
+    const mm = (x, d = 2) => fmt(x, d) + ' mm';
+    const dg = (x, d = 2) => fmt(deg(x), d) + '°';
+    function updatePanels() {
+      const { e, table, ps } = calc;
+      byId('originRows').innerHTML = table.map((row) => (
+        `<tr class="${row.key === state.originKey ? 'active' : ''}"><td>${ORIGINS[row.key].label}</td>` +
+        `<td>${dg(row.theta)}</td><td>${fmt(row.dt, 2)}</td><td>${fmt(row.rho, 2)}</td><td>${fmt(row.twist, 2)}</td></tr>`
+      )).join('');
+      const b = state.camBefore;
+      const camRow = (label, before, now, tol) => {
+        const cls = b ? (Math.abs(before - now) < tol ? 'same' : 'diff') : '';
+        return `<tr><td>${label}</td><td>${b ? fmt(before, 3) : '–'}</td><td class="${cls}">${fmt(now, 3)}</td></tr>`;
+      };
+      byId('cameraRows').innerHTML =
+        camRow('θ in degrees', b ? deg(b.theta) : 0, deg(e.theta), 1e-6) +
+        camRow('‖Δt‖ in mm', b ? b.dt : 0, e.dt, 1e-6) +
+        camRow('‖ρ‖ in mm', b ? b.rho : 0, e.rho, 1e-6) +
+        camRow('d in mm', b ? b.twist : 0, e.twist, 1e-6) +
+        `<tr><td>true origin, camera frame</td><td colspan="2">${fmtVec(ps.Tg.t, 1)}</td></tr>`;
+      byId('lChip').textContent = `1° is worth ${fmt(state.L * Math.PI / 180, 2)} mm · L·θ = ${fmt(state.L * e.theta, 2)} mm`;
+
+      byId('p1Theta').textContent = dg(table[0].theta);
+      byId('p1Centre').textContent = mm(table[0].dt);
+      byId('p1Nose').textContent = mm(table[1].dt);
+      byId('p2Theta').textContent = dg(e.theta);
+      byId('p2Dt').textContent = mm(e.dt);
+      byId('p2Rho').textContent = mm(e.rho);
+      byId('p3L').textContent = fmt(ONE_DEG_ONE_MM, 1);
+
+      byId('poseDisplay').textContent =
+        fmtMatrix(se3.toMatrix(ps.Tg), 'T_gt =   (last column t, in mm)', 2) + '\n\n' +
+        fmtMatrix(se3.toMatrix(ps.Te), 'T_est =', 2);
+      const dtVec = v3.sub(ps.Te.t, ps.Tg.t);
+      byId('errKv').innerHTML =
+        `<span>model origin</span><strong>${ORIGINS[state.originKey].label}, c = ${fmtVec(state.c, 0)}</strong>` +
+        `<span>θ</span><strong>${dg(e.theta)} = ${fmt(e.theta, 4)} rad</strong>` +
+        `<span>Δt = t_est − t_gt</span><strong>${fmtVec(dtVec, 2)}</strong>` +
+        `<span>‖Δt‖</span><strong>${mm(e.dt)}</strong>` +
+        `<span>ω (rad)</span><strong>${fmtVec(e.xi.w, 4)}</strong>` +
+        `<span>‖ω‖</span><strong>${fmt(v3.len(e.xi.w), 4)} rad</strong>` +
+        `<span>ρ (mm)</span><strong>${fmtVec(e.xi.rho, 2)}</strong>` +
+        `<span>‖ρ‖</span><strong>${mm(e.rho)}</strong>` +
+        `<span>L</span><strong>${mm(state.L, 1)}</strong>` +
+        `<span>L·θ</span><strong>${mm(state.L * e.theta)}</strong>` +
+        `<span>d = √(‖ρ‖² + L²θ²)</span><strong>${mm(e.twist)}</strong>` +
+        `<span>√(‖Δt‖² + L²θ²)</span><strong>${mm(e.decoupledCombined)}</strong>`;
+      const tRel = relativePose(ps.Te, ps.Tg).t;
+      byId('rhoKv').innerHTML =
+        `<span>‖t_rel‖</span><strong>${mm(v3.len(tRel), 3)}</strong>` +
+        `<span>‖Δt‖</span><strong>${mm(e.dt, 3)}</strong>` +
+        `<span>‖ρ‖</span><strong>${mm(e.rho, 3)}</strong>` +
+        `<span>‖ρ‖ − ‖Δt‖</span><strong>${mm(e.rho - e.dt, 3)}</strong>` +
+        (calc.screw ? `<span>slide along the screw axis</span><strong>${mm(calc.screw.advance)}</strong>` : '') +
+        `<span>walks differ mid-way by</span><strong>${mm(calc.gap, 3)}</strong>`;
+      byId('trapKv').innerHTML =
+        `<span>Δt at the centre</span><strong>${fmtVec(calc.dtCentre, 2)}</strong>` +
+        `<span>c</span><strong>${fmtVec(state.c, 1)}</strong>` +
+        `<span>predicted ‖Δt′‖</span><strong>${mm(v3.len(calc.predicted), 3)}</strong>` +
+        `<span>measured ‖Δt′‖</span><strong>${mm(e.dt, 3)}</strong>`;
+    }
+    function updateCaption() {
+      const { e, table } = calc;
+      const noRot = e.theta < rad(0.05);
+      const noShift = table[0].dt < 0.05;
+      const b = state.before;
+      if (state.action === 'origin' && b) {
+        const moved = Math.abs(b.dt - e.dt) > 0.05;
+        setCaption(`<span class="badge ${moved ? 'bad' : 'good'}">${moved ? 'the origin trap' : 'origin-proof'}</span> ` +
+          `The planes did not move. θ stayed at <strong>${dg(e.theta)}</strong>. ` +
+          `The tape measure went from <strong>${mm(b.dt)}</strong> to <strong>${mm(e.dt)}</strong>.` +
+          (moved ? ' Δt is only the gap between the two origin markers.' : ' With θ = 0 every model point shifts by the same Δt.'));
+        return;
+      }
+      if (state.action === 'camera') {
+        setCaption('<span class="badge good">the camera cancels</span> The whole scene swung. ' +
+          `Yet θ = <strong>${dg(e.theta)}</strong>, ‖Δt‖ = <strong>${mm(e.dt)}</strong> and ‖ρ‖ = <strong>${mm(e.rho)}</strong> did not change. ` +
+          'These errors are left-invariant.');
+        return;
+      }
+      if (state.action === 'L') {
+        setCaption('<span class="badge warn">exchange rate</span> ' +
+          (state.L < 0.05 ? 'With L = 0 the rotation is free, so d = ‖ρ‖. '
+            : `L = <strong>${mm(state.L, 1)}</strong> makes 1° worth <strong>${mm(state.L * Math.PI / 180)}</strong>. `) +
+          `Rotation costs L·θ = <strong>${mm(state.L * e.theta)}</strong>. Translation costs ‖ρ‖ = <strong>${mm(e.rho)}</strong>. ` +
+          `One number: d = <strong>${mm(e.twist)}</strong>.` +
+          (calc.hasRot && state.L >= 6 ? ` The green point at distance L really moves <strong>${mm(calc.leverMove)}</strong>.` : ''));
+        return;
+      }
+      if (state.action === 'walk') {
+        setCaption(state.mode === 'screw'
+          ? '<span class="badge warn">one screw</span> Every point rides a helix about one fixed axis. ' +
+            `Mid-way, this walk and the two-ruler walk differ by <strong>${mm(calc.gap)}</strong>. Both end at the estimate.`
+          : '<span class="badge warn">two rulers</span> The origin slides along the straight red line while the plane turns steadily. ' +
+            `Mid-way, this walk and the screw walk differ by <strong>${mm(calc.gap)}</strong>. Both end at the estimate.`);
+        return;
+      }
+      if (noRot && noShift) {
+        setCaption('<span class="badge good">perfect</span> Both rulers read zero. The two planes coincide, so every origin and every L agree.');
+      } else if (noRot) {
+        setCaption('<span class="badge good">origin-proof</span> θ = 0, so every model point shifts by the same Δt. ' +
+          `Any origin gives ‖Δt‖ = <strong>${mm(e.dt)}</strong>, and ρ equals Δt seen from the object.`);
+      } else if (noShift && state.originKey === 'centre') {
+        setCaption(`<span class="badge warn">tape measure reads zero</span> Only the protractor sees this error: θ = <strong>${dg(e.theta)}</strong>. ` +
+          'The two origins coincide. Move the origin to the nose and read the tape again.');
+      } else {
+        setCaption(`<span class="badge warn">two rulers</span> Protractor: θ = <strong>${dg(e.theta)}</strong>. ` +
+          `Tape measure: ‖Δt‖ = <strong>${mm(e.dt)}</strong>. One number needs an exchange rate. ` +
+          `With L = ${mm(state.L, 1)}, d = <strong>${mm(e.twist)}</strong>.`);
+      }
+    }
+
+    // ---- frame loop ----
+    app.onFrame = (dt) => {
+      if (tweenC) {
+        tweenC.u = Math.min(1, tweenC.u + dt / 0.7);
+        state.c = v3.lerp(tweenC.from, tweenC.to, ease(tweenC.u));
+        if (tweenC.u >= 1) tweenC = null;
+        dirty = true;
+      }
+      if (tweenA) {
+        tweenA.u = Math.min(1, tweenA.u + dt / 0.9);
+        state.A = screwInterp(tweenA.from, tweenA.to, ease(tweenA.u));
+        if (tweenA.u >= 1) { state.A = tweenA.to; tweenA = null; }
+        dirty = true;
+      }
+      if (state.play) {
+        state.s = clamp(state.s + dt * 0.45, 0, 1);
+        walkSlider.set(state.s);
+        if (state.s >= 1) state.play = 0;
+      }
+    };
+
+    // A text label at a world point, on a dark plate so it stays readable over wires.
+    function label3(X, str, o = {}) {
+      const p = project(toView(X), app.mainViewport());
+      ctx.save();
+      ctx.font = o.font || '600 12px Inter, sans-serif';
+      const tw = ctx.measureText(str).width;
+      const x = p.x + (o.dx || 0) - (o.align === 'right' ? tw : 0);
+      const y = p.y + (o.dy || 0);
+      ctx.fillStyle = 'rgba(7, 17, 31, 0.78)';
+      ctx.fillRect(x - 4, y - 12, tw + 8, 16);
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    app.draw = () => {
+      if (dirty) {
+        recompute();
+        updatePanels();
+        updateCaption();
+        dirty = false;
+      }
+      background();
+      const vp = app.mainViewport();
+      const { ps, e, O, nErr, hasRot } = calc;
+      // Lever direction: perpendicular to the error axis and to the line of sight,
+      // so the lever arm is never drawn end-on.
+      let u = v3.cross(nErr, unrotate([0, 0, 1]));
+      if (v3.len(u) < 0.2) u = v3.cross(nErr, unrotate([0, 1, 0]));
+      u = v3.norm(u);
+      const w = v3.cross(nErr, u);
+
+      // protractor: error axis, angle arc, lever-arm ring
+      if (hasRot) {
+        line3(toView(v3.add(O, v3.scale(nErr, -175))), toView(v3.add(O, v3.scale(nErr, 175))), vp,
+          { color: 'rgba(160, 231, 160, 0.5)', dash: [6, 6], width: 1.2 });
+        label3(v3.add(O, v3.scale(nErr, 182)), 'error axis', { color: 'rgba(160, 231, 160, 0.9)', font: '11px Inter, sans-serif' });
+        const spin = (s, r) => v3.add(O, v3.scale(m3.apply(axisAngle(nErr, s * e.theta), u), r));
+        line3(toView(O), toView(spin(0, 58)), vp, { color: 'rgba(160, 231, 160, 0.6)', width: 1 });
+        line3(toView(O), toView(spin(1, 58)), vp, { color: 'rgba(160, 231, 160, 0.6)', width: 1 });
+        drawPath((s) => spin(s, 50), vp, { color: '#a0e7a0', width: 2.4, samples: 20 });
+        label3(spin(0.5, 84), `θ = ${dg(e.theta, 1)}`, { color: '#a0e7a0' });
+        if (state.L >= 6) {
+          drawPath((s) => v3.add(O, v3.add(v3.scale(u, state.L * Math.cos(s * 2 * Math.PI)), v3.scale(w, state.L * Math.sin(s * 2 * Math.PI)))),
+            vp, { color: 'rgba(160, 231, 160, 0.22)', samples: 72 });
+          drawPath((s) => spin(s, state.L), vp, { color: '#a0e7a0', width: 2, samples: 20 });
+          const lever0 = spin(0, state.L);
+          const lever1 = spin(1, state.L);
+          line3(toView(O), toView(lever0), vp, { color: 'rgba(160, 231, 160, 0.35)', dash: [3, 5] });
+          dot3(toView(lever0), vp, { color: '#a0e7a0', r: 3.5, alpha: 0.6 });
+          dot3(toView(lever1), vp, { color: '#a0e7a0', r: 4.5 });
+          label3(lever1, `point at L = ${fmt(state.L, 0)} mm moves ${fmt(calc.leverMove, 1)} mm`,
+            { color: '#a0e7a0', dx: 10, dy: 18, font: '11px Inter, sans-serif' });
+        }
+      }
+
+      // the screw axis of the one-screw walk
+      if (calc.screw) {
+        const bright = state.mode === 'screw';
+        const a = v3.add(calc.screw.pc, v3.scale(calc.screw.dir, -230));
+        const bEnd = v3.add(calc.screw.pc, v3.scale(calc.screw.dir, 230));
+        line3(toView(a), toView(bEnd), vp, { color: bright ? 'rgba(235, 242, 255, 0.75)' : 'rgba(235, 242, 255, 0.28)', dash: [10, 5, 2, 5], width: 1.3 });
+        // Put the label on the end that is lower on screen, clear of the readout box.
+        const lowEnd = project(toView(a), vp).y > project(toView(bEnd), vp).y ? a : bEnd;
+        label3(lowEnd, 'screw axis', { color: bright ? 'rgba(235, 242, 255, 0.9)' : 'rgba(235, 242, 255, 0.55)', font: '11px Inter, sans-serif', dx: 8 });
+      }
+
+      // the two poses
+      drawPlane(ps.Tg0.R, ps.Tg0.t, vp, { size: SIZE, color: '#5aa6ff', width: 1.5 });
+      drawPlane(ps.Te0.R, ps.Te0.t, vp, { size: SIZE, color: '#f08f3c', width: 1.5 });
+
+      // the two walks of the model origin: straight line and helix
+      polyline3(calc.pathScrew.map(toView), vp, {
+        color: state.mode === 'screw' ? 'rgba(235, 242, 255, 0.85)' : 'rgba(235, 242, 255, 0.3)', width: 1.4, dash: [3, 4],
+      });
+
+      // tape measure: the gap between the two origin markers
+      if (e.dt > 0.3) {
+        arrow3(toView(ps.Tg.t), toView(ps.Te.t), vp, { color: '#ff8a8a', width: 2.4, glow: 6 });
+        label3(ps.Te.t, `‖Δt‖ = ${fmt(e.dt, 1)} mm`, { color: '#ff8a8a', dx: 12, dy: -12 });
+      }
+      dot3(toView(ps.Tg.t), vp, { color: '#86d4ff', r: 5.5 });
+      dot3(toView(ps.Te.t), vp, { color: '#f08f3c', r: 5.5 });
+      label3(ps.Tg.t, 'origin, true', { color: '#86d4ff', dx: -12, dy: 24, align: 'right', font: '11px Inter, sans-serif' });
+      label3(ps.Te.t, 'origin, estimate', { color: '#f08f3c', dx: 12, dy: 26, font: '11px Inter, sans-serif' });
+
+      // the walker
+      if (state.s > 0.002 && state.s < 0.998) {
+        const G = (state.mode === 'screw' ? screwInterp : decoupledInterp)(ps.Tg, ps.Te, state.s);
+        const centre = v3.sub(G.t, m3.apply(G.R, state.c));
+        drawPlane(G.R, centre, vp, { size: SIZE, color: '#ebf2ff', alpha: 0.55, lights: false });
+        dot3(toView(G.t), vp, { color: '#ebf2ff', r: 4 });
+      }
+
+      const wide = canvas.clientWidth >= 880;
+      drawReadout(canvas.clientWidth - 336, wide ? 16 : 232, 320, 'Two rulers, and one exchange rate', [
+        ['protractor  θ', `${dg(e.theta)} = ${fmt(e.theta, 3)} rad`, '#a0e7a0'],
+        ['tape measure  ‖Δt‖', mm(e.dt), '#ff8a8a'],
+        ['twist slide  ‖ρ‖', mm(e.rho)],
+        ['exchange rate  L', mm(state.L, 1)],
+        ['rotation priced in mm  L·θ', mm(state.L * e.theta), '#a0e7a0'],
+        ['one screw  √(‖ρ‖² + L²θ²)', mm(e.twist)],
+        ['two rulers merged  √(‖Δt‖² + L²θ²)', mm(e.decoupledCombined)],
+        ['1° is worth', mm(state.L * Math.PI / 180)],
+        ['the two walks differ mid-way by', mm(calc.gap)],
+      ]);
+    };
+
+    // ---- deep links, e.g. #preset=big&origin=nose&mode=screw&s=0.5&L=57.3&tab=math&cam=1&open=1 ----
+    (function applyHash() {
+      const h = new URLSearchParams(location.hash.slice(1));
+      recompute();
+      if (h.get('preset')) applyPreset(h.get('preset'));
+      if (h.get('cam')) moveCamera({ R: axisAngle([0.4, 1, -0.3], rad(60)), t: [120, -40, 90] }, false);
+      if (h.get('origin')) { recompute(); setOrigin(h.get('origin'), false); }
+      if (h.get('L')) setL(Number(h.get('L')));
+      if (h.get('mode')) setMode(h.get('mode'));
+      if (h.get('s')) { state.s = clamp(Number(h.get('s')), 0, 1); walkSlider.set(state.s); }
+      if (h.get('open')) document.querySelectorAll('details.predict').forEach((d) => { d.open = true; });
+      if (h.get('tab')) document.querySelector(`[data-tab-button="${h.get('tab')}"]`)?.click();
+      if (h.get('action')) state.action = h.get('action');
+      dirty = true;
+    }());
+  </script>
+</body>
+</html>

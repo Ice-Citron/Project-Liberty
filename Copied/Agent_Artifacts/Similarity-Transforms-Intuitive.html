@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Same Shape, Different Rules — a visual transform lesson</title>
+<style>
+  :root {color-scheme:dark;--background:#0b1423;--foreground:#edf2fb;--muted-foreground:#a4b3cb;--border:#283952;--muted:#152339;--primary:#e4eaf5;--primary-foreground:#101c30;--viz-series-1:#79c6ff;--viz-series-2:#ffcc7c;--viz-series-3:#8cdda6;--viz-series-4:#c7a2ff}
+  * {box-sizing:border-box} body {margin:0;background:#070f1b;color:var(--foreground);font:16px/1.65 system-ui,-apple-system,sans-serif}
+  main {max-width:1050px;margin:auto;padding:40px 28px 70px}
+  .eyebrow {color:var(--viz-series-1);text-transform:uppercase;letter-spacing:.16em;font-size:12px}
+  h1 {font-size:clamp(30px,5vw,52px);line-height:1.1;letter-spacing:-.04em;margin:12px 0 22px;font-weight:500}
+  h2,h3 {font-weight:500;line-height:1.35} h3 {margin-top:0}
+  p {max-width:900px;color:#becce0;margin:14px 0} strong {color:var(--foreground);font-weight:600}
+  a {color:var(--viz-series-1)}
+  .lesson {margin:30px 0;padding:24px;border:1px solid var(--border);background:var(--background);border-radius:16px}
+  .viz-row,.viz-controls {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  button {font:inherit;cursor:pointer} .btn {padding:9px 13px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--foreground);font-size:14px}
+  .btn:hover {background:var(--muted)} .btn[aria-pressed=true] {background:var(--primary);color:var(--primary-foreground)}
+  .form-label {flex:1 1 220px;display:block;max-width:470px;font-size:14px}
+  .form-range {display:block;width:100%;accent-color:var(--viz-series-2);margin-top:10px}
+  .form-check {display:flex;gap:9px;align-items:center;font-size:14px}
+  .form-check-input {width:18px;height:18px;accent-color:var(--viz-series-1)}
+  .text-small {font-size:12px} .text-muted {color:var(--muted-foreground)} .tabular-nums,output {font-variant-numeric:tabular-nums}
+  .notice {display:grid;grid-template-columns:1.2fr 1fr;gap:24px;border-top:1px solid var(--border);padding-top:22px;margin-top:22px}
+  .notice p {margin:4px 0;font-size:15px} #mode-title {font-size:21px;margin:0 0 8px}
+  .rule {font:16px/1.6 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--viz-series-2)}
+  details {border-top:1px solid var(--border);padding:16px 0} summary {cursor:pointer;color:var(--foreground)}
+  table {width:100%;border-collapse:collapse;font-size:14px;margin-top:16px} td,th {text-align:left;vertical-align:top;padding:10px 7px;border-bottom:1px solid var(--border)} th {font-weight:500;color:var(--viz-series-1)}
+  .small-note {font-size:13px;color:var(--muted-foreground)}
+  @media(max-width:650px) {main{padding:24px 16px}.lesson{padding:16px}.notice{grid-template-columns:1fr}table{font-size:12px}td,th{padding:8px 3px}}
+</style>
+</head>
+<body><main>
+<div class="eyebrow">Visual intuition · geometry before algebra</div>
+<h1>Same shape.<br>Different rules.</h1>
+<p>Imagine a square sticker on graph paper. A <strong>rigid transform</strong> lets you slide or rotate it. A <strong>similarity transform</strong> also lets you enlarge the entire sticker, like a photocopier. Every length gets the same multiplier, so the shape stays the same. Stretch only its width, and the square becomes a rectangle. Slide its top sideways relative to its bottom, and you create a shear.</p>
+<p>In <strong>GigaPose</strong>, the template is a rendered image of the object. After the template supplies the approximate viewpoint, the method estimates a similarity map between image coordinates. Its four controls are one rotation angle, one uniform scale, and two translation coordinates. The rule is <strong>x<sub>q</sub> = sR x<sub>t</sub> + t</strong>. This image map is an approximation for real 3D objects under perspective; it is not the full 3D pose matrix. <a href="https://arxiv.org/html/2311.14155v2#S3.SS3">GigaPose §3.3, Eq. 4</a>.</p>
+<section class="lesson" aria-label="Interactive transform lesson">
+<div id="similarity-motion">
+  <h3>What happens to the same square?</h3>
+  <div class="viz-row" role="group" aria-label="Transform family">
+    <button class="btn" data-mode="rigid" aria-pressed="false">Rigid</button>
+    <button class="btn" data-mode="similarity" aria-pressed="true">Similarity</button>
+    <button class="btn" data-mode="stretch" aria-pressed="false">Stretch</button>
+    <button class="btn" data-mode="shear" aria-pressed="false">Shear</button>
+    <button class="btn" data-mode="perspective" aria-pressed="false">Perspective</button>
+    <button class="btn" data-mode="bend" aria-pressed="false">Bend</button>
+    <button class="btn" data-mode="gigapose" aria-pressed="false">GigaPose controls</button>
+  </div>
+  <div class="sm-scenes">
+    <div><div class="text-small">TEMPLATE · before</div><svg class="sm-scene" data-scene="before" role="img" aria-label="Original square and circle on a coordinate grid"></svg></div>
+    <div><div class="text-small">QUERY · after</div><svg class="sm-scene" data-scene="after" role="img" aria-label="Transformed square and circle on a coordinate grid"></svg></div>
+  </div>
+  <div class="viz-controls">
+    <label class="form-label sm-amount">Transform amount · <output data-value="amount">100%</output>
+      <input class="form-range" data-control="amount" type="range" min="0" max="1" step="0.01" value="1">
+    </label>
+    <label class="form-check"><input class="form-check-input" data-control="tilt" type="checkbox"><span class="form-check-label">Tilt diagram into 3D</span></label>
+  </div>
+  <div class="sm-giga viz-controls" hidden>
+    <label class="form-label">Rotate · <output data-value="angle">25°</output><input class="form-range" data-control="angle" type="range" min="-90" max="90" step="1" value="25"></label>
+    <label class="form-label">Uniform scale · <output data-value="scale">1.30×</output><input class="form-range" data-control="scale" type="range" min="0.5" max="1.6" step="0.01" value="1.3"></label>
+    <label class="form-label">Move horizontally · <output data-value="tx">0.40</output><input class="form-range" data-control="tx" type="range" min="-0.7" max="0.7" step="0.01" value="0.4"></label>
+    <label class="form-label">Move vertically · <output data-value="ty">0.15</output><input class="form-range" data-control="ty" type="range" min="-0.7" max="0.7" step="0.01" value="0.15"></label>
+  </div>
+  <div class="sm-metrics text-small tabular-nums" aria-live="polite"></div>
+  <div class="text-small text-muted">Grid units · x right, y up · side lengths and angles measured on the image plane</div>
+</div>
+<style>
+  #similarity-motion .sm-scenes {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:20px 0 8px}
+  #similarity-motion .sm-scene {width:100%;height:300px;display:block;overflow:hidden}
+  #similarity-motion .sm-scene text {fill:var(--foreground)}
+  #similarity-motion .sm-metrics {margin:16px 0 8px;min-height:2em}
+  #similarity-motion [hidden] {display:none!important}
+  @media(max-width:560px) {#similarity-motion .sm-scenes {grid-template-columns:1fr;gap:8px} #similarity-motion .sm-scene {height:255px}}
+</style>
+<script>
+(() => {
+  const root = document.getElementById('similarity-motion');
+  const $ = selector => root.querySelector(selector);
+  const values = {amount:1, angle:25, scale:1.3, tx:0.4, ty:0.15};
+  let mode = 'similarity';
+  let animation = 0;
+  let visualAmount = 1;
+  const corners = [[-1,-1],[1,-1],[1,1],[-1,1]];
+  const color = name => `var(--${name})`;
+  const sample = (a,b,n=40) => Array.from({length:n+1},(_,i) =>
+    a.map((v,j) => v + (b[j]-v)*i/n));
+  const edge = (a,b) => sample(a,b);
+  const square = corners.flatMap((p,i) => edge(p,corners[(i+1)%4]));
+  const circle = Array.from({length:121},(_,i) =>
+    [0.68*Math.cos(i*Math.PI/60),0.68*Math.sin(i*Math.PI/60)]);
+
+  function transform([x,y], amount=visualAmount) {
+    if (mode === 'stretch') return [x*(1+0.7*amount),y];
+    if (mode === 'shear') return [x+0.8*amount*y,y];
+    if (mode === 'perspective') {
+      const w=1+0.16*amount*x+0.09*amount*y;
+      return [x/w,y/w];
+    }
+    if (mode === 'bend') return [x,y+0.4*amount*x*x];
+    const giga=mode==='gigapose';
+    const theta=(giga?values.angle:25)*Math.PI/180*amount;
+    const s=mode==='rigid'?1:1+((giga?values.scale:1.3)-1)*amount;
+    const tx=(giga?values.tx:0.4)*amount;
+    const ty=(giga?values.ty:0.15)*amount;
+    return [s*(Math.cos(theta)*x-Math.sin(theta)*y)+tx,
+      s*(Math.sin(theta)*x+Math.cos(theta)*y)+ty];
+  }
+
+  function drawScene(svg, after) {
+    const width=svg.clientWidth, height=svg.clientHeight;
+    if (!width) return;
+    svg.setAttribute('viewBox',`0 0 ${width} ${height}`);
+    const tilt=$('[data-control="tilt"]').checked;
+    const scale=Math.min((width-36)/6.4,(height-42)/6.4);
+    const project=([x,y]) => tilt
+      ? [width/2+scale*(0.87*x+0.42*y),height/2+scale*(0.22*x-0.69*y)]
+      : [width/2+scale*x,height/2-scale*y];
+    const map=p=>project(after?transform(p):p);
+    const path=(pts,mapper=map)=>pts.map((p,i)=>
+      `${i?'L':'M'}${mapper(p).map(n=>n.toFixed(2)).join(',')}`).join(' ');
+    const drawPath=(pts,stroke,weight=1,fill='none',mapper=map,extra='') =>
+      `<path d="${path(pts,mapper)}" stroke="${stroke}" stroke-width="${weight}" fill="${fill}" ${extra}/>`;
+    const text=(p,t,anchor='start')=>{
+      const [x,y]=project(p);
+      return `<text x="${x}" y="${y}" text-anchor="${anchor}" class="text-small">${t}</text>`;
+    };
+    const plane=[[-2.7,-2.7],[2.7,-2.7],[2.7,2.7],[-2.7,2.7],[-2.7,-2.7]];
+    let html='<title>'+ (after?'Transformed':'Original') +' square and circle</title>';
+    if(tilt) html+=drawPath(plane,color('border'),1,color('muted'),
+      p=>{const [x,y]=project(p);return [x,y+9];});
+    html+=drawPath(plane,color('border'),1,color('background'),project);
+    for(let i=-2;i<=2;i++) {
+      html+=drawPath([[-2.65,i],[2.65,i]],color('border'),1,'none',project);
+      html+=drawPath([[i,-2.65],[i,2.65]],color('border'),1,'none',project);
+    }
+    html+=text([2.75,0],'x');
+    html+=text([0,2.84],'y','middle');
+    if(after) html+=drawPath(square,color('muted-foreground'),1,'none',project,
+      'stroke-dasharray="4 5" opacity="0.5"');
+    const outline=color(after?'viz-series-2':'viz-series-1');
+    html+=drawPath(square,outline,2.5,outline,map,'fill-opacity="0.08"');
+    html+=drawPath(circle,outline,2,'none',map,'opacity="0.8"');
+    // Two original unit directions remain visible within the square.
+    html+=drawPath([[0,0],[0.9,0]],color('viz-series-3'),3);
+    html+=drawPath([[0,0],[0,0.9]],color('viz-series-4'),3);
+    for(const [p,label] of [[[0.97,0],'u'],[[0,0.98],'v']]) {
+      const [x,y]=map(p);
+      html+=`<text x="${x+4}" y="${y-5}" class="text-small">${label}</text>`;
+    }
+    corners.forEach((p,i)=>{
+      const [x,y]=map(p);
+      html+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${outline}"/>`;
+      html+=`<text x="${x+(p[0]>0?7:-7)}" y="${y+(p[1]>0?-8:17)}" text-anchor="${p[0]>0?'start':'end'}" class="text-small">${['A','B','C','D'][i]}</text>`;
+    });
+    svg.innerHTML=html;
+  }
+
+  function report() {
+    const pts=corners.map(p=>transform(p,values.amount));
+    const vec=(a,b)=>[b[0]-a[0],b[1]-a[1]];
+    const u=vec(pts[0],pts[1]),v=vec(pts[0],pts[3]);
+    const len=p=>Math.hypot(...p);
+    const angle=Math.acos(Math.max(-1,Math.min(1,
+      (u[0]*v[0]+u[1]*v[1])/(len(u)*len(v)))))*180/Math.PI;
+    const label=mode==='bend'?'Endpoint distances':'Side lengths';
+    $('.sm-metrics').textContent=`${label}: AB ${len(u).toFixed(2)}, AD ${len(v).toFixed(2)} · ${mode==='bend'?'Angle between endpoint chords':'Corner A'}: ${angle.toFixed(1)}°`;
+    root.dataset.mode=mode;
+    root.dispatchEvent(new CustomEvent('transformchange',{
+      detail:{mode,values:{...values}},bubbles:true}));
+  }
+
+  function draw() {
+    drawScene($('[data-scene="before"]'),false);
+    drawScene($('[data-scene="after"]'),true);
+  }
+
+  root.querySelectorAll('[data-mode]').forEach(button=>{
+    button.addEventListener('click',()=>{
+      cancelAnimationFrame(animation);
+      mode=button.dataset.mode;
+      values.amount=1;
+      $('[data-control="amount"]').value=1;
+      $('[data-value="amount"]').textContent='100%';
+      root.querySelectorAll('[data-mode]').forEach(b=>
+        b.setAttribute('aria-pressed',String(b===button)));
+      $('.sm-giga').hidden=mode!=='gigapose';
+      $('.sm-amount').hidden=mode==='gigapose';
+      if(matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        visualAmount=1;draw();report();return;
+      }
+      visualAmount=0;draw();
+      const start=performance.now();
+      const tick=now=>{
+        const t=Math.min(1,(now-start)/650);
+        visualAmount=t*t*(3-2*t);
+        draw();
+        if(t<1) animation=requestAnimationFrame(tick);else report();
+      };
+      animation=requestAnimationFrame(tick);
+    });
+  });
+
+  root.querySelectorAll('[data-control]').forEach(input=>{
+    input.addEventListener('input',()=>{
+      cancelAnimationFrame(animation);
+      const key=input.dataset.control;
+      if(key!=='tilt') {
+        values[key]=Number(input.value);
+        const suffix=key==='angle'?'°':key==='scale'?'×':'';
+        $('[data-value="'+key+'"]').textContent=key==='amount'
+          ?Math.round(values[key]*100)+'%':values[key].toFixed(key==='angle'?0:2)+suffix;
+      }
+      visualAmount=values.amount;
+      draw();report();
+    });
+  });
+  new ResizeObserver(draw).observe(root);
+  draw();report();
+})();
+</script>
+<div class="notice" aria-live="polite">
+  <div><h2 id="mode-title">Similarity: same shape, new size</h2><p id="mode-note">All distances receive one common multiplier. The circle stays circular and every square corner stays 90°.</p></div>
+  <div><div class="eyebrow">The rule behind the motion</div><div class="rule" id="mode-rule"></div></div>
+</div>
+<p class="small-note">Move the amount slider from 0% to 100%. Letters identify the same corners before and after. The dashed outline marks the original square. The 3D switch changes only your view of the diagram; use the flat view to judge shape directly. This diagram uses y-up coordinates.</p>
+</section>
+<details>
+  <summary>How the transform families fit together</summary>
+  <p><strong>Rigid ⊂ similarity ⊂ affine ⊂ projective</strong>, for the invertible maps here. A general nonlinear warp need not preserve straight lines. Stretch and shear are examples within the affine family.</p>
+  <table>
+    <thead><tr><th>Family</th><th>Allowed change</th><th>What survives</th><th>2D controls</th></tr></thead>
+    <tbody>
+      <tr><td>Rigid</td><td>Rotate and translate</td><td>Lengths and angles</td><td>3</td></tr>
+      <tr><td>Similarity</td><td>Also scale uniformly</td><td>Angles and length ratios</td><td>4</td></tr>
+      <tr><td>Affine</td><td>Also stretch or shear</td><td>Straightness and parallelism</td><td>6</td></tr>
+      <tr><td>Projective</td><td>Also perspective distortion</td><td>Straightness, within the finite image</td><td>8</td></tr>
+      <tr><td>Nonlinear warp</td><td>May bend lines</td><td>Depends on the chosen warp</td><td>Varies</td></tr>
+    </tbody>
+  </table>
+  <p class="small-note">This lesson uses rotations with positive uniform scale, as in GigaPose. Some geometry texts also include reflections within similarities.</p>
+</details>
+<details>
+  <summary>Why does the paper call this “affine”?</summary>
+  <p>Every similarity map is also affine. A generic affine map has an arbitrary 2 × 2 matrix A and a translation t. GigaPose restricts that matrix to A = sR. Its two columns stay perpendicular and have equal lengths. That restriction excludes shear and unequal scale.</p>
+  <pre class="rule">      [ s cos θ   −s sin θ   tₓ ]
+M  =  [ s sin θ    s cos θ   tᵧ ]
+      [    0          0      1 ]</pre>
+  <p class="small-note">The last coordinate is a homogeneous coordinate equal to 1. It is not depth. The matrix acts on [x, y, 1].</p>
+</details>
+<details>
+  <summary>One useful distinction: a 3D move versus a 2D image change</summary>
+  <p>A rigid object can look smaller when it moves farther from a camera. The object did not shrink. Its image did. Under a weak-perspective approximation, this image size change acts like uniform scale. Depth variation and a different viewpoint can produce more complex image changes.</p>
+  <p>The tilt switch demonstrates another distinction: the diagram camera can change the apparent angles on your screen. The reported measurements stay on the image plane.</p>
+</details>
+<footer class="small-note">Original interactive lesson. Offline: no libraries, accounts, or network connection required. Format reference: your Claude Notes and existing transform chapters.</footer>
+<script>
+(() => {
+  const notes={
+    rigid:['Rigid: the sticker keeps its size','The whole sticker turns and slides. Every distance stays the same.','x′ = R x + t'],
+    similarity:['Similarity: same shape, new size','Every distance receives the same multiplier. The circle stays circular and every square corner stays 90°.','x′ = sR x + t'],
+    stretch:['Stretch: width and height disagree','Only the horizontal direction grows. The square becomes a rectangle; the circle becomes an ellipse. This is affine.','x′ = (1 + 0.7a)x\ny′ = y'],
+    shear:['Shear: the top slides farther','Horizontal displacement grows with height. The square slants. Parallel edges remain parallel, but right angles change. This is affine.','x′ = x + 0.8ay\ny′ = y'],
+    perspective:['Perspective: scale depends on position','Different parts receive different divisors. Straight edges stay straight, but opposite sides need not remain parallel.','w = 1 + 0.16ax + 0.09ay\nx′ = x/w,  y′ = y/w'],
+    bend:['Bend: straight lines can curve','Vertical displacement depends on x². A horizontal line bends into a parabola. This is nonlinear.','x′ = x\ny′ = y + 0.4ax²'],
+    gigapose:['GigaPose: four controls, one shape','Turn the image, scale it uniformly, then choose its horizontal and vertical offset. The square keeps its shape.','x_q = sR x_t + t']
+  };
+  function update({mode,values}) {
+    const [title,note,rule]=notes[mode];
+    document.getElementById('mode-title').textContent=title;
+    document.getElementById('mode-note').textContent=note;
+    let text=rule;
+    if(mode==='gigapose') {
+      const angle=values.angle*Math.PI/180;
+      const a=values.scale*Math.cos(angle),b=values.scale*Math.sin(angle);
+      text+='\n\n'+[
+        [a,-b,values.tx],[b,a,values.ty],[0,0,1]
+      ].map(row=>'[ '+row.map(n=>(Math.abs(n)<0.0001?0:n).toFixed(2).padStart(5)).join('  ')+' ]').join('\n');
+    } else if(['stretch','shear','perspective','bend'].includes(mode)) {
+      text+='\n\na = '+values.amount.toFixed(2);
+    }
+    document.getElementById('mode-rule').textContent=text;
+  }
+  document.getElementById('similarity-motion').addEventListener('transformchange',event=>update(event.detail));
+  update({mode:'similarity',values:{amount:1}});
+})();
+</script>
+</main></body></html>
