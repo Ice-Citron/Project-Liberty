@@ -64,8 +64,6 @@ Project-Liberty/
 │   ├── standard-technical-claude-skills/
 │   ├── standard-technical-codex-skills/
 │   └── ...
-├── personal-notes/
-│   └── Douglas.md
 └── reference-repos/                 # Local only; excluded from Git
     ├── In-Progress/
     ├── Completed/
