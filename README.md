@@ -6,7 +6,11 @@ My central library for ongoing technical study and programming practice.
 
 This repository records how I move from an unfamiliar concept to an independent solution.
 
-I type explanations and source code manually to control my pace. I use questions and repeated practice to develop my understanding. I also ask AI tools to make interactive lessons that connect equations to visual examples.
+I personally love typing out explanations (be it from the internet, or Gemini) 
+and source code manually so I can pace myself. Because I find that if I do 
+read-only, I would start moving too quickly and get burnt out quickly. 
+
+I use questions and repeated practice to develop my understanding. I also ask AI tools to make interactive lessons that connect equations to visual examples.
 
 I add material as my studies and projects develop. The library has no fixed completion date.
 
@@ -128,7 +132,13 @@ QSCHA gives each difficulty its own type of hint.
 | Conceptual hint | Explain the logic or mathematical steps. |
 | Answer | Give a reference solution after an attempt. |
 
-For mathematics, syntactical hints give the notation and relevant definitions. Conceptual hints give the proof strategy or calculation steps.
+For mathematics, syntactical hints give the notation and relevant definitions. 
+Conceptual hints give the proof strategy or calculation steps.
+
+For programming, at times I don't even know what the logical flow to solving a 
+task even is, let alone it's syntaxes. So conceptual hints would help show me
+what the logical essence that's needed, before I start working with the forest
+of syntax.
 
 The hints become less detailed as I improve:
 
@@ -148,9 +158,15 @@ The [QSCHA method document](ai-workflows/standard-technical-codex-skills/skills/
 
 ## Interactive lessons
 
-I ask AI tools to make visual explanations for concepts that I want to understand.
+Additionally, I like asking Fable or Astra to make visual explanations for 
+concepts that I want to understand. For example, to learn about pose estimation
+of Computer Vision, I find that it's much more effective to ask these agents to 
+create me interactive video-game-like artifacts, for which I can tweak with such
+that I'm able to more intuitively understand the essence of a topic. I find this
+builds up intuition much better over being obfuscated and confused by syntax and overly
+technical terms.
 
-These HTML lessons let me change parameters and compare the result with my prediction. The diagrams connect geometric behavior to the corresponding equations.
+Examples:
 
 | Lesson | Topics |
 |---|---|
@@ -261,34 +277,6 @@ The additional practice packs cover:
 | [Threads and tests](practice/kotlin/02-imperial40009/threaded-pack-02/) | Locks, concurrent operations, Java threads, and JUnit test cases. |
 | [Java and Kotlin interoperability](practice/kotlin/03-imperial40009/junit-interop-pack-03/) | Cross-language interfaces, function references, and tests across Java and Kotlin. |
 
-## Research papers
-
-The [paper collection](papers/) supports current and future study.
-
-Selected papers include:
-
-- [Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm](papers/Printed/1712.01815v1.pdf).
-- [Highly Accurate Protein Structure Prediction with AlphaFold](papers/Printed/s41586-021-03819-2.pdf).
-- [GR00T N1: An Open Foundation Model for Generalist Humanoid Robots](papers/Robotics/2503.14734v2.pdf).
-- [EgoScale: Scaling Dexterous Manipulation with Diverse Egocentric Human Data](papers/Robotics/2602.16710v1.pdf).
-- [Learning High-Speed Flight in the Wild](papers/Robotics/Loquercio21_Science.pdf).
-- [Proximal Policy Optimization Algorithms](papers/To-Print/1707.06347v2.pdf).
-- [Decision Transformer: Reinforcement Learning via Sequence Modeling](papers/To-Print/2106.01345v2.pdf).
-
-## AI study workflows
-
-The [AI workflow collection](ai-workflows/) contains saved instructions for Claude Code and Codex.
-
-These instructions describe:
-
-- The QSCHA exercise format.
-- Technical explanations in Simplified Technical English.
-- Code review and verification practices.
-- Session handoffs that preserve context.
-
-The library includes AI-generated explanations and exercises. I use these materials as part of the study process described above.
-
-The interactive HTML lessons are also AI-generated study tools that I request and explore.
 
 ## License
 
