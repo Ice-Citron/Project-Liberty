@@ -22,6 +22,11 @@ spirit.**
 
 ## Rule 1 — Prose shape: STE, two paragraphs
 
+`standard-technical-english` is the authority on prose shape: at most
+one comma per sentence, two to six sentences per paragraph, and the
+paragraph budget. Read it first. Where this rule and that skill
+differ, follow that skill.
+
 Write all prose in ASD-STE100 Simplified Technical English. The full
 rules and an example are in `references/ste-rules.md`. The core: write
 short sentences (20 words or fewer). Write one topic per sentence. Use
@@ -127,7 +132,8 @@ every line of code you suggest or write:
 
 ## Authority
 
-This skill owns the shared interaction rules: STE, answer length,
+This skill owns the shared interaction rules (prose shape excepted; it
+belongs to `standard-technical-english`): STE as a style reference,
 before/after edits, plans, verification, and code shape. Where another
 skill states the same rules in different words, follow this one, so
 the two cannot drift apart.
