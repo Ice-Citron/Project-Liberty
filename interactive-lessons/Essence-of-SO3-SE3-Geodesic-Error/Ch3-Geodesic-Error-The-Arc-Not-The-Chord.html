@@ -1,0 +1,1437 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch3 · Geodesic Error: The Arc, Not the Chord</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .formula {
+      font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; font-size: 13px; }
+  </style>
+
+</head>
+<body>
+  <style>
+    .dot.arc { background: #a0e7a0; box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.chord { background: #ff8a8a; box-shadow: 0 0 12px rgba(255, 138, 138, 0.8); }
+    .mode-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .body a, .src a { color: var(--blue-1); }
+    .kv .wide { grid-column: 1 / -1; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+  </style>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of Rotations and Rigid Motions · Chapter 3</div>
+        <h1>Geodesic Error: The Arc, Not the Chord</h1>
+        <p class="lead">
+          A rigid bracket has three unit sticks. Their tips live on a globe of radius 1.
+          From the <strong>true pose</strong> to the <strong>estimate</strong>, do you walk on the globe or dig a tunnel?
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>true frame</span>
+        <span class="legend"><span class="dot query"></span>estimated frame</span>
+        <span class="legend"><span class="dot arc"></span>arc on the globe</span>
+        <span class="legend"><span class="dot chord"></span>tunnel (chord)</span><br>
+        Drag to orbit. Scroll to zoom. The dashed line is the axis of ΔR.
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch2-Axis-Angle-Exp-And-Log.html">← Ch 2</a>
+        <span>Chapter 3 of 5 · <a href="index.html">Index</a></span>
+        <a href="Ch4-SE3-A-Rotation-Plus-A-Place.html">Ch 4 →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">How wrong is the estimate?</div>
+          <div class="body">Each preset sets the size of the error turn. The readout gives both rulers at once.</div>
+          <div id="presetGrid" class="preset-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Two ways to travel</div>
+          <div class="body">Walk on the globe and the bracket stays rigid. Dig the tunnel and watch the sticks shrink.</div>
+          <div id="modeGrid" class="mode-grid"></div>
+          <div id="walkHost"></div>
+          <div class="action-grid">
+            <button id="animateBtn">Animate the trip from true to estimate</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then press the button and check.</div>
+          <details class="predict">
+            <summary>1 · The estimate is off by 90° about x, then 90° about y. Is θ = 180°?</summary>
+            <div class="answer" id="answer1"></div>
+            <button id="predict1">Set it up: two quarter turns</button>
+          </details>
+          <details class="predict">
+            <summary>2 · θ doubles from 90° to 180°. Does the Frobenius distance double too?</summary>
+            <div class="answer" id="answer2"></div>
+            <button id="predict2">Set it up: 90°, then you drag the angle to 180°</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Move the camera frame, and re-label the object's axes. Does θ change?</summary>
+            <div class="answer" id="answer3"></div>
+            <button id="predict3">Set it up: re-label both frames at random</button>
+          </details>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The error turn</div>
+          <div class="body">The estimate is the true frame, turned by θ about one fixed axis. Choose the axis and the angle.</div>
+          <div id="errorHost"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">True orientation</div>
+          <div id="gtGrid" class="preset-grid three"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Same ruler, other labels</div>
+          <div class="body">ΔR can be written in camera coordinates or in object coordinates. You can also re-label both frames at random. Watch θ.</div>
+          <label class="checkbox"><input id="rightBox" type="checkbox"> Use R_gtᵀ R_est instead of R_est R_gtᵀ</label>
+          <div class="action-grid">
+            <button id="relabelBtn">Re-label both frames: R → A·R·B</button>
+            <button id="resetBtn">Reset view</button>
+          </div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The formula</div>
+          <div class="formula">ΔR = R_est · R_gtᵀ
+
+θ  = arccos( (Tr ΔR − 1) / 2 )
+   = ‖ Log(ΔR) ‖₂ ,        θ ∈ [0, π]
+
+rival: straight through matrix space
+‖R_est − R_gt‖_F = 2√2 · sin(θ / 2)</div>
+          <div class="body">ΔR is the single turn that carries the true frame onto the estimate.
+            Its trace hides the angle: <strong>Tr ΔR = 1 + 2 cos θ</strong>. Chapter 2 shows why.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Live matrices</div>
+          <div id="matrices" class="matrix-display"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Live numbers</div>
+          <div id="numbers" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Numerics</div>
+          <div class="body">Clamp (Tr ΔR − 1)/2 to [−1, 1] before arccos. Rounding can push it outside.
+            Near θ = 0 the arccos form loses digits.
+            The form <strong>atan2(‖vee(ΔR − ΔRᵀ)‖/2, (Tr ΔR − 1)/2)</strong> stays accurate.</div>
+          <div id="tinyTest" class="live-line"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Notation</div>
+          <div class="body">Lowercase <strong>log</strong> returns a skew matrix. The ∨ operator turns it into a vector.
+            Capital <strong>Log</strong> does both steps. So the ∨ in ‖Log(ΔR)<sup>∨</sup>‖ is harmless but redundant.</div>
+          <div class="body">Some authors take the Frobenius norm of the skew matrix log ΔR.
+            That gives <strong>√2·θ</strong>, not θ. Check which one a paper uses.</div>
+          <div id="skewLine" class="live-line"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Symmetric objects</div>
+          <div class="body">A symmetric object has several correct orientations. The error is the smallest θ over its symmetry group.
+            That is the same min over S as
+            <a href="../Essence-of-BOP-Pose-Errors/Ch1-MSSD-Worst-Point-Best-Symmetry.html">MSSD in the BOP series</a>.</div>
+        </section>
+        <section class="section">
+          <div class="src">Sources: Solà, Deray, Atchuthan, A micro Lie theory for state estimation in robotics (2018).
+            Huynh, Metrics for 3D Rotations: Comparison and Analysis, JMIV 2009.
+            Park, Distance Metrics on the Rigid-Body Motions with Applications to Mechanism Design, J. Mech. Design 1995.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>One angle.</strong> The geodesic error is the smallest single turn that carries the true frame onto the estimate. It lives in [0, π].</div>
+          <div class="essence"><strong>Arc versus tunnel.</strong> θ is the walk on the globe. The Frobenius distance is the tunnel through it: 2√2·sin(θ/2).</div>
+          <div class="essence"><strong>Small errors agree.</strong> For small θ the tunnel is about √2·θ. For large θ it saturates at 2√2, so it under-reports.</div>
+          <div class="essence"><strong>The tunnel leaves SO(3).</strong> A straight blend of two rotation matrices is not a rotation. Only the arc stays rigid all the way.</div>
+          <div class="essence"><strong>θ is bi-invariant.</strong> No choice of camera frame or object axes changes it. That makes it the natural ruler on SO(3).</div>
+          <div class="essence"><strong>Two ways to write ΔR.</strong> R_est R_gtᵀ and R_gtᵀ R_est give the same θ and the same physical axis. Only the coordinates differ.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveat</div>
+          <div class="body">θ says nothing about position. Two poses can share an orientation and sit a metre apart.
+            Chapter 5 handles the full pose.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== LIE KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Rotations are 3x3 arrays, vectors are [x, y, z].
+    // Conventions follow Sola et al., "A micro Lie theory for state estimation
+    // in robotics" (2018): Exp / Log map between R^3 (or R^6) and the group.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      add: (A, B) => A.map((row, i) => row.map((x, j) => x + B[i][j])),
+      sub: (A, B) => A.map((row, i) => row.map((x, j) => x - B[i][j])),
+      scale: (A, s) => A.map((row) => row.map((x) => x * s)),
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => x + (B[i][j] - x) * t)),
+      trace: (A) => A[0][0] + A[1][1] + A[2][2],
+      frob: (A) => Math.sqrt(A.flat().reduce((s, x) => s + x * x, 0)),
+      col: (A, j) => [A[0][j], A[1][j], A[2][j]],
+      fromCols: (a, b, c) => [[a[0], b[0], c[0]], [a[1], b[1], c[1]], [a[2], b[2], c[2]]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+    };
+
+    // ---- so(3): hat, vee, Exp (Rodrigues), Log ----
+    const hat = (w) => [[0, -w[2], w[1]], [w[2], 0, -w[0]], [-w[1], w[0], 0]];
+    const vee = (K) => [K[2][1], K[0][2], K[1][0]];
+    // Rotation vector w = theta * axis  ->  rotation matrix.
+    function expSO3(w) {
+      const th = v3.len(w);
+      if (th < 1e-10) return m3.add(m3.I(), hat(w));
+      const K = hat(v3.scale(w, 1 / th));
+      return m3.add(m3.I(), m3.add(m3.scale(K, Math.sin(th)), m3.scale(m3.mul(K, K), 1 - Math.cos(th))));
+    }
+    // Angle of a rotation matrix, in [0, pi]. The atan2 form stays accurate
+    // near 0, where arccos((tr - 1) / 2) loses precision.
+    function rotAngle(R) {
+      const s = v3.len(vee(m3.sub(R, m3.T(R)))) / 2;  // = sin(theta)
+      const c = (m3.trace(R) - 1) / 2;                 // = cos(theta)
+      return Math.atan2(s, c);
+    }
+    // Rotation matrix -> rotation vector with angle in [0, pi].
+    function logSO3(R) {
+      const sv = v3.scale(vee(m3.sub(R, m3.T(R))), 0.5);  // sin(theta) * axis
+      const th = rotAngle(R);
+      if (th < 1e-8) return sv;
+      if (Math.PI - th < 1e-4) {
+        // Near pi the skew part vanishes. Read the axis from the symmetric part:
+        // (R + R^T) / 2 = cos I + (1 - cos) n n^T.
+        const c = Math.cos(th);
+        const M = m3.scale(m3.sub(m3.scale(m3.add(R, m3.T(R)), 0.5), m3.scale(m3.I(), c)), 1 / (1 - c));
+        let k = 0;
+        if (M[1][1] > M[k][k]) k = 1;
+        if (M[2][2] > M[k][k]) k = 2;
+        const nk = Math.sqrt(Math.max(M[k][k], 0));
+        let n = [M[0][k] / nk, M[1][k] / nk, M[2][k] / nk];
+        if (v3.dot(n, sv) < 0) n = v3.scale(n, -1);
+        return v3.scale(v3.norm(n), th);
+      }
+      return v3.scale(sv, th / Math.sin(th));
+    }
+    const axisAngle = (axis, th) => expSO3(v3.scale(v3.norm(axis), th));
+    // Unit direction from azimuth (about y, from +x towards +z) and elevation. y is up.
+    const dirFromAzEl = (az, el) => [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+
+    // ---- distances between rotations ----
+    // Geodesic: the angle of dR = R_est R_gt^T. (R_gt^T R_est has the same angle.)
+    const deltaR = (Re, Rg) => m3.mul(Re, m3.T(Rg));
+    const geodesicAngle = (Re, Rg) => rotAngle(deltaR(Re, Rg));
+    // Chordal: straight line through the 9-D space of matrices.
+    const chordalDist = (Re, Rg) => m3.frob(m3.sub(Re, Rg));
+    // Walk from R_gt to R_est along the geodesic (s in [0, 1]).
+    const slerpR = (Rg, Re, s) => m3.mul(expSO3(v3.scale(logSO3(deltaR(Re, Rg)), s)), Rg);
+    // Straight blend of the matrices. It leaves SO(3) on the way.
+    const lerpR = (Rg, Re, s) => m3.lerp(Rg, Re, s);
+    // How far a 3x3 matrix is from being a rotation.
+    function rotationCheck(R, tol = 1e-6) {
+      const G = m3.mul(m3.T(R), R);
+      const orthoError = m3.frob(m3.sub(G, m3.I()));
+      const det = m3.det(R);
+      const orthogonal = orthoError < tol;
+      const inSO3 = orthogonal && det > 0;
+      let name = 'not orthogonal: the sticks are bent or stretched';
+      if (inSO3) name = 'a rotation, in SO(3)';
+      else if (orthogonal) name = 'orthogonal with det -1: a mirror image, in O(3) but not SO(3)';
+      return { G, orthoError, det, orthogonal, inSO3, name, colLengths: [0, 1, 2].map((j) => v3.len(m3.col(R, j))) };
+    }
+
+    // ---- SE(3): T = (R, t), p_cam = R p_obj + t ----
+    const se3 = {
+      I: () => ({ R: m3.I(), t: [0, 0, 0] }),
+      apply: (T, p) => v3.add(m3.apply(T.R, p), T.t),
+      // compose(A, B) applies B first, then A.
+      compose: (A, B) => ({ R: m3.mul(A.R, B.R), t: v3.add(m3.apply(A.R, B.t), A.t) }),
+      inv: (T) => { const Rt = m3.T(T.R); return { R: Rt, t: v3.scale(m3.apply(Rt, T.t), -1) }; },
+      toMatrix: (T) => [[...T.R[0], T.t[0]], [...T.R[1], T.t[1]], [...T.R[2], T.t[2]], [0, 0, 0, 1]],
+    };
+    // Left Jacobian V of SO(3) and its inverse: t = V(w) rho.
+    function leftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, 0.5), m3.scale(K2, 1 / 6)));
+      return m3.add(m3.I(), m3.add(m3.scale(K, (1 - Math.cos(th)) / (th * th)), m3.scale(K2, (th - Math.sin(th)) / (th * th * th))));
+    }
+    function invLeftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, 1 / 12)));
+      const k = 1 / (th * th) - 1 / (2 * th * Math.tan(th / 2));
+      return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, k)));
+    }
+    // Twist xi = { rho, w } in R^6  <->  rigid motion. Exp traces a screw.
+    const expSE3 = (xi) => ({ R: expSO3(xi.w), t: m3.apply(leftJacobian(xi.w), xi.rho) });
+    function logSE3(T) {
+      const w = logSO3(T.R);
+      return { w, rho: m3.apply(invLeftJacobian(w), T.t) };
+    }
+    // The estimate as seen from the true object frame: T_gt^-1 T_est.
+    const relativePose = (Te, Tg) => se3.compose(se3.inv(Tg), Te);
+    // Two ways to walk from T_gt to T_est.
+    const screwInterp = (Tg, Te, s) => {
+      const xi = logSE3(relativePose(Te, Tg));
+      return se3.compose(Tg, expSE3({ rho: v3.scale(xi.rho, s), w: v3.scale(xi.w, s) }));
+    };
+    const decoupledInterp = (Tg, Te, s) => ({ R: slerpR(Tg.R, Te.R, s), t: v3.lerp(Tg.t, Te.t, s) });
+    // Move the model's origin to the model point c. Same physical object pose.
+    const shiftOrigin = (T, c) => ({ R: T.R, t: se3.apply(T, c) });
+    // All the error numbers. L is the characteristic length (same unit as t).
+    function poseErrors(Te, Tg, L) {
+      const theta = geodesicAngle(Te.R, Tg.R);
+      const dt = v3.dist(Te.t, Tg.t);
+      const xi = logSE3(relativePose(Te, Tg));
+      const rho = v3.len(xi.rho);
+      return { theta, dt, xi, rho, twist: Math.hypot(rho, L * theta), decoupledCombined: Math.hypot(dt, L * theta) };
+    }
+    // ===================== END LIE KIT =====================
+
+    // ===================== LIE DRAW (copy verbatim) =====================
+    // World units -> orbit-view units. Chapters may change pivot and scale.
+    const SCENE = { pivot: [0, 0, 0], scale: 2.4 };
+    const toView = (X) => [
+      (X[0] - SCENE.pivot[0]) * SCENE.scale,
+      (X[1] - SCENE.pivot[1]) * SCENE.scale,
+      (X[2] - SCENE.pivot[2]) * SCENE.scale,
+    ];
+    const XYZ_COLORS = ['#ff8a8a', '#a0e7a0', '#86d4ff'];  // one frame: x red, y green, z blue
+    const GT_COLORS = ['#5aa6ff', '#5aa6ff', '#5aa6ff'];   // true frame: blue
+    const EST_COLORS = ['#f08f3c', '#f08f3c', '#f08f3c'];  // estimated frame: warm
+    // Three arrows: the columns of R, drawn from `origin`.
+    function drawTriad(R, origin, vp, o = {}) {
+      const len = o.len ?? 1;
+      const colors = o.colors || XYZ_COLORS;
+      const labels = o.labels || ['x', 'y', 'z'];
+      for (let j = 0; j < 3; j += 1) {
+        const tip = v3.add(origin, v3.scale(m3.col(R, j), len));
+        arrow3(toView(origin), toView(tip), vp, { color: colors[j], label: labels[j], alpha: o.alpha ?? 1, width: o.width ?? 2.6, glow: o.glow ?? 8 });
+      }
+    }
+    // Sample a path s -> point for s in [0, 1] and draw it.
+    function drawPath(fn, vp, o = {}) {
+      const n = o.samples || 48;
+      const pts = [];
+      for (let i = 0; i <= n; i += 1) pts.push(toView(fn(i / n)));
+      polyline3(pts, vp, o);
+    }
+    function drawSphereWire(center, radius, vp, o = {}) {
+      const color = o.color || 'rgba(132, 160, 202, 0.22)';
+      const ring = (f) => drawPath((s) => v3.add(center, v3.scale(f(s * Math.PI * 2), radius)), vp, { color, width: o.width || 1, samples: 64 });
+      ring((a) => [Math.cos(a), 0, Math.sin(a)]);
+      ring((a) => [Math.cos(a), Math.sin(a), 0]);
+      ring((a) => [0, Math.sin(a), Math.cos(a)]);
+      (o.latitudes || [-60, -30, 30, 60]).forEach((d) => {
+        const el = d * Math.PI / 180;
+        ring((a) => [Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)]);
+      });
+    }
+    // A toy plane: nose along +x, fin along +y. Green light on the +z wing tip,
+    // red light on the -z wing tip, so a mirror image is easy to spot.
+    const PLANE_WIRE = (() => {
+      const seg = [];
+      const h = [1.0, 0.12, 0.12];
+      const c = (sx, sy, sz) => [sx * h[0], sy * h[1], sz * h[2]];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        seg.push([c(-1, a, b), c(1, a, b)]);
+        seg.push([c(a, -1, b), c(a, 1, b)]);
+        seg.push([c(a, b, -1), c(a, b, 1)]);
+        seg.push([c(1, a, b), [1.5, 0, 0]]);
+      }));
+      [1, -1].forEach((s) => {
+        const w = [[0.3, 0, 0.12 * s], [-0.3, 0, 1.2 * s], [-0.6, 0, 1.2 * s], [-0.4, 0, 0.12 * s]];
+        for (let i = 0; i < 3; i += 1) seg.push([w[i], w[i + 1]]);
+      });
+      seg.push([[-1, 0.12, 0], [-1, 0.7, 0]], [[-1, 0.7, 0], [-0.6, 0.12, 0]]);
+      return seg;
+    })();
+    const PLANE_LIGHTS = [{ p: [-0.45, 0, 1.2], color: '#a0e7a0' }, { p: [-0.45, 0, -1.2], color: '#ff8a8a' }];
+    // Draw the plane with pose (R, t). o.size scales the model.
+    function drawPlane(R, t, vp, o = {}) {
+      const size = o.size ?? 1;
+      const at = (p) => toView(v3.add(m3.apply(R, v3.scale(p, size)), t));
+      PLANE_WIRE.forEach(([a, b]) => line3(at(a), at(b), vp, { color: o.color || '#ebf2ff', width: o.width || 1.3, alpha: o.alpha ?? 0.9 }));
+      if (o.lights !== false) PLANE_LIGHTS.forEach((l) => dot3(at(l.p), vp, { color: l.color, r: 3.2, alpha: o.alpha ?? 0.9 }));
+    }
+    // A small readout box on the canvas: rows of [label, value].
+    function drawReadout(x, y, w, title, rows, o = {}) {
+      const lineH = 17;
+      const hgt = 26 + rows.length * lineH;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.82)';
+      ctx.strokeStyle = o.border || 'rgba(132, 160, 202, 0.4)';
+      ctx.fillRect(x, y, w, hgt);
+      ctx.strokeRect(x + 0.5, y + 0.5, w, hgt);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = o.titleColor || '#86d4ff';
+      ctx.fillText(title, x + 10, y + 17);
+      rows.forEach(([label, value, color], i) => {
+        const yy = y + 36 + i * lineH;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + 10, yy);
+        ctx.font = '600 12px ui-monospace, Menlo, monospace';
+        ctx.fillStyle = color || 'rgba(235, 242, 255, 0.95)';
+        ctx.textAlign = 'right';
+        ctx.fillText(value, x + w - 10, yy);
+      });
+      ctx.restore();
+      return hgt;
+    }
+    // ===================== END LIE DRAW =====================
+
+    // ===================== CHAPTER 3: GEODESIC ERROR, THE ARC NOT THE CHORD =====================
+    const GT_PRESETS = [
+      { label: 'Tilted', value: 'tilted', R: m3.mul(m3.rotY(rad(20)), m3.rotX(rad(-15))) },
+      { label: 'Aligned', value: 'aligned', R: m3.I() },
+      { label: 'Banked', value: 'banked', R: m3.mul(m3.rotZ(rad(35)), m3.rotY(rad(-50))) },
+    ];
+    const QUARTER_TURNS = m3.mul(m3.rotY(rad(90)), m3.rotX(rad(90)));  // 90 deg about x, then 90 deg about y
+    const ERROR_PRESETS = [
+      { label: 'Small error, 5°', value: 'small', angle: 5 },
+      { label: '45°', value: 'a45', angle: 45 },
+      { label: '90°', value: 'a90', angle: 90 },
+      { label: 'Two quarter turns', value: 'quarter', title: 'R_est = rotY(90°) · rotX(90°) · R_gt' },
+      { label: 'Opposite, 180°', value: 'a180', angle: 180 },
+    ];
+    const ARC = '#a0e7a0';
+    const BROKEN = '#ff8a8a';
+    const azElFromDir = (n) => [Math.atan2(n[2], n[0]), Math.asin(clamp(n[1], -1, 1))];
+
+    const state = {
+      Rg: GT_PRESETS[0].R, az: rad(30), el: rad(40), angle: rad(100),
+      s: 0.5, mode: 'globe', play: 0, useRight: false, relabel: null,
+    };
+    view.home = { yaw: -0.6, pitch: 0.3 };
+    resetView();
+    const COLUMN_W = 300;
+    app.mainViewport = () => {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const radius = Math.max(60, Math.min((w - COLUMN_W - 40) / 2 - 10, h * 0.27));
+      return viewport(Math.max(radius + 20, (w - COLUMN_W - 20) / 2), h * 0.56, radius / SCENE.scale);
+    };
+
+    // ---- controls ----
+    const errorHost = document.getElementById('errorHost');
+    const angleS = makeSlider(errorHost, {
+      label: 'Error angle θ', min: 0, max: 180, step: 0.5, value: 100,
+      format: (v) => fmt(v, 1) + '°', onInput: (v) => { state.angle = rad(v); errorGroup.setActive(null); },
+    });
+    const azS = makeSlider(errorHost, {
+      label: 'Axis azimuth', min: -180, max: 180, step: 0.1, value: 30,
+      format: (v) => fmt(v, 1) + '°', onInput: (v) => { state.az = rad(v); errorGroup.setActive(null); },
+    });
+    const elS = makeSlider(errorHost, {
+      label: 'Axis elevation', min: -90, max: 90, step: 0.1, value: 40,
+      format: (v) => fmt(v, 1) + '°', onInput: (v) => { state.el = rad(v); errorGroup.setActive(null); },
+    });
+    const walkS = makeSlider(document.getElementById('walkHost'), {
+      label: 'Trip progress s (0 = true, 1 = estimate)', min: 0, max: 1, step: 0.005, value: 0.5,
+      onInput: (v) => { state.s = v; state.play = 0; },
+    });
+    function syncErrorSliders() {
+      angleS.set(deg(state.angle));
+      azS.set(deg(state.az));
+      elS.set(deg(state.el));
+    }
+    function applyErrorPreset(value) {
+      const p = ERROR_PRESETS.find((q) => q.value === value);
+      if (!p) return;
+      if (value === 'quarter') {
+        const w = logSO3(QUARTER_TURNS);
+        [state.az, state.el] = azElFromDir(v3.norm(w));
+        state.angle = v3.len(w);
+      } else {
+        state.angle = rad(p.angle);
+      }
+      syncErrorSliders();
+      errorGroup.setActive(value);
+    }
+    const errorGroup = makeButtonGroup(document.getElementById('presetGrid'), ERROR_PRESETS, (value) => applyErrorPreset(value));
+    const modeGroup = makeButtonGroup(document.getElementById('modeGrid'), [
+      { label: 'Walk on the globe', value: 'globe', title: 'Geodesic: Exp(s · Log ΔR) · R_gt' },
+      { label: 'Dig the tunnel', value: 'tunnel', title: 'Straight blend: (1 − s) R_gt + s R_est' },
+    ], (value) => { state.mode = value; }, { active: 'globe' });
+    const gtGroup = makeButtonGroup(document.getElementById('gtGrid'), GT_PRESETS, (value, item) => {
+      state.Rg = item.R;
+      state.relabel = null;
+    }, { active: 'tilted' });
+    document.getElementById('animateBtn').addEventListener('click', () => {
+      if (state.s >= 0.999) state.s = 0;
+      state.play = 1;
+    });
+    document.getElementById('resetBtn').addEventListener('click', resetView);
+    const rightBox = document.getElementById('rightBox');
+    rightBox.addEventListener('change', () => { state.useRight = rightBox.checked; });
+
+    function currentEstimate() {
+      return m3.mul(axisAngle(dirFromAzEl(state.az, state.el), state.angle), state.Rg);
+    }
+    function randomRotation() {
+      let a = [Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5];
+      if (v3.len(a) < 1e-3) a = [0, 1, 0];
+      return axisAngle(a, Math.random() * Math.PI);
+    }
+    // Replace both rotations by A R B. dR becomes A dR A^T: same angle, turned axis.
+    function relabel() {
+      const Rg = state.Rg;
+      const Re = currentEstimate();
+      const A = randomRotation();
+      const B = randomRotation();
+      const RgNew = m3.mul(m3.mul(A, Rg), B);
+      const ReNew = m3.mul(m3.mul(A, Re), B);
+      const before = geodesicAngle(Re, Rg);
+      const after = geodesicAngle(ReNew, RgNew);
+      state.Rg = RgNew;
+      [state.az, state.el] = azElFromDir(m3.apply(A, dirFromAzEl(state.az, state.el)));
+      syncErrorSliders();
+      gtGroup.setActive(null);
+      state.relabel = { before, after, time: performance.now(), count: (state.relabel ? state.relabel.count : 0) + 1 };
+    }
+    document.getElementById('relabelBtn').addEventListener('click', relabel);
+
+    // ---- predict-first cards: numbers come from the kit at load time ----
+    (function fillPredictCards() {
+      const w = logSO3(QUARTER_TURNS);
+      const n = v3.norm(w);
+      document.getElementById('answer1').innerHTML =
+        `No. θ = <strong>${fmt(deg(v3.len(w)), 1)}°</strong>. Two quarter turns compose into one turn about the diagonal axis ` +
+        `<strong>${fmtVec(n)}</strong>. Rotation angles only add when the axes match.`;
+      const Rg = GT_PRESETS[0].R;
+      const axis = dirFromAzEl(rad(30), rad(40));
+      const f90 = chordalDist(m3.mul(axisAngle(axis, rad(90)), Rg), Rg);
+      const f180 = chordalDist(m3.mul(axisAngle(axis, rad(180)), Rg), Rg);
+      document.getElementById('answer2').innerHTML =
+        `No. It goes from <strong>${fmt(f90, 2)}</strong> to <strong>${fmt(f180, 2)}</strong>, a factor of ${fmt(f180 / f90, 2)}, not 2. ` +
+        `The arc doubles from ${fmt(rad(90), 2)} to ${fmt(rad(180), 2)} rad. The tunnel saturates, so it under-reports large errors.`;
+      const A = axisAngle([0.4, -0.7, 0.2], rad(133));
+      const B = axisAngle([-0.6, 0.1, 0.9], rad(71));
+      const Re = m3.mul(axisAngle(axis, rad(75)), Rg);
+      const before = geodesicAngle(Re, Rg);
+      const after = geodesicAngle(m3.mul(m3.mul(A, Re), B), m3.mul(m3.mul(A, Rg), B));
+      document.getElementById('answer3').innerHTML =
+        `No. A test with two fixed turns A and B gives θ = <strong>${fmt(deg(before), 4)}°</strong> before and ` +
+        `<strong>${fmt(deg(after), 4)}°</strong> after. The angle is bi-invariant: angle(A·R_est·B, A·R_gt·B) = angle(R_est, R_gt). ` +
+        'Press the button again and again. The picture changes. θ does not.';
+      const tiny = 1e-8;
+      const Rt = axisAngle([0.3, -0.8, 0.52], tiny);
+      const acosForm = Math.acos(clamp((m3.trace(Rt) - 1) / 2, -1, 1));
+      document.getElementById('tinyTest').textContent =
+        `Test, true angle ${tiny.toExponential(1)} rad: arccos form → ${acosForm.toExponential(2)}, atan2 form → ${rotAngle(Rt).toExponential(2)}.`;
+    })();
+    document.getElementById('predict1').addEventListener('click', () => {
+      applyErrorPreset('quarter');
+      state.mode = 'globe';
+      modeGroup.setActive('globe');
+      state.s = 0;
+      state.play = 1;
+    });
+    document.getElementById('predict2').addEventListener('click', () => {
+      state.az = rad(30);
+      state.el = rad(40);
+      applyErrorPreset('a90');
+      state.s = 1;
+      walkS.set(1);
+    });
+    document.getElementById('predict3').addEventListener('click', relabel);
+
+    // ---- everything the picture and the text need, from the kit ----
+    function compute() {
+      const Rg = state.Rg;
+      const n = dirFromAzEl(state.az, state.el);
+      const Re = m3.mul(axisAngle(n, state.angle), Rg);
+      const dLeft = deltaR(Re, Rg);
+      const dRight = m3.mul(m3.T(Rg), Re);
+      const theta = geodesicAngle(Re, Rg);
+      const wLeft = logSO3(dLeft);
+      const wRight = logSO3(dRight);
+      const hasAxis = theta > 1e-9;
+      const axisLeft = hasAxis ? v3.norm(wLeft) : null;
+      const axisRight = hasAxis ? v3.norm(wRight) : null;
+      let axisGap = null;
+      if (hasAxis) {
+        const mapped = m3.apply(Rg, axisRight);
+        axisGap = Math.min(v3.dist(axisLeft, mapped), v3.dist(axisLeft, v3.scale(mapped, -1)));
+      }
+      const used = state.useRight ? dRight : dLeft;
+      const tr = m3.trace(used);
+      const chords = [0, 1, 2].map((j) => v3.dist(m3.col(Re, j), m3.col(Rg, j)));
+      const walker = state.mode === 'globe' ? slerpR(Rg, Re, state.s) : lerpR(Rg, Re, state.s);
+      const check = rotationCheck(walker, 1e-6);
+      const c0 = m3.col(walker, 0);
+      const c1 = m3.col(walker, 1);
+      const l0 = v3.len(c0);
+      const l1 = v3.len(c1);
+      const xyAngle = l0 > 1e-9 && l1 > 1e-9 ? Math.acos(clamp(v3.dot(c0, c1) / (l0 * l1), -1, 1)) : NaN;
+      let shrink = null;
+      if (hasAxis) {
+        const helper = Math.abs(axisLeft[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+        const perp = v3.norm(v3.cross(axisLeft, helper));
+        shrink = v3.len(m3.apply(lerpR(Rg, Re, 0.5), m3.apply(m3.T(Rg), perp)));
+      }
+      return {
+        Rg, Re, n, dLeft, dRight, used, theta, thetaRight: rotAngle(dRight), wLeft, axisLeft, axisRight, axisGap,
+        tr, cosArg: (tr - 1) / 2, thetaAcos: Math.acos(clamp((tr - 1) / 2, -1, 1)), thetaAtan: rotAngle(used),
+        frob: chordalDist(Re, Rg), closed: 2 * Math.SQRT2 * Math.sin(theta / 2), chords, rss: Math.hypot(...chords),
+        walker, check, xyAngle, shrink, skewNorm: m3.frob(hat(state.useRight ? wRight : wLeft)),
+      };
+    }
+
+    app.onFrame = (dt) => {
+      if (state.play !== 0) {
+        state.s = clamp(state.s + dt * 0.4, 0, 1);
+        if (state.s >= 1) state.play = 0;
+        walkS.set(state.s);
+      }
+    };
+
+    // ---- on-canvas chart: arc versus tunnel ----
+    function drawChart(x, y, w, h, theta) {
+      const padL = 28;
+      const padR = 22;
+      const padT = 44;
+      const padB = 22;
+      const gx = x + padL;
+      const gy = y + padT;
+      const gw = w - padL - padR;
+      const gh = h - padT - padB;
+      const X = (th) => gx + gw * th / Math.PI;
+      const Y = (v) => gy + gh * (1 - v / 3.3);
+      const arc = (th) => th;
+      const tunnel = (th) => 2 * Math.sin(th / 2);
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.82)';
+      ctx.strokeStyle = 'rgba(132, 160, 202, 0.4)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = '#86d4ff';
+      ctx.fillText('Arc versus tunnel, for every θ', x + 10, y + 17);
+      ctx.font = '11px Inter, sans-serif';
+      ctx.fillStyle = ARC;
+      ctx.fillText('arc: θ in radians', x + 10, y + 33);
+      ctx.fillStyle = BROKEN;
+      ctx.fillText('tunnel ÷ √2 = 2 sin(θ/2)', x + 118, y + 33);
+      ctx.lineWidth = 1;
+      ctx.font = '10px Inter, sans-serif';
+      [0, 45, 90, 135, 180].forEach((d) => {
+        ctx.strokeStyle = 'rgba(132, 160, 202, 0.16)';
+        ctx.beginPath();
+        ctx.moveTo(X(rad(d)), gy);
+        ctx.lineTo(X(rad(d)), gy + gh);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+        ctx.textAlign = 'center';
+        ctx.fillText(d + '°', X(rad(d)), gy + gh + 13);
+      });
+      [0, 1, 2, 3].forEach((v) => {
+        ctx.strokeStyle = 'rgba(132, 160, 202, 0.16)';
+        ctx.beginPath();
+        ctx.moveTo(gx, Y(v));
+        ctx.lineTo(gx + gw, Y(v));
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+        ctx.textAlign = 'right';
+        ctx.fillText(String(v), gx - 5, Y(v) + 3);
+      });
+      [[arc, ARC], [tunnel, BROKEN]].forEach(([f, color]) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for (let i = 0; i <= 60; i += 1) {
+          const th = (i / 60) * Math.PI;
+          if (i === 0) ctx.moveTo(X(th), Y(f(th)));
+          else ctx.lineTo(X(th), Y(f(th)));
+        }
+        ctx.stroke();
+      });
+      ctx.textAlign = 'left';
+      ctx.fillStyle = ARC;
+      ctx.fillText('π', X(Math.PI) + 4, Y(Math.PI) + 3);
+      ctx.fillStyle = BROKEN;
+      ctx.fillText('2', X(Math.PI) + 4, Y(2) + 3);
+      ctx.strokeStyle = 'rgba(235, 242, 255, 0.55)';
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(X(theta), gy);
+      ctx.lineTo(X(theta), gy + gh);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      [[arc, ARC], [tunnel, BROKEN]].forEach(([f, color]) => {
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(X(theta), Y(f(theta)), 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
+    // ---- text: caption and Math tab, refreshed only when something changed ----
+    let lastSignature = '';
+    function updateText(c, flash) {
+      const signature = [state.az, state.el, state.angle, state.s, state.mode, state.useRight, flash,
+        state.relabel ? state.relabel.count : 0, state.Rg.flat().join(',')].join('|');
+      if (signature === lastSignature) return;
+      lastSignature = signature;
+
+      const usedName = state.useRight ? 'ΔR = R_gtᵀ R_est   (object coordinates)' : 'ΔR = R_est R_gtᵀ   (camera coordinates)';
+      document.getElementById('matrices').textContent =
+        fmtMatrix(c.Rg, 'R_gt', 3) + '\n\n' + fmtMatrix(c.Re, 'R_est', 3) + '\n\n' + fmtMatrix(c.used, usedName, 3);
+      const axisText = (a) => (a ? fmtVec(a, 3) : 'undefined, no turn');
+      document.getElementById('numbers').innerHTML =
+        `<span>Tr ΔR</span><strong>${fmt(c.tr, 4)}</strong>` +
+        `<span>(Tr ΔR − 1) / 2</span><strong>${fmt(c.cosArg, 4)}</strong>` +
+        `<span>θ, arccos form</span><strong>${fmt(deg(c.thetaAcos), 6)}°</strong>` +
+        `<span>θ, atan2 form (kit)</span><strong>${fmt(deg(c.thetaAtan), 6)}°</strong>` +
+        `<span>θ of R_est R_gtᵀ</span><strong>${fmt(deg(c.theta), 6)}°</strong>` +
+        `<span>θ of R_gtᵀ R_est</span><strong>${fmt(deg(c.thetaRight), 6)}°</strong>` +
+        `<span>Log(ΔR): angle</span><strong>${fmt(c.theta, 4)} rad</strong>` +
+        `<span>axis, camera coords</span><strong>${axisText(c.axisLeft)}</strong>` +
+        `<span>axis, object coords</span><strong>${axisText(c.axisRight)}</strong>` +
+        `<span>‖axis_cam − R_gt · axis_obj‖</span><strong>${c.axisGap === null ? 'n/a' : c.axisGap.toExponential(1)}</strong>` +
+        `<span>‖R_est − R_gt‖_F</span><strong>${fmt(c.frob, 4)}</strong>` +
+        `<span>2√2 · sin(θ/2)</span><strong>${fmt(c.closed, 4)}</strong>` +
+        `<span>tip chords x, y, z</span><strong>${c.chords.map((x) => fmt(x, 3)).join(', ')}</strong>` +
+        `<span>root-sum-square of chords</span><strong>${fmt(c.rss, 4)}</strong>` +
+        `<span>midpoint shrink, measured</span><strong>${c.shrink === null ? 'n/a' : fmt(c.shrink, 4)}</strong>` +
+        `<span>cos(θ/2)</span><strong>${fmt(Math.cos(c.theta / 2), 4)}</strong>` +
+        (state.relabel ? `<span>last re-label: θ before</span><strong>${fmt(deg(state.relabel.before), 6)}°</strong>` +
+          `<span>last re-label: θ after</span><strong>${fmt(deg(state.relabel.after), 6)}°</strong>` : '');
+      document.getElementById('skewLine').textContent =
+        `Live: ‖Log ΔR‖₂ = ${fmt(c.theta, 4)},  ‖log ΔR‖_F = ${fmt(c.skewNorm, 4)},  ratio = ${c.theta > 1e-9 ? fmt(c.skewNorm / c.theta, 4) : 'n/a'}.`;
+
+      const thetaText = `θ = <strong>${fmt(deg(c.theta), 1)}°</strong>`;
+      let html;
+      if (flash) {
+        html = '<span class="badge good">θ did not move</span> Both frames were re-labelled with random turns A and B. ' +
+          `θ was <strong>${fmt(deg(state.relabel.before), 4)}°</strong> and is <strong>${fmt(deg(state.relabel.after), 4)}°</strong>. The picture changed. The ruler did not.`;
+      } else if (c.theta < 1e-6) {
+        html = '<span class="badge good">perfect</span> The two frames coincide. No walk is needed, and no tunnel either. θ = <strong>0°</strong>.';
+      } else if (state.mode === 'globe') {
+        html = '<span class="badge good">still a rotation</span> ' +
+          `The walker is <strong>${fmt(deg(c.theta) * state.s, 1)}°</strong> along a ${fmt(deg(c.theta), 1)}° arc. ` +
+          `det = ${fmt(c.check.det, 3)} and every stick has length 1. Geodesic error ${thetaText}, tunnel ${fmt(c.frob, 2)}.`;
+      } else if (!c.check.inSO3 && c.check.orthoError > 1e-3) {
+        const flat = Math.abs(c.check.det) < 0.02 ? ' The bracket has collapsed flat.' : '';
+        html = '<span class="badge bad">left SO(3)</span> ' +
+          `Inside the tunnel the sticks shrink to <strong>${c.check.colLengths.map((x) => fmt(x, 2)).join(', ')}</strong> and det = <strong>${fmt(c.check.det, 2)}</strong>. ` +
+          `This matrix is ${c.check.name.split(':')[0]}.${flat} ${thetaText}.`;
+      } else {
+        html = '<span class="badge warn">tunnel mouth</span> ' +
+          `At the two ends the blend is a rotation again. Drag s to the middle and watch the sticks shrink. ${thetaText}.`;
+      }
+      setCaption(html);
+    }
+
+    app.draw = () => {
+      background();
+      const vp = app.mainViewport();
+      const c = compute();
+      const tunnelMode = state.mode === 'tunnel';
+      const broken = tunnelMode && !c.check.inSO3 && c.check.orthoError > 1e-3;
+      const walkerColor = broken ? BROKEN : ARC;
+
+      drawSphereWire([0, 0, 0], 1, vp);
+      line3(toView(v3.scale(c.n, -1.35)), toView(v3.scale(c.n, 1.35)), vp, { color: 'rgba(235, 242, 255, 0.55)', dash: [6, 6] });
+      const axisCoords = state.useRight ? c.axisRight : c.axisLeft;
+      // Label the upper end of the axis, and keep the text clear of the readout column.
+      const endA = project(toView(v3.scale(c.n, 1.42)), vp);
+      const endB = project(toView(v3.scale(c.n, -1.42)), vp);
+      const labelEnd = endA.y <= endB.y ? 1.42 : -1.42;
+      const nearColumn = Math.min(endA.y, endB.y) === endA.y ? endA.x : endB.x;
+      const flip = nearColumn > canvas.clientWidth - COLUMN_W - 110;
+      text3(toView(v3.scale(c.n, labelEnd)), vp, 'axis of ΔR',
+        { color: 'rgba(235, 242, 255, 0.8)', font: '12px Inter, sans-serif', dx: flip ? -8 : 8, align: flip ? 'right' : 'left' });
+      for (let j = 0; j < 3; j += 1) {
+        drawPath((u) => m3.col(slerpR(c.Rg, c.Re, u), j), vp, { color: ARC, width: tunnelMode ? 1.2 : 2.4, alpha: tunnelMode ? 0.55 : 1 });
+        line3(toView(m3.col(c.Rg, j)), toView(m3.col(c.Re, j)), vp,
+          { color: BROKEN, width: tunnelMode ? 2.2 : 1.3, alpha: tunnelMode ? 1 : 0.7, dash: [4, 4] });
+      }
+      drawTriad(c.Rg, [0, 0, 0], vp, { colors: GT_COLORS, alpha: 0.9 });
+      drawTriad(c.Re, [0, 0, 0], vp, { colors: EST_COLORS, labels: ['x′', 'y′', 'z′'], alpha: 0.9 });
+      drawPlane(c.walker, [0, 0, 0], vp, { size: 0.42, color: walkerColor, alpha: 0.6, lights: false });
+      drawTriad(c.walker, [0, 0, 0], vp, { colors: [walkerColor, walkerColor, walkerColor], labels: ['', '', ''], width: 2, glow: 4 });
+      for (let j = 0; j < 3; j += 1) dot3(toView(m3.col(c.walker, j)), vp, { color: walkerColor, r: 4.5 });
+
+      const x0 = Math.max(10, canvas.clientWidth - COLUMN_W - 16);
+      let y = 16;
+      drawChart(x0, y, COLUMN_W, 170, c.theta);
+      y += 178;
+      y += drawReadout(x0, y, COLUMN_W, 'Two rulers, one error', [
+        ['geodesic angle θ', `${fmt(deg(c.theta), 1)}° = ${fmt(c.theta, 3)} rad`, ARC],
+        [state.useRight ? 'axis, object coords' : 'axis, camera coords', axisCoords ? fmtVec(axisCoords) : 'no turn'],
+        ['Tr ΔR', fmt(c.tr, 3)],
+        ['(Tr ΔR − 1) / 2', fmt(c.cosArg, 3)],
+        ['‖R_est − R_gt‖_F  (tunnel)', fmt(c.frob, 3), BROKEN],
+        ['2√2 sin(θ/2)', fmt(c.closed, 3)],
+        ['tip chords x, y, z', c.chords.map((v) => fmt(v, 2)).join(', ')],
+        ['root-sum-square of chords', fmt(c.rss, 3)],
+      ]) + 8;
+      drawReadout(x0, y, COLUMN_W, tunnelMode ? 'The walker, inside the tunnel' : 'The walker, on the globe', [
+        ['trip progress s', fmt(state.s, 2)],
+        ['det', fmt(c.check.det, 3), broken ? BROKEN : undefined],
+        ['stick lengths', c.check.colLengths.map((v) => fmt(v, 2)).join(', '), broken ? BROKEN : undefined],
+        ['angle between sticks x and y', Number.isFinite(c.xyAngle) ? fmt(deg(c.xyAngle), 1) + '°' : 'n/a', broken ? BROKEN : undefined],
+        ['midpoint shrink cos(θ/2)', fmt(Math.cos(c.theta / 2), 3)],
+        ['verdict', c.check.inSO3 || c.check.orthoError <= 1e-3 ? 'in SO(3)' : 'outside SO(3)', broken ? BROKEN : ARC],
+      ], { border: broken ? 'rgba(255, 138, 138, 0.6)' : undefined, titleColor: broken ? BROKEN : undefined });
+
+      const flash = Boolean(state.relabel) && performance.now() - state.relabel.time < 7000;
+      updateText(c, flash);
+    };
+
+    // ---- deep links, e.g. #preset=quarter&mode=tunnel&s=0.5&tab=math&right=1 ----
+    (function applyHash() {
+      const q = new URLSearchParams(location.hash.replace(/^#/, ''));
+      if (q.get('gt')) {
+        const g = GT_PRESETS.find((p) => p.value === q.get('gt'));
+        if (g) { state.Rg = g.R; gtGroup.setActive(g.value); }
+      }
+      if (q.get('preset')) applyErrorPreset(q.get('preset'));
+      if (q.get('angle')) { state.angle = rad(clamp(Number(q.get('angle')) || 0, 0, 180)); syncErrorSliders(); }
+      if (q.get('mode') === 'tunnel' || q.get('mode') === 'globe') { state.mode = q.get('mode'); modeGroup.setActive(state.mode); }
+      if (q.get('s')) { state.s = clamp(Number(q.get('s')) || 0, 0, 1); walkS.set(state.s); }
+      if (q.get('right') === '1') { rightBox.checked = true; state.useRight = true; }
+      if (q.get('relabel') === '1') relabel();
+      if (q.get('open')) document.querySelectorAll('details.predict').forEach((d) => { d.open = true; });
+      if (q.get('tab')) document.querySelector(`[data-tab-button="${q.get('tab')}"]`)?.click();
+    })();
+  </script>
+</body>
+</html>

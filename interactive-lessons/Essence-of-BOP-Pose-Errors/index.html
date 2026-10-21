@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of BOP Pose Errors</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f; --bg-2: #0a1627; --ink: #ebf2ff; --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24); --blue-1: #86d4ff; --blue-2: #5aa6ff;
+      --warm-1: #d3a35f; --warm-2: #f08f3c; --green: #a0e7a0; --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.86); --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    canvas#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    .page { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+    .eyebrow { color: var(--blue-1); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { margin: 10px 0 0; font-size: clamp(34px, 5vw, 60px); line-height: 1; }
+    .lead { margin-top: 14px; max-width: 40rem; color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    h2 { margin: 44px 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue-1); }
+    .rulers { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 22px; }
+    .ruler { padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); border-left: 3px solid var(--warm-2); background: var(--panel); backdrop-filter: blur(12px); display: grid; gap: 6px; }
+    .ruler .name { font-size: 18px; font-weight: 700; }
+    .ruler .long { color: var(--muted); font-size: 12px; }
+    .ruler .pic { font-size: 14px; line-height: 1.5; }
+    .ruler .f { font-family: var(--mono); font-size: 12px; color: var(--blue-1); line-height: 1.5; overflow-x: auto; white-space: nowrap; }
+    .ruler .unit { font-size: 12px; color: var(--muted); }
+    .ruler .unit strong { color: var(--green); font-weight: 600; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    a.card {
+      display: grid; gap: 8px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--panel); backdrop-filter: blur(12px); color: var(--ink); text-decoration: none;
+      transition: transform 0.14s ease, border-color 0.14s ease;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: rgba(134, 212, 255, 0.8); }
+    .card .num { font-family: var(--mono); font-size: 12px; color: var(--warm-1); }
+    .card .title { font-size: 19px; font-weight: 700; line-height: 1.15; }
+    .card .hook { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .card .after { font-size: 13px; line-height: 1.5; color: var(--ink); }
+    .card .after::before { content: "After this you can say: "; color: var(--green); font-weight: 600; }
+    .card.core { border-color: rgba(240, 143, 60, 0.55); }
+    .how { color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 46rem; }
+    .how strong { color: var(--ink); }
+    .how a { color: var(--blue-1); }
+    .checklist { display: grid; gap: 8px; max-width: 50rem; }
+    .checklist label {
+      display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--panel); color: var(--muted); font-size: 14px; line-height: 1.45; cursor: pointer;
+    }
+    .checklist input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--blue-2); flex: none; }
+    .checklist label.done { color: var(--ink); border-color: rgba(160, 231, 160, 0.45); }
+    .checklist .ch { font-family: var(--mono); font-size: 11px; color: var(--warm-1); margin-left: auto; white-space: nowrap; }
+    .score { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .score strong { color: var(--green); font-family: var(--mono); }
+    .src { margin-top: 28px; color: var(--muted); font-size: 12px; line-height: 1.6; max-width: 50rem; }
+    .state { position: fixed; right: 18px; bottom: 14px; z-index: 1; color: var(--muted); font-size: 12px; font-family: var(--mono); pointer-events: none; }
+    .state strong { color: var(--danger); font-weight: 600; }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div class="page">
+    <div class="eyebrow">Interactive notes · geometry before algebra</div>
+    <h1>Essence of BOP Pose Errors</h1>
+    <p class="lead">
+      How does the BOP benchmark decide that an estimated 6D pose is <strong>right</strong>?
+      It uses three different rulers. In each chapter you break a pose on purpose and watch what that ruler says.
+      Every number comes from one shared implementation that follows the official <strong>bop_toolkit</strong>.
+    </p>
+
+    <div class="rulers">
+      <div class="ruler">
+        <span class="name">MSSD</span>
+        <span class="long">Maximum Symmetry-Aware Surface Distance</span>
+        <span class="pic">Tie a rubber band between every matching vertex of the true copy and the estimated copy. MSSD is the <strong>longest band</strong>.</span>
+        <span class="f">min<sub>S</sub> max<sub>x</sub> ‖P̂x − P̄Sx‖</span>
+        <span class="unit">Ruler: <strong>millimetres, in 3D</strong>. Thinks like a gripper.</span>
+      </div>
+      <div class="ruler">
+        <span class="name">MSPD</span>
+        <span class="long">Maximum Symmetry-Aware Projection Distance</span>
+        <span class="pic">Same bands. A lamp at the camera casts their shadows on the image. MSPD is the <strong>longest shadow</strong>.</span>
+        <span class="f">min<sub>S</sub> max<sub>x</sub> ‖proj(P̂x) − proj(P̄Sx)‖</span>
+        <span class="unit">Ruler: <strong>pixels, in the image</strong>. Thinks like an AR overlay.</span>
+      </div>
+      <div class="ruler">
+        <span class="name">VSD</span>
+        <span class="long">Visible Surface Discrepancy</span>
+        <span class="pic">Two depth photos vote pixel by pixel. Only visible pixels get a ballot. VSD is the <strong>share that disagrees</strong>.</span>
+        <span class="f">avg<sub>p ∈ V̂∪V̄</sub> [ not ( p ∈ V̂∩V̄ and |D̂−D̄| &lt; τ ) ]</span>
+        <span class="unit">Ruler: <strong>fraction of visible surface</strong>. Thinks like the depth sensor.</span>
+      </div>
+    </div>
+
+    <h2>Chapters</h2>
+    <div class="cards">
+      <a class="card" href="Ch1-MSSD-Worst-Point-Best-Symmetry.html">
+        <span class="num">Chapter 1 · about 12 min</span>
+        <span class="title">MSSD: the worst point, after the best symmetry</span>
+        <span class="hook">Flip a box by 180°. Spin a can. Tilt a long rod. Watch the longest rubber band, and watch the symmetry list rescue the poses that only look wrong on paper.</span>
+        <span class="after">max picks the one worst vertex; min over S picks the closest of the equally correct poses.</span>
+      </a>
+      <a class="card" href="Ch2-MSPD-Same-Question-In-Pixels.html">
+        <span class="num">Chapter 2 · about 10 min</span>
+        <span class="title">MSPD: the same question, asked in pixels</span>
+        <span class="hook">Push the estimate 80 mm away from the camera. MSSD is furious. MSPD hardly notices. Then change the image resolution and see why r = w/640 exists.</span>
+        <span class="after">MSPD is blind along the viewing ray, and a millimetre costs more pixels up close.</span>
+      </a>
+      <a class="card core" href="Ch3-VSD-Only-What-The-Camera-Sees.html">
+        <span class="num">Chapter 3 · about 15 min · the subtle one</span>
+        <span class="title">VSD: compare only what the camera can see</span>
+        <span class="hook">Step through the pipeline: render, visibility, vote, score. Hide the mug's handle, spin it 50°, and watch VSD stay at zero while MSSD fails.</span>
+        <span class="after">VSD is the failing share of visible pixels, so invisible differences cost nothing.</span>
+      </a>
+      <a class="card" href="Ch4-One-Pose-Three-Verdicts.html">
+        <span class="num">Chapter 4 · about 10 min</span>
+        <span class="title">One pose, three verdicts</span>
+        <span class="hook">Seven scenarios where the three rulers disagree, and the arithmetic that turns their verdicts into BOP's Average Recall.</span>
+        <span class="after">which ruler sees depth error, which sees occlusion, and why BOP averages all three.</span>
+      </a>
+    </div>
+
+    <h2>How to use these pages</h2>
+    <p class="how">
+      <strong>Drag</strong> to orbit the scene. <strong>Scroll</strong> to zoom.
+      Open a <strong>Predict first</strong> card, commit to an answer, then press its button and check yourself.
+      Every number in the <strong>Math</strong> tab is computed live from the picture.
+      Blue is the ground-truth pose. Warm is the estimate. Red is the worst point.
+      These build on <a href="../Essence-of-Similarity-Transforms/index.html">Essence of Similarity Transforms</a>; GigaPose reports exactly the AR score explained in Chapter 4.
+    </p>
+
+    <h2>Mental picture checklist</h2>
+    <div id="checklist" class="checklist"></div>
+    <div id="score" class="score"></div>
+
+    <p class="src">
+      Sources: Hodaň et al., "BOP Challenge 2020 on 6D Object Localization", Sec. 2.2 to 2.4 (arXiv 2009.07378).
+      Hodaň et al., "On Evaluation of 6D Object Pose Estimation", ECCVW 2016 (original VSD).
+      Code: github.com/thodan/bop_toolkit, files pose_error.py and visibility.py.
+      The objects here are simple stand-ins (a mug, a can, a box, a rod), not BOP dataset models.
+    </p>
+  </div>
+  <div id="state" class="state"></div>
+
+  <script>
+    const items = [
+      ['All three errors compare an estimated pose P̂ with the ground-truth pose P̄ of a known 3D model. A pose is correct when e < θ.', 'all'],
+      ['MSSD = min over symmetries S of the max over vertices x of ‖P̂x − P̄Sx‖, in millimetres.', 'Ch 1'],
+      ['The max picks the single worst vertex. One bad corner fails the pose even when the average distance is small.', 'Ch 1'],
+      ['One symmetry S is chosen for the whole object. It is not a separate nearest-neighbour match per vertex (that is ADI).', 'Ch 1'],
+      ['A continuous symmetry is sampled so that the furthest vertex moves at most 1% of the diameter per step.', 'Ch 1'],
+      ['MSPD has the same min-max form, but the distance is measured after projection, in pixels.', 'Ch 2'],
+      ['MSPD barely reacts to error along the viewing ray. The same millimetre error costs more pixels when the object is close (about f·mm / Z).', 'Ch 2'],
+      ['MSPD thresholds are 5r to 50r pixels with r = w / 640, so image resolution does not change the verdict.', 'Ch 2'],
+      ['VSD renders distance maps D̂ and D̄, keeps only pixels where the object is visible in the test depth image, and lets each pixel vote.', 'Ch 3'],
+      ['A pixel passes only if it is visible in both poses and |D̂ − D̄| < τ. A pixel visible in just one pose fails. e_VSD is the failing share of the union.', 'Ch 3'],
+      ['The test depth image decides visibility only (tolerance δ = 15 mm). The estimate also counts as visible wherever the true pose is visible and the estimate renders.', 'Ch 3'],
+      ['VSD needs no symmetry list. Poses that look the same from this viewpoint score the same, including a mug whose handle is hidden.', 'Ch 3'],
+      ['MSSD and MSPD use every model vertex, visible or not. Only VSD knows about occlusion. Only VSD needs a depth image.', 'Ch 4'],
+      ['AR_MSSD and AR_MSPD average recall over 10 thresholds; AR_VSD over 10 τ × 10 θ. AR = (AR_VSD + AR_MSSD + AR_MSPD) / 3.', 'Ch 4'],
+    ];
+    const KEY = 'essence-bop-errors-checklist';
+    let done = {};
+    try { done = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { done = {}; }
+    const list = document.getElementById('checklist');
+    const score = document.getElementById('score');
+    function renderScore() {
+      const n = items.filter((_, i) => done[i]).length;
+      score.innerHTML = `Confirmed <strong>${n} / ${items.length}</strong> statements. Ticks are saved in this browser only.`;
+    }
+    items.forEach(([text, ch], i) => {
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = Boolean(done[i]);
+      label.classList.toggle('done', box.checked);
+      const span = document.createElement('span');
+      span.textContent = text;
+      const tag = document.createElement('span');
+      tag.className = 'ch';
+      tag.textContent = ch;
+      box.addEventListener('change', () => {
+        done[i] = box.checked;
+        label.classList.toggle('done', box.checked);
+        try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* private mode */ }
+        renderScore();
+      });
+      label.append(box, span, tag);
+      list.appendChild(label);
+    });
+    renderScore();
+
+    // ===================== BOP KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Units: millimetres. Camera frame: x right, y up,
+    // z forward. The camera centre is the origin. Follows bop_toolkit
+    // (pose_error.py, visibility.py) and BOP Challenge 2020, Sec. 2.2-2.4.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+    };
+    // A pose maps model coordinates to camera coordinates: X = R x + t.
+    const pose = {
+      apply: (P, x) => v3.add(m3.apply(P.R, x), P.t),
+      // P composed with a model-frame symmetry S: x -> P(S x).
+      withSym: (P, S) => ({ R: m3.mul(P.R, S.R), t: v3.add(m3.apply(P.R, S.t), P.t) }),
+    };
+
+    // ---- pinhole camera. BOP reference width is 640 px, so r = w / 640. ----
+    function makeCamera(width = 640) {
+      const r = width / 640;
+      return { w: 640 * r, h: 480 * r, f: 600 * r, cx: 320 * r, cy: 240 * r, r };
+    }
+    function projectPx(X, cam) {
+      return [cam.cx + cam.f * X[0] / X[2], cam.cy - cam.f * X[1] / X[2]];
+    }
+
+    // ---- object models: primitives (for ray casting), vertices V_M, symmetries S_M ----
+    function cylinderVerts(r, h, nAround = 24, levels = [-1, -0.5, 0, 0.5, 1]) {
+      const out = [[0, h, 0], [0, -h, 0]];
+      levels.forEach((k) => {
+        for (let i = 0; i < nAround; i += 1) {
+          const a = (i / nAround) * Math.PI * 2;
+          out.push([r * Math.cos(a), h * k, r * Math.sin(a)]);
+        }
+      });
+      return out;
+    }
+    function boxSurfaceVerts(c, half, n = [2, 2, 2]) {
+      const out = [];
+      for (let i = 0; i <= n[0]; i += 1) {
+        for (let j = 0; j <= n[1]; j += 1) {
+          for (let k = 0; k <= n[2]; k += 1) {
+            const onSurface = i === 0 || i === n[0] || j === 0 || j === n[1] || k === 0 || k === n[2];
+            if (!onSurface) continue;
+            out.push([
+              c[0] + half[0] * (2 * i / n[0] - 1),
+              c[1] + half[1] * (2 * j / n[1] - 1),
+              c[2] + half[2] * (2 * k / n[2] - 1),
+            ]);
+          }
+        }
+      }
+      return out;
+    }
+    function cylinderWire(r, h, seg = 32, nVertical = 8) {
+      const out = [];
+      for (let i = 0; i < seg; i += 1) {
+        const a = (i / seg) * Math.PI * 2;
+        const b = ((i + 1) / seg) * Math.PI * 2;
+        [h, -h].forEach((y) => out.push([[r * Math.cos(a), y, r * Math.sin(a)], [r * Math.cos(b), y, r * Math.sin(b)]]));
+      }
+      for (let i = 0; i < nVertical; i += 1) {
+        const a = (i / nVertical) * Math.PI * 2;
+        out.push([[r * Math.cos(a), h, r * Math.sin(a)], [r * Math.cos(a), -h, r * Math.sin(a)]]);
+      }
+      return out;
+    }
+    function boxWire(c, half) {
+      const p = (sx, sy, sz) => [c[0] + sx * half[0], c[1] + sy * half[1], c[2] + sz * half[2]];
+      const out = [];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        out.push([p(-1, a, b), p(1, a, b)]);
+        out.push([p(a, -1, b), p(a, 1, b)]);
+        out.push([p(a, b, -1), p(a, b, 1)]);
+      }));
+      return out;
+    }
+    // The 24 proper rotations of a cube (signed permutation matrices, det +1).
+    function cubeRotations() {
+      const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const out = [];
+      perms.forEach((p) => {
+        for (let s = 0; s < 8; s += 1) {
+          const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+          for (let i = 0; i < 3; i += 1) R[i][p[i]] = (s >> i) & 1 ? -1 : 1;
+          if (Math.abs(m3.det(R) - 1) < 1e-9) out.push(R);
+        }
+      });
+      return out;
+    }
+    // Rotations that map a centred box with these half sizes onto itself.
+    function boxSymmetries(half) {
+      const keep = cubeRotations().filter((R) => {
+        const mapped = m3.apply(R.map((row) => row.map(Math.abs)), half);
+        return mapped.every((x, i) => Math.abs(x - half[i]) < 1e-9);
+      });
+      keep.sort((A, B) => (B[0][0] + B[1][1] + B[2][2]) - (A[0][0] + A[1][1] + A[2][2]));  // identity first
+      return keep.map((R) => ({ R, t: [0, 0, 0] }));
+    }
+    // BOP rule for a continuous symmetry: the vertex furthest from the axis
+    // travels at most 1% of the object diameter between consecutive steps.
+    function axisSymmetries(rMax, diameter, withFlip) {
+      const n = Math.ceil((2 * Math.PI * rMax) / (0.01 * diameter));
+      const out = [];
+      for (let k = 0; k < n; k += 1) out.push({ R: m3.rotY((k / n) * Math.PI * 2), t: [0, 0, 0] });
+      if (withFlip) {
+        for (let k = 0; k < n; k += 1) out.push({ R: m3.mul(m3.rotX(Math.PI), m3.rotY((k / n) * Math.PI * 2)), t: [0, 0, 0] });
+      }
+      return out;
+    }
+    function modelDiameter(verts) {
+      let d = 0;
+      for (let i = 0; i < verts.length; i += 1) {
+        for (let j = i + 1; j < verts.length; j += 1) d = Math.max(d, v3.dist(verts[i], verts[j]));
+      }
+      return d;
+    }
+    // kinds: 'mug' (no symmetry), 'can' (continuous axis + flip),
+    // 'box' (4 rotations), 'rod' (8 rotations). Model axis is y.
+    function makeModel(kind) {
+      const m = { kind };
+      if (kind === 'mug') {
+        m.label = 'Mug';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }, { type: 'box', c: [50, 0, 0], half: [10, 20, 6] }];
+        m.verts = cylinderVerts(40, 45).concat(boxSurfaceVerts([50, 0, 0], [10, 20, 6]));
+        m.wire = cylinderWire(40, 45).concat(boxWire([50, 0, 0], [10, 20, 6]));
+        m.symNote = 'No symmetry. The handle breaks it. S_M = { identity }.';
+      } else if (kind === 'can') {
+        m.label = 'Can';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }];
+        m.verts = cylinderVerts(40, 45);
+        m.wire = cylinderWire(40, 45);
+        m.symNote = 'Continuous symmetry about its axis, sampled in 1%-of-diameter steps, plus the top-bottom flip.';
+      } else if (kind === 'box') {
+        m.label = 'Box';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [50, 30, 20] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [50, 30, 20], [4, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [50, 30, 20]);
+        m.symNote = 'Three different side lengths. 4 rotations map it onto itself.';
+      } else {
+        m.kind = 'rod';
+        m.label = 'Rod';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [90, 10, 10] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [90, 10, 10], [8, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [90, 10, 10]);
+        m.symNote = 'Square cross-section. 8 rotations map it onto itself.';
+      }
+      m.diameter = modelDiameter(m.verts);
+      if (m.kind === 'mug') m.syms = [{ R: m3.I(), t: [0, 0, 0] }];
+      else if (m.kind === 'can') m.syms = axisSymmetries(40, m.diameter, true);
+      else m.syms = boxSymmetries(m.prims[0].half);
+      return m;
+    }
+
+    // ---- poses ----
+    // az: spin about the model axis (0 = handle to camera right, -90deg = handle
+    // points away from the camera). tilt > 0 tips the top towards the camera.
+    function gtPose(o) {
+      return { R: m3.mul(m3.rotX(-(o.tilt || 0)), m3.rotY(o.az || 0)), t: [o.x || 0, o.y || 0, o.z || 600] };
+    }
+    // Pose error e: spin (about the model axis), tilt (about camera x), roll
+    // (about camera z), all through the object centre. dx, dy in the image
+    // directions, ray = slide along the viewing ray through the object centre.
+    function perturb(Pg, e) {
+      const R = m3.mul(m3.rotZ(e.roll || 0), m3.mul(m3.rotX(e.tilt || 0), m3.mul(Pg.R, m3.rotY(e.spin || 0))));
+      const dir = v3.norm(Pg.t);
+      const t = v3.add(v3.add(Pg.t, [e.dx || 0, e.dy || 0, 0]), v3.scale(dir, e.ray || 0));
+      return { R, t };
+    }
+
+    // ---- MSSD and MSPD: min over S of max over x ----
+    // Returns both errors, the arg-min symmetry and arg-max vertex of each, the
+    // per-symmetry maxima, and ADD (mean distance, no symmetry) for contrast.
+    function surfaceErrors(Pe, Pg, model, cam, useSym = true) {
+      const est = model.verts.map((x) => pose.apply(Pe, x));
+      const estPx = est.map((X) => projectPx(X, cam));
+      const syms = useSym ? model.syms : [model.syms[0]];
+      const perSymMssd = [];
+      const perSymMspd = [];
+      let mssd = null;
+      let mspd = null;
+      syms.forEach((S, si) => {
+        const Pgs = pose.withSym(Pg, S);
+        let max3 = -1;
+        let arg3 = -1;
+        let max2 = -1;
+        let arg2 = -1;
+        model.verts.forEach((x, i) => {
+          const G = pose.apply(Pgs, x);
+          const d3 = v3.dist(est[i], G);
+          if (d3 > max3) { max3 = d3; arg3 = i; }
+          const g = projectPx(G, cam);
+          const d2 = Math.hypot(estPx[i][0] - g[0], estPx[i][1] - g[1]);
+          if (d2 > max2) { max2 = d2; arg2 = i; }
+        });
+        perSymMssd.push(max3);
+        perSymMspd.push(max2);
+        if (!mssd || max3 < mssd.value) mssd = { value: max3, sym: si, vert: arg3 };
+        if (!mspd || max2 < mspd.value) mspd = { value: max2, sym: si, vert: arg2 };
+      });
+      let sum = 0;
+      model.verts.forEach((x, i) => { sum += v3.dist(est[i], pose.apply(Pg, x)); });
+      return { mssd, mspd, perSymMssd, perSymMspd, add: sum / model.verts.length };
+    }
+    // Matched point pairs (camera frame) under symmetry index si: est = P^ x, gt = P- S x.
+    function matchedPairs(Pe, Pg, model, si) {
+      const Pgs = pose.withSym(Pg, model.syms[si]);
+      return model.verts.map((x) => ({ est: pose.apply(Pe, x), gt: pose.apply(Pgs, x) }));
+    }
+
+    // ---- ray casting: distance maps (distance from the camera centre, 0 = no hit) ----
+    function rayPrim(o, d, prim) {
+      const ox = o[0] - prim.c[0];
+      const oy = o[1] - prim.c[1];
+      const oz = o[2] - prim.c[2];
+      let best = Infinity;
+      if (prim.type === 'box') {
+        let tmin = -Infinity;
+        let tmax = Infinity;
+        const oo = [ox, oy, oz];
+        for (let k = 0; k < 3; k += 1) {
+          if (Math.abs(d[k]) < 1e-12) {
+            if (Math.abs(oo[k]) > prim.half[k]) return Infinity;
+          } else {
+            const t1 = (-prim.half[k] - oo[k]) / d[k];
+            const t2 = (prim.half[k] - oo[k]) / d[k];
+            tmin = Math.max(tmin, Math.min(t1, t2));
+            tmax = Math.min(tmax, Math.max(t1, t2));
+          }
+        }
+        if (tmax >= Math.max(tmin, 0)) best = tmin > 0 ? tmin : tmax;
+        return best;
+      }
+      const a = d[0] * d[0] + d[2] * d[2];
+      if (a > 1e-12) {
+        const b = 2 * (ox * d[0] + oz * d[2]);
+        const c = ox * ox + oz * oz - prim.r * prim.r;
+        const disc = b * b - 4 * a * c;
+        if (disc >= 0) {
+          const t = (-b - Math.sqrt(disc)) / (2 * a);
+          if (t > 0 && Math.abs(oy + t * d[1]) <= prim.h) best = t;
+        }
+      }
+      if (Math.abs(d[1]) > 1e-12) {
+        [prim.h, -prim.h].forEach((yc) => {
+          const t = (yc - oy) / d[1];
+          if (t > 0 && t < best) {
+            const x = ox + t * d[0];
+            const z = oz + t * d[2];
+            if (x * x + z * z <= prim.r * prim.r) best = t;
+          }
+        });
+      }
+      return best;
+    }
+    // Maps may cover a zoomed window (roi, in image pixels) instead of the full
+    // image, so the pixel grid is large enough to read. VSD only needs the
+    // window to contain both silhouettes.
+    function fullRoi(cam) {
+      return { u0: 0, v0: 0, w: cam.w, h: cam.h };
+    }
+    function roiAround(px, w, h) {
+      return { u0: px[0] - w / 2, v0: px[1] - h / 2, w, h };
+    }
+    // Image pixel (u, v) at the centre of map cell (i, j).
+    function mapCellToImagePx(i, j, W, H, roi) {
+      return [roi.u0 + (i + 0.5) * roi.w / W, roi.v0 + (j + 0.5) * roi.h / H];
+    }
+    const rayCache = { key: '', rays: null };
+    function pixelRays(cam, W, H, roi) {
+      const q = roi || fullRoi(cam);
+      const key = [cam.w, W, H, q.u0, q.v0, q.w, q.h].map((x) => Math.round(x * 100)).join(':');
+      if (rayCache.key !== key) {
+        const rays = [];
+        for (let j = 0; j < H; j += 1) {
+          for (let i = 0; i < W; i += 1) {
+            const [u, v] = mapCellToImagePx(i, j, W, H, q);
+            rays.push(v3.norm([(u - cam.cx) / cam.f, -(v - cam.cy) / cam.f, 1]));
+          }
+        }
+        rayCache.key = key;
+        rayCache.rays = rays;
+      }
+      return rayCache.rays;
+    }
+    // Distance map of primitives placed by pose P (P = null: already in camera frame).
+    function renderDistance(prims, P, cam, W, H, roi) {
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      const Rt = P ? m3.T(P.R) : null;
+      const o = P ? m3.apply(Rt, v3.scale(P.t, -1)) : [0, 0, 0];
+      for (let n = 0; n < rays.length; n += 1) {
+        const d = P ? m3.apply(Rt, rays[n]) : rays[n];
+        let best = Infinity;
+        for (let k = 0; k < prims.length; k += 1) best = Math.min(best, rayPrim(o, d, prims[k]));
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+    // The test image D_I: what a depth sensor sees. Real object + occluders + back wall.
+    function sceneDistance(dGt, occluderPrims, cam, W, H, wallZ = 1500, roi) {
+      const dOcc = occluderPrims && occluderPrims.length ? renderDistance(occluderPrims, null, cam, W, H, roi) : null;
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      for (let n = 0; n < out.length; n += 1) {
+        let best = wallZ ? wallZ / rays[n][2] : Infinity;
+        if (dGt[n] > 0) best = Math.min(best, dGt[n]);
+        if (dOcc && dOcc[n] > 0) best = Math.min(best, dOcc[n]);
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+
+    // ---- VSD, as in bop_toolkit: visib_mode 'bop19', cost_type 'step' ----
+    const VSD_DELTA = 15;  // mm, visibility tolerance
+    function visibMask(dTest, dModel, delta = VSD_DELTA) {
+      const out = new Uint8Array(dModel.length);
+      for (let n = 0; n < out.length; n += 1) {
+        out[n] = dModel[n] > 0 && (dTest[n] === 0 || dModel[n] - dTest[n] <= delta) ? 1 : 0;
+      }
+      return out;
+    }
+    // labels: 0 outside the union, 1 match, 2 both visible but |dD| >= tau,
+    // 3 visible only in the GT pose, 4 visible only in the estimated pose.
+    function vsd(dEst, dGt, dTest, tau, delta = VSD_DELTA) {
+      const visGt = visibMask(dTest, dGt, delta);
+      const visEst = visibMask(dTest, dEst, delta);
+      for (let n = 0; n < visEst.length; n += 1) if (visGt[n] && dEst[n] > 0) visEst[n] = 1;
+      const labels = new Uint8Array(dEst.length);
+      const count = [0, 0, 0, 0, 0];
+      for (let n = 0; n < labels.length; n += 1) {
+        let l = 0;
+        if (visGt[n] && visEst[n]) l = Math.abs(dEst[n] - dGt[n]) < tau ? 1 : 2;
+        else if (visGt[n]) l = 3;
+        else if (visEst[n]) l = 4;
+        labels[n] = l;
+        count[l] += 1;
+      }
+      const nUnion = count[1] + count[2] + count[3] + count[4];
+      const e = nUnion === 0 ? 1 : (count[2] + count[3] + count[4]) / nUnion;
+      return { e, labels, visGt, visEst, nUnion, nInter: count[1] + count[2], nMatch: count[1], nMismatch: count[2], nGtOnly: count[3], nEstOnly: count[4] };
+    }
+
+    // ---- BOP thresholds and the per-pose share of Average Recall ----
+    const FRACS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+    const mssdThresholds = (diameter) => FRACS.map((k) => k * diameter);        // mm
+    const mspdThresholds = (cam) => FRACS.map((k) => k * 100 * cam.r);          // 5r .. 50r px
+    const passes = (e, thresholds) => thresholds.map((th) => e < th);           // correct iff e < theta
+    const share = (flags) => flags.filter(Boolean).length / flags.length;
+    // 10 x 10 grid: tau = 5%..50% of the diameter (rows), theta = 0.05..0.5 (columns).
+    function vsdGrid(dEst, dGt, dTest, diameter, delta = VSD_DELTA) {
+      const errors = FRACS.map((k) => vsd(dEst, dGt, dTest, k * diameter, delta).e);
+      const grid = errors.map((e) => FRACS.map((theta) => e < theta));
+      return { errors, grid, score: share(grid.flat()) };
+    }
+    // ===================== END BOP KIT =====================
+
+
+    // ---- ambient background: a mug, its estimate, and the longest rubber band ----
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    const stateEl = document.getElementById('state');
+    const mug = makeModel('mug');
+    const camera = makeCamera(640);
+    const Pg = gtPose({ az: 0.5, tilt: 0.3, z: 450 });
+    let yaw = -0.6;
+    const pitch = 0.3;
+    function rotate([x, y, z]) {
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      return [x1, cp * y + sp * z1, -sp * y + cp * z1];
+    }
+    function toScreen(X, cx, cy, px) {
+      const r = rotate([(X[0] - Pg.t[0]) * 0.03, (X[1] - Pg.t[1]) * 0.03, (X[2] - Pg.t[2]) * 0.03]);
+      const f = px * 10 / (10 + r[2]);
+      return [cx + r[0] * f, cy - r[1] * f];
+    }
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(innerWidth * dpr);
+      canvas.height = Math.round(innerHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function wire(P, color, cx, cy, px) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      mug.wire.forEach(([a, b]) => {
+        const pa = toScreen(pose.apply(P, a), cx, cy, px);
+        const pb = toScreen(pose.apply(P, b), cx, cy, px);
+        ctx.moveTo(pa[0], pa[1]);
+        ctx.lineTo(pb[0], pb[1]);
+      });
+      ctx.stroke();
+    }
+    function draw(ts) {
+      const w = innerWidth, h = innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      yaw = -0.6 + 0.35 * Math.sin(ts / 9000);
+      const err = { spin: 0.55 * Math.sin(ts / 2300), dx: 9 * Math.sin(ts / 3100), roll: 0.14 * Math.sin(ts / 4100) };
+      const Pe = perturb(Pg, err);
+      const e = surfaceErrors(Pe, Pg, mug, camera);
+      const cx = w * 0.82, cy = h * 0.3, px = Math.min(w, h) / 13;
+      ctx.globalAlpha = 0.4;
+      wire(Pg, '#5aa6ff', cx, cy, px);
+      wire(Pe, '#f08f3c', cx, cy, px);
+      const pair = matchedPairs(Pe, Pg, mug, e.mssd.sym)[e.mssd.vert];
+      const a = toScreen(pair.gt, cx, cy, px);
+      const b = toScreen(pair.est, cx, cy, px);
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = '#ff8a8a';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+      ctx.globalAlpha = 1;
+      stateEl.innerHTML = `background: longest band, MSSD = <strong>${e.mssd.value.toFixed(1)} mm</strong> · longest shadow, MSPD = <strong>${e.mspd.value.toFixed(1)} px</strong>`;
+      requestAnimationFrame(draw);
+    }
+    addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

@@ -1,0 +1,1495 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch4 · One Pose, Three Verdicts</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .formula {
+      font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; font-size: 13px; }
+  </style>
+
+</head>
+<body>
+  <style>
+    .dot.worst { background: #ff8a8a; box-shadow: 0 0 12px rgba(255, 138, 138, 0.8); }
+    .sq { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    table.dof td.num { font-family: var(--mono); color: var(--ink); white-space: nowrap; }
+    .predict-list { display: grid; gap: 8px; }
+    .caption { bottom: 62px; max-width: 560px; }
+  </style>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of BOP Pose Errors · Chapter 4</div>
+        <h1>One Pose, Three Verdicts</h1>
+        <p class="lead">
+          Three rulers measure the same estimated pose: <strong>millimetres in 3D</strong>,
+          <strong>pixels in the image</strong>, <strong>share of visible surface</strong>.
+          Pick a scenario and watch the three ladders. When do the rulers disagree, and why?
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>ground-truth pose</span>
+        <span class="legend"><span class="dot query"></span>estimated pose</span>
+        <span class="legend"><span class="dot worst"></span>longest band / longest shadow</span>
+        <span class="legend">Drag to orbit. Scroll to zoom.</span><br>
+        <span class="legend">votes:</span>
+        <span class="legend"><span class="sq" style="background:rgb(120,220,130)"></span>match</span>
+        <span class="legend"><span class="sq" style="background:rgb(255,110,110)"></span>too far apart</span>
+        <span class="legend"><span class="sq" style="background:rgb(90,166,255)"></span>GT only</span>
+        <span class="legend"><span class="sq" style="background:rgb(240,143,60)"></span>estimate only</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch3-VSD-Only-What-The-Camera-Sees.html">← Ch 3</a>
+        <span>Chapter 4 of 4</span>
+        <a href="index.html">Index →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Scenarios</div>
+          <div class="body">Each scenario is one wrong pose. The rulers disagree, or they agree for different reasons. Read the caption for the mechanism.</div>
+          <div id="scenarioGrid" class="preset-grid"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="predict-list">
+            <details class="predict">
+              <summary>Which error almost ignores a 50 mm depth mistake?</summary>
+              <div class="answer"><strong>MSPD.</strong> A band that points at the camera casts a very short shadow.
+                It is not zero: the estimate looks slightly smaller, so outer points shift a few pixels.
+                MSSD sees the full 50 mm. VSD fails every pixel until τ exceeds the gap.</div>
+              <button id="predict1">Set it up: too deep</button>
+            </details>
+            <details class="predict">
+              <summary>Which error needs no list of symmetries, and why?</summary>
+              <div class="answer"><strong>VSD.</strong> It compares only what is visible. Two poses that look the same
+                give the same depth photo, so they score the same. Untick "symmetry-aware": MSSD and MSPD
+                now reject the flipped box. VSD does not move.</div>
+              <button id="predict2">Set it up: box flipped</button>
+            </details>
+            <details class="predict">
+              <summary>Which error knows about occlusion?</summary>
+              <div class="answer"><strong>Only VSD.</strong> It reads the test depth image, so hidden pixels get no ballot.
+                MSSD and MSPD use every model vertex, visible or not. Untick the occluder and the handle
+                pixels vote again.</div>
+              <button id="predict3">Set it up: occluded handle</button>
+            </details>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Free play</div>
+          <div id="modelGrid" class="preset-grid"></div>
+          <div id="sliders" style="display:grid;gap:8px"></div>
+          <label class="checkbox"><input id="symBox" type="checkbox" checked>Symmetry-aware (min over S in S_M)</label>
+          <label class="checkbox"><input id="occBox" type="checkbox">Occluder in front of the right side</label>
+          <div class="action-grid"><button id="resetBtn">Reset view</button></div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Live verdicts</div>
+          <div style="overflow-x:auto">
+            <table class="dof" id="verdictTable"></table>
+          </div>
+          <div id="shareLine" class="body"></div>
+          <div id="extraNumbers" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">The three rulers</div>
+          <div class="formula">e_MSSD = min   max  ‖ P̂x − P̄Sx ‖              [mm]
+         S∈S_M x∈V_M
+
+e_MSPD = min   max  ‖ proj(P̂x) − proj(P̄Sx) ‖  [px]
+         S∈S_M x∈V_M
+
+e_VSD  = avg    { 0  if p ∈ V̂∩V̄ and |D̂(p) − D̄(p)| &lt; τ
+        p∈V̂∪V̄  { 1  otherwise              [share]</div>
+          <div class="body">P̂ is the estimate. P̄ is the ground truth. S_M lists the symmetries of the model. V_M lists its vertices.
+            D̂ and D̄ are rendered distance maps. V̂ and V̄ are the visible pixels, found with the test depth image.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">From errors to AR</div>
+          <div class="formula">AR = (AR_VSD + AR_MSSD + AR_MSPD) / 3</div>
+          <div class="body">A pose is <strong>correct</strong> for one setting when e &lt; θ.
+            <strong>Recall</strong> is the fraction of annotated instances with a correct pose.
+            Each AR averages recall over its settings: ten θ for MSSD and MSPD, ten τ times ten θ for VSD.
+            The ladders show this pose's share of each.</div>
+          <div class="body">GigaPose and other BOP methods report exactly this AR.</div>
+          <div class="body"><em>Caveat.</em> The maps here are 128 by 96 cells over a zoomed window. BOP renders full images. The idea is the same; small numbers differ.</div>
+          <div class="src">Source: Hodaň et al., BOP Challenge 2020 on 6D Object Localization, Sec. 2.2 to 2.4; bop_toolkit pose_error.py and visibility.py</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Three rulers, one pose.</strong> MSSD measures millimetres in 3D. MSPD measures pixels in the image. VSD measures a share of visible surface.</div>
+          <div class="essence"><strong>MSSD asks: would a gripper succeed?</strong> It reports the longest rubber band. One bad corner is enough to fail.</div>
+          <div class="essence"><strong>MSPD asks: would an AR overlay look right?</strong> It reports the longest shadow. Depth mistakes along the viewing ray barely show.</div>
+          <div class="essence"><strong>VSD asks: could this sensor tell the difference?</strong> Only visible pixels get a ballot. It alone handles occlusion and ambiguity that nobody listed.</div>
+          <div class="essence"><strong>Each ruler needs something.</strong> MSSD and MSPD need the symmetry list S_M. VSD needs a depth image of the scene.</div>
+          <div class="essence"><strong>BOP averages all three.</strong> AR = (AR_VSD + AR_MSSD + AR_MSPD) / 3. A method cannot win by being good on one ruler only.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== BOP KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Units: millimetres. Camera frame: x right, y up,
+    // z forward. The camera centre is the origin. Follows bop_toolkit
+    // (pose_error.py, visibility.py) and BOP Challenge 2020, Sec. 2.2-2.4.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+    };
+    // A pose maps model coordinates to camera coordinates: X = R x + t.
+    const pose = {
+      apply: (P, x) => v3.add(m3.apply(P.R, x), P.t),
+      // P composed with a model-frame symmetry S: x -> P(S x).
+      withSym: (P, S) => ({ R: m3.mul(P.R, S.R), t: v3.add(m3.apply(P.R, S.t), P.t) }),
+    };
+
+    // ---- pinhole camera. BOP reference width is 640 px, so r = w / 640. ----
+    function makeCamera(width = 640) {
+      const r = width / 640;
+      return { w: 640 * r, h: 480 * r, f: 600 * r, cx: 320 * r, cy: 240 * r, r };
+    }
+    function projectPx(X, cam) {
+      return [cam.cx + cam.f * X[0] / X[2], cam.cy - cam.f * X[1] / X[2]];
+    }
+
+    // ---- object models: primitives (for ray casting), vertices V_M, symmetries S_M ----
+    function cylinderVerts(r, h, nAround = 24, levels = [-1, -0.5, 0, 0.5, 1]) {
+      const out = [[0, h, 0], [0, -h, 0]];
+      levels.forEach((k) => {
+        for (let i = 0; i < nAround; i += 1) {
+          const a = (i / nAround) * Math.PI * 2;
+          out.push([r * Math.cos(a), h * k, r * Math.sin(a)]);
+        }
+      });
+      return out;
+    }
+    function boxSurfaceVerts(c, half, n = [2, 2, 2]) {
+      const out = [];
+      for (let i = 0; i <= n[0]; i += 1) {
+        for (let j = 0; j <= n[1]; j += 1) {
+          for (let k = 0; k <= n[2]; k += 1) {
+            const onSurface = i === 0 || i === n[0] || j === 0 || j === n[1] || k === 0 || k === n[2];
+            if (!onSurface) continue;
+            out.push([
+              c[0] + half[0] * (2 * i / n[0] - 1),
+              c[1] + half[1] * (2 * j / n[1] - 1),
+              c[2] + half[2] * (2 * k / n[2] - 1),
+            ]);
+          }
+        }
+      }
+      return out;
+    }
+    function cylinderWire(r, h, seg = 32, nVertical = 8) {
+      const out = [];
+      for (let i = 0; i < seg; i += 1) {
+        const a = (i / seg) * Math.PI * 2;
+        const b = ((i + 1) / seg) * Math.PI * 2;
+        [h, -h].forEach((y) => out.push([[r * Math.cos(a), y, r * Math.sin(a)], [r * Math.cos(b), y, r * Math.sin(b)]]));
+      }
+      for (let i = 0; i < nVertical; i += 1) {
+        const a = (i / nVertical) * Math.PI * 2;
+        out.push([[r * Math.cos(a), h, r * Math.sin(a)], [r * Math.cos(a), -h, r * Math.sin(a)]]);
+      }
+      return out;
+    }
+    function boxWire(c, half) {
+      const p = (sx, sy, sz) => [c[0] + sx * half[0], c[1] + sy * half[1], c[2] + sz * half[2]];
+      const out = [];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        out.push([p(-1, a, b), p(1, a, b)]);
+        out.push([p(a, -1, b), p(a, 1, b)]);
+        out.push([p(a, b, -1), p(a, b, 1)]);
+      }));
+      return out;
+    }
+    // The 24 proper rotations of a cube (signed permutation matrices, det +1).
+    function cubeRotations() {
+      const perms = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+      const out = [];
+      perms.forEach((p) => {
+        for (let s = 0; s < 8; s += 1) {
+          const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+          for (let i = 0; i < 3; i += 1) R[i][p[i]] = (s >> i) & 1 ? -1 : 1;
+          if (Math.abs(m3.det(R) - 1) < 1e-9) out.push(R);
+        }
+      });
+      return out;
+    }
+    // Rotations that map a centred box with these half sizes onto itself.
+    function boxSymmetries(half) {
+      const keep = cubeRotations().filter((R) => {
+        const mapped = m3.apply(R.map((row) => row.map(Math.abs)), half);
+        return mapped.every((x, i) => Math.abs(x - half[i]) < 1e-9);
+      });
+      keep.sort((A, B) => (B[0][0] + B[1][1] + B[2][2]) - (A[0][0] + A[1][1] + A[2][2]));  // identity first
+      return keep.map((R) => ({ R, t: [0, 0, 0] }));
+    }
+    // BOP rule for a continuous symmetry: the vertex furthest from the axis
+    // travels at most 1% of the object diameter between consecutive steps.
+    function axisSymmetries(rMax, diameter, withFlip) {
+      const n = Math.ceil((2 * Math.PI * rMax) / (0.01 * diameter));
+      const out = [];
+      for (let k = 0; k < n; k += 1) out.push({ R: m3.rotY((k / n) * Math.PI * 2), t: [0, 0, 0] });
+      if (withFlip) {
+        for (let k = 0; k < n; k += 1) out.push({ R: m3.mul(m3.rotX(Math.PI), m3.rotY((k / n) * Math.PI * 2)), t: [0, 0, 0] });
+      }
+      return out;
+    }
+    function modelDiameter(verts) {
+      let d = 0;
+      for (let i = 0; i < verts.length; i += 1) {
+        for (let j = i + 1; j < verts.length; j += 1) d = Math.max(d, v3.dist(verts[i], verts[j]));
+      }
+      return d;
+    }
+    // kinds: 'mug' (no symmetry), 'can' (continuous axis + flip),
+    // 'box' (4 rotations), 'rod' (8 rotations). Model axis is y.
+    function makeModel(kind) {
+      const m = { kind };
+      if (kind === 'mug') {
+        m.label = 'Mug';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }, { type: 'box', c: [50, 0, 0], half: [10, 20, 6] }];
+        m.verts = cylinderVerts(40, 45).concat(boxSurfaceVerts([50, 0, 0], [10, 20, 6]));
+        m.wire = cylinderWire(40, 45).concat(boxWire([50, 0, 0], [10, 20, 6]));
+        m.symNote = 'No symmetry. The handle breaks it. S_M = { identity }.';
+      } else if (kind === 'can') {
+        m.label = 'Can';
+        m.prims = [{ type: 'cyl', c: [0, 0, 0], r: 40, h: 45 }];
+        m.verts = cylinderVerts(40, 45);
+        m.wire = cylinderWire(40, 45);
+        m.symNote = 'Continuous symmetry about its axis, sampled in 1%-of-diameter steps, plus the top-bottom flip.';
+      } else if (kind === 'box') {
+        m.label = 'Box';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [50, 30, 20] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [50, 30, 20], [4, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [50, 30, 20]);
+        m.symNote = 'Three different side lengths. 4 rotations map it onto itself.';
+      } else {
+        m.kind = 'rod';
+        m.label = 'Rod';
+        m.prims = [{ type: 'box', c: [0, 0, 0], half: [90, 10, 10] }];
+        m.verts = boxSurfaceVerts([0, 0, 0], [90, 10, 10], [8, 2, 2]);
+        m.wire = boxWire([0, 0, 0], [90, 10, 10]);
+        m.symNote = 'Square cross-section. 8 rotations map it onto itself.';
+      }
+      m.diameter = modelDiameter(m.verts);
+      if (m.kind === 'mug') m.syms = [{ R: m3.I(), t: [0, 0, 0] }];
+      else if (m.kind === 'can') m.syms = axisSymmetries(40, m.diameter, true);
+      else m.syms = boxSymmetries(m.prims[0].half);
+      return m;
+    }
+
+    // ---- poses ----
+    // az: spin about the model axis (0 = handle to camera right, -90deg = handle
+    // points away from the camera). tilt > 0 tips the top towards the camera.
+    function gtPose(o) {
+      return { R: m3.mul(m3.rotX(-(o.tilt || 0)), m3.rotY(o.az || 0)), t: [o.x || 0, o.y || 0, o.z || 600] };
+    }
+    // Pose error e: spin (about the model axis), tilt (about camera x), roll
+    // (about camera z), all through the object centre. dx, dy in the image
+    // directions, ray = slide along the viewing ray through the object centre.
+    function perturb(Pg, e) {
+      const R = m3.mul(m3.rotZ(e.roll || 0), m3.mul(m3.rotX(e.tilt || 0), m3.mul(Pg.R, m3.rotY(e.spin || 0))));
+      const dir = v3.norm(Pg.t);
+      const t = v3.add(v3.add(Pg.t, [e.dx || 0, e.dy || 0, 0]), v3.scale(dir, e.ray || 0));
+      return { R, t };
+    }
+
+    // ---- MSSD and MSPD: min over S of max over x ----
+    // Returns both errors, the arg-min symmetry and arg-max vertex of each, the
+    // per-symmetry maxima, and ADD (mean distance, no symmetry) for contrast.
+    function surfaceErrors(Pe, Pg, model, cam, useSym = true) {
+      const est = model.verts.map((x) => pose.apply(Pe, x));
+      const estPx = est.map((X) => projectPx(X, cam));
+      const syms = useSym ? model.syms : [model.syms[0]];
+      const perSymMssd = [];
+      const perSymMspd = [];
+      let mssd = null;
+      let mspd = null;
+      syms.forEach((S, si) => {
+        const Pgs = pose.withSym(Pg, S);
+        let max3 = -1;
+        let arg3 = -1;
+        let max2 = -1;
+        let arg2 = -1;
+        model.verts.forEach((x, i) => {
+          const G = pose.apply(Pgs, x);
+          const d3 = v3.dist(est[i], G);
+          if (d3 > max3) { max3 = d3; arg3 = i; }
+          const g = projectPx(G, cam);
+          const d2 = Math.hypot(estPx[i][0] - g[0], estPx[i][1] - g[1]);
+          if (d2 > max2) { max2 = d2; arg2 = i; }
+        });
+        perSymMssd.push(max3);
+        perSymMspd.push(max2);
+        if (!mssd || max3 < mssd.value) mssd = { value: max3, sym: si, vert: arg3 };
+        if (!mspd || max2 < mspd.value) mspd = { value: max2, sym: si, vert: arg2 };
+      });
+      let sum = 0;
+      model.verts.forEach((x, i) => { sum += v3.dist(est[i], pose.apply(Pg, x)); });
+      return { mssd, mspd, perSymMssd, perSymMspd, add: sum / model.verts.length };
+    }
+    // Matched point pairs (camera frame) under symmetry index si: est = P^ x, gt = P- S x.
+    function matchedPairs(Pe, Pg, model, si) {
+      const Pgs = pose.withSym(Pg, model.syms[si]);
+      return model.verts.map((x) => ({ est: pose.apply(Pe, x), gt: pose.apply(Pgs, x) }));
+    }
+
+    // ---- ray casting: distance maps (distance from the camera centre, 0 = no hit) ----
+    function rayPrim(o, d, prim) {
+      const ox = o[0] - prim.c[0];
+      const oy = o[1] - prim.c[1];
+      const oz = o[2] - prim.c[2];
+      let best = Infinity;
+      if (prim.type === 'box') {
+        let tmin = -Infinity;
+        let tmax = Infinity;
+        const oo = [ox, oy, oz];
+        for (let k = 0; k < 3; k += 1) {
+          if (Math.abs(d[k]) < 1e-12) {
+            if (Math.abs(oo[k]) > prim.half[k]) return Infinity;
+          } else {
+            const t1 = (-prim.half[k] - oo[k]) / d[k];
+            const t2 = (prim.half[k] - oo[k]) / d[k];
+            tmin = Math.max(tmin, Math.min(t1, t2));
+            tmax = Math.min(tmax, Math.max(t1, t2));
+          }
+        }
+        if (tmax >= Math.max(tmin, 0)) best = tmin > 0 ? tmin : tmax;
+        return best;
+      }
+      const a = d[0] * d[0] + d[2] * d[2];
+      if (a > 1e-12) {
+        const b = 2 * (ox * d[0] + oz * d[2]);
+        const c = ox * ox + oz * oz - prim.r * prim.r;
+        const disc = b * b - 4 * a * c;
+        if (disc >= 0) {
+          const t = (-b - Math.sqrt(disc)) / (2 * a);
+          if (t > 0 && Math.abs(oy + t * d[1]) <= prim.h) best = t;
+        }
+      }
+      if (Math.abs(d[1]) > 1e-12) {
+        [prim.h, -prim.h].forEach((yc) => {
+          const t = (yc - oy) / d[1];
+          if (t > 0 && t < best) {
+            const x = ox + t * d[0];
+            const z = oz + t * d[2];
+            if (x * x + z * z <= prim.r * prim.r) best = t;
+          }
+        });
+      }
+      return best;
+    }
+    // Maps may cover a zoomed window (roi, in image pixels) instead of the full
+    // image, so the pixel grid is large enough to read. VSD only needs the
+    // window to contain both silhouettes.
+    function fullRoi(cam) {
+      return { u0: 0, v0: 0, w: cam.w, h: cam.h };
+    }
+    function roiAround(px, w, h) {
+      return { u0: px[0] - w / 2, v0: px[1] - h / 2, w, h };
+    }
+    // Image pixel (u, v) at the centre of map cell (i, j).
+    function mapCellToImagePx(i, j, W, H, roi) {
+      return [roi.u0 + (i + 0.5) * roi.w / W, roi.v0 + (j + 0.5) * roi.h / H];
+    }
+    const rayCache = { key: '', rays: null };
+    function pixelRays(cam, W, H, roi) {
+      const q = roi || fullRoi(cam);
+      const key = [cam.w, W, H, q.u0, q.v0, q.w, q.h].map((x) => Math.round(x * 100)).join(':');
+      if (rayCache.key !== key) {
+        const rays = [];
+        for (let j = 0; j < H; j += 1) {
+          for (let i = 0; i < W; i += 1) {
+            const [u, v] = mapCellToImagePx(i, j, W, H, q);
+            rays.push(v3.norm([(u - cam.cx) / cam.f, -(v - cam.cy) / cam.f, 1]));
+          }
+        }
+        rayCache.key = key;
+        rayCache.rays = rays;
+      }
+      return rayCache.rays;
+    }
+    // Distance map of primitives placed by pose P (P = null: already in camera frame).
+    function renderDistance(prims, P, cam, W, H, roi) {
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      const Rt = P ? m3.T(P.R) : null;
+      const o = P ? m3.apply(Rt, v3.scale(P.t, -1)) : [0, 0, 0];
+      for (let n = 0; n < rays.length; n += 1) {
+        const d = P ? m3.apply(Rt, rays[n]) : rays[n];
+        let best = Infinity;
+        for (let k = 0; k < prims.length; k += 1) best = Math.min(best, rayPrim(o, d, prims[k]));
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+    // The test image D_I: what a depth sensor sees. Real object + occluders + back wall.
+    function sceneDistance(dGt, occluderPrims, cam, W, H, wallZ = 1500, roi) {
+      const dOcc = occluderPrims && occluderPrims.length ? renderDistance(occluderPrims, null, cam, W, H, roi) : null;
+      const rays = pixelRays(cam, W, H, roi);
+      const out = new Float32Array(W * H);
+      for (let n = 0; n < out.length; n += 1) {
+        let best = wallZ ? wallZ / rays[n][2] : Infinity;
+        if (dGt[n] > 0) best = Math.min(best, dGt[n]);
+        if (dOcc && dOcc[n] > 0) best = Math.min(best, dOcc[n]);
+        out[n] = Number.isFinite(best) ? best : 0;
+      }
+      return out;
+    }
+
+    // ---- VSD, as in bop_toolkit: visib_mode 'bop19', cost_type 'step' ----
+    const VSD_DELTA = 15;  // mm, visibility tolerance
+    function visibMask(dTest, dModel, delta = VSD_DELTA) {
+      const out = new Uint8Array(dModel.length);
+      for (let n = 0; n < out.length; n += 1) {
+        out[n] = dModel[n] > 0 && (dTest[n] === 0 || dModel[n] - dTest[n] <= delta) ? 1 : 0;
+      }
+      return out;
+    }
+    // labels: 0 outside the union, 1 match, 2 both visible but |dD| >= tau,
+    // 3 visible only in the GT pose, 4 visible only in the estimated pose.
+    function vsd(dEst, dGt, dTest, tau, delta = VSD_DELTA) {
+      const visGt = visibMask(dTest, dGt, delta);
+      const visEst = visibMask(dTest, dEst, delta);
+      for (let n = 0; n < visEst.length; n += 1) if (visGt[n] && dEst[n] > 0) visEst[n] = 1;
+      const labels = new Uint8Array(dEst.length);
+      const count = [0, 0, 0, 0, 0];
+      for (let n = 0; n < labels.length; n += 1) {
+        let l = 0;
+        if (visGt[n] && visEst[n]) l = Math.abs(dEst[n] - dGt[n]) < tau ? 1 : 2;
+        else if (visGt[n]) l = 3;
+        else if (visEst[n]) l = 4;
+        labels[n] = l;
+        count[l] += 1;
+      }
+      const nUnion = count[1] + count[2] + count[3] + count[4];
+      const e = nUnion === 0 ? 1 : (count[2] + count[3] + count[4]) / nUnion;
+      return { e, labels, visGt, visEst, nUnion, nInter: count[1] + count[2], nMatch: count[1], nMismatch: count[2], nGtOnly: count[3], nEstOnly: count[4] };
+    }
+
+    // ---- BOP thresholds and the per-pose share of Average Recall ----
+    const FRACS = [0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5];
+    const mssdThresholds = (diameter) => FRACS.map((k) => k * diameter);        // mm
+    const mspdThresholds = (cam) => FRACS.map((k) => k * 100 * cam.r);          // 5r .. 50r px
+    const passes = (e, thresholds) => thresholds.map((th) => e < th);           // correct iff e < theta
+    const share = (flags) => flags.filter(Boolean).length / flags.length;
+    // 10 x 10 grid: tau = 5%..50% of the diameter (rows), theta = 0.05..0.5 (columns).
+    function vsdGrid(dEst, dGt, dTest, diameter, delta = VSD_DELTA) {
+      const errors = FRACS.map((k) => vsd(dEst, dGt, dTest, k * diameter, delta).e);
+      const grid = errors.map((e) => FRACS.map((theta) => e < theta));
+      return { errors, grid, score: share(grid.flat()) };
+    }
+    // ===================== END BOP KIT =====================
+
+    // ===================== BOP DRAW (copy verbatim) =====================
+    // Browser-side helpers. Camera-frame millimetres -> orbit-view units.
+    const SCENE = { pivot: [0, 0, 380], scale: 0.01 };
+    const toView = (X) => [
+      (X[0] - SCENE.pivot[0]) * SCENE.scale,
+      (X[1] - SCENE.pivot[1]) * SCENE.scale,
+      (X[2] - SCENE.pivot[2]) * SCENE.scale,
+    ];
+    function drawWire(model, P, vp, o = {}) {
+      model.wire.forEach(([a, b]) => line3(toView(pose.apply(P, a)), toView(pose.apply(P, b)), vp, o));
+    }
+    function drawBoxPrim(prim, vp, o = {}) {
+      boxWire(prim.c, prim.half).forEach(([a, b]) => line3(toView(a), toView(b), vp, o));
+    }
+    // Camera-frame 3D point on the drawn image plane for pixel (u, v).
+    function imagePlanePoint(px, cam, zPlane) {
+      return [(px[0] - cam.cx) / cam.f * zPlane, -(px[1] - cam.cy) / cam.f * zPlane, zPlane];
+    }
+    function drawFrustum(cam, vp, zPlane = 170, o = {}) {
+      const corners = [[0, 0], [cam.w, 0], [cam.w, cam.h], [0, cam.h]].map((p) => imagePlanePoint(p, cam, zPlane));
+      polyline3(corners.map(toView), vp, { close: true, color: o.color || 'rgba(182, 206, 245, 0.55)', fill: o.fill || 'rgba(90, 166, 255, 0.05)', width: 1.2 });
+      corners.forEach((c) => line3(toView([0, 0, 0]), toView(v3.scale(c, o.reach || 4.2)), vp, { color: 'rgba(182, 206, 245, 0.16)', dash: [4, 6] }));
+      dot3(toView([0, 0, 0]), vp, { color: '#ebf2ff', r: 4, label: o.label ?? 'camera' });
+      return corners;
+    }
+    // Low-resolution map (distance map, mask, label map) drawn as a crisp inset.
+    const insetCanvases = new Map();
+    function drawMapInset(key, x, y, w, h, title, W, H, colorFn, o = {}) {
+      let off = insetCanvases.get(key);
+      if (!off || off.width !== W || off.height !== H) {
+        off = document.createElement('canvas');
+        off.width = W;
+        off.height = H;
+        insetCanvases.set(key, off);
+      }
+      const octx = off.getContext('2d');
+      const img = octx.createImageData(W, H);
+      for (let n = 0; n < W * H; n += 1) {
+        const c = colorFn(n);
+        img.data[4 * n] = c[0];
+        img.data[4 * n + 1] = c[1];
+        img.data[4 * n + 2] = c[2];
+        img.data[4 * n + 3] = 255;
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, x, y, w, h);
+      ctx.strokeStyle = o.border || 'rgba(132, 160, 202, 0.55)';
+      ctx.lineWidth = o.borderWidth || 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+      ctx.fillStyle = 'rgba(7, 17, 31, 0.78)';
+      ctx.fillRect(x + 1, y + 1, ctx.measureText(title).width + 22, 17);
+      ctx.fillStyle = o.titleColor || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = '600 11px Inter, sans-serif';
+      ctx.fillText(title, x + 6, y + 13);
+      ctx.restore();
+    }
+    const EMPTY_RGB = [9, 16, 28];
+    // Near = bright, far = dark. 0 (no hit) = empty.
+    function distShade(d, near, far, tint = [134, 212, 255]) {
+      if (!(d > 0)) return EMPTY_RGB;
+      const k = 0.22 + 0.78 * clamp((far - d) / (far - near), 0, 1);
+      return [tint[0] * k, tint[1] * k, tint[2] * k];
+    }
+    // VSD label colours: 1 match, 2 too far apart, 3 GT only, 4 estimate only.
+    const LABEL_RGB = [EMPTY_RGB, [120, 220, 130], [255, 110, 110], [90, 166, 255], [240, 143, 60]];
+    // A row of pass/fail chips for one error function. Returns the height used.
+    function drawLadder(x, y, w, title, valueText, flags, firstLabel, lastLabel) {
+      const n = flags.length;
+      const gap = 3;
+      const cw = (w - gap * (n - 1)) / n;
+      ctx.save();
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(235, 242, 255, 0.92)';
+      ctx.fillText(title, x, y + 11);
+      ctx.textAlign = 'right';
+      ctx.font = '600 12px ui-monospace, Menlo, monospace';
+      ctx.fillText(valueText, x + w, y + 11);
+      flags.forEach((ok, i) => {
+        ctx.fillStyle = ok ? 'rgba(120, 220, 130, 0.85)' : 'rgba(255, 110, 110, 0.75)';
+        ctx.fillRect(x + i * (cw + gap), y + 18, cw, 12);
+      });
+      ctx.font = '10px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+      ctx.textAlign = 'left';
+      ctx.fillText(firstLabel, x, y + 43);
+      ctx.textAlign = 'right';
+      ctx.fillText(lastLabel, x + w, y + 43);
+      ctx.textAlign = 'center';
+      ctx.fillText(`passes ${flags.filter(Boolean).length} of ${n}`, x + w / 2, y + 43);
+      ctx.restore();
+      return 50;
+    }
+    // ===================== END BOP DRAW =====================
+
+    // ===================== CHAPTER 4: ONE POSE, THREE VERDICTS =====================
+    const cam = makeCamera(640);
+    const MAP_W = 128;
+    const MAP_H = 96;
+    const TAU_FRAC = 0.2;
+    const models = { mug: makeModel('mug'), can: makeModel('can'), box: makeModel('box'), rod: makeModel('rod') };
+
+    // Angles in degrees, lengths in millimetres. Captions explain the mechanism;
+    // every number on the page comes from the kit.
+    const scenarios = [
+      { id: 'deep', label: 'Too deep', model: 'mug', gt: { az: 20, tilt: 15, z: 450 }, err: { ray: 50 }, occ: false,
+        text: 'The estimate sits 50 mm too deep along the viewing ray. Every band is 50 mm long, yet its shadow is a few pixels. The depth photos disagree at every pixel until τ exceeds the gap.' },
+      { id: 'hidden', label: 'Hidden handle', model: 'mug', gt: { az: -115, tilt: 12, z: 450 }, err: { spin: 50 }, occ: false,
+        text: 'The handle points away from the camera in both poses, 50° apart. Its bands are long, and so are their shadows. No visible pixel changes, so VSD stays at zero.' },
+      { id: 'box', label: 'Box flipped', model: 'box', gt: { az: 30, tilt: 20, z: 450 }, err: { spin: 180 }, occ: false,
+        text: 'The box is turned by 180° about its axis. MSSD and MSPD first relabel the ground truth with a symmetry from S_M. VSD needs no list: the two depth photos are identical.' },
+      { id: 'can', label: 'Can spun 73°', model: 'can', gt: { az: 0, tilt: 15, z: 450 }, err: { spin: 73 }, occ: false,
+        text: 'The can is spun by 73° about its axis. S_M samples that symmetry in steps of 1% of the diameter, so a near-perfect relabelling exists. The depth photos match as well.' },
+      { id: 'rod', label: 'Rod tip', model: 'rod', gt: { az: 25, tilt: 10, z: 450 }, err: { roll: 8 }, occ: false,
+        text: 'A roll of 8° barely moves the middle but swings the tips. The max (MSSD) is well above the mean (ADD). The rod is thin, so a small swing uncovers much of each silhouette, and VSD is strict.' },
+      { id: 'far', label: 'Small slip, far away', model: 'mug', gt: { az: 20, tilt: 15, z: 900 }, err: { dx: 12 }, occ: false,
+        text: 'A 12 mm sideways slip, 900 mm from the camera. MSSD sees 12 mm at any depth. The shadow shrinks with distance, so MSPD is lenient. Drag GT depth to 450 and watch MSPD double.' },
+      { id: 'occluded', label: 'Occluded handle', model: 'mug', gt: { az: 0, tilt: 15, z: 450 }, err: { spin: 50 }, occ: true,
+        text: 'The handle is spun by 50°, but a box hides it from the sensor. Hidden pixels get no ballot, so VSD forgives. MSSD and MSPD use every vertex, visible or not.' },
+    ];
+    const state = {
+      model: 'mug', gt: { az: 20, tilt: 15, z: 450 }, err: { spin: 0, roll: 0, dx: 0, ray: 0 },
+      sym: true, occ: false, scenario: null,
+    };
+    let dirty = true;
+    let result = null;
+    view.home = { yaw: -0.8, pitch: 0.3 };
+    resetView();
+    app.mainViewport = () => viewport(canvas.clientWidth * 0.4, canvas.clientHeight * 0.62,
+      Math.min(canvas.clientWidth, canvas.clientHeight) / 9);
+
+    // ---- controls ----
+    function touched() {
+      state.scenario = null;
+      scenarioGroup.setActive(null);
+      dirty = true;
+    }
+    const scenarioGroup = makeButtonGroup(document.getElementById('scenarioGrid'),
+      scenarios.map((s) => ({ label: s.label, value: s.id })), (id) => loadScenario(id));
+    const modelGroup = makeButtonGroup(document.getElementById('modelGrid'),
+      Object.values(models).map((m) => ({ label: m.label, value: m.kind })),
+      (kind) => { state.model = kind; touched(); }, { active: 'mug' });
+    const host = document.getElementById('sliders');
+    const sliders = {
+      spin: makeSlider(host, { label: 'Spin about the model axis', min: -180, max: 180, step: 1, value: 0,
+        format: (v) => v + '°', onInput: (v) => { state.err.spin = v; touched(); } }),
+      roll: makeSlider(host, { label: 'Roll about the camera axis', min: -30, max: 30, step: 1, value: 0,
+        format: (v) => v + '°', onInput: (v) => { state.err.roll = v; touched(); } }),
+      dx: makeSlider(host, { label: 'Slide sideways', min: -40, max: 40, step: 1, value: 0,
+        format: (v) => v + ' mm', onInput: (v) => { state.err.dx = v; touched(); } }),
+      ray: makeSlider(host, { label: 'Slide along the viewing ray', min: -100, max: 100, step: 1, value: 0,
+        format: (v) => v + ' mm', onInput: (v) => { state.err.ray = v; touched(); } }),
+      z: makeSlider(host, { label: 'GT depth', min: 300, max: 900, step: 10, value: 450,
+        format: (v) => v + ' mm', onInput: (v) => { state.gt.z = v; touched(); } }),
+    };
+    const symBox = document.getElementById('symBox');
+    const occBox = document.getElementById('occBox');
+    symBox.addEventListener('change', () => { state.sym = symBox.checked; touched(); });
+    occBox.addEventListener('change', () => { state.occ = occBox.checked; touched(); });
+    document.getElementById('resetBtn').addEventListener('click', resetView);
+
+    function loadScenario(id) {
+      const s = scenarios.find((item) => item.id === id);
+      state.model = s.model;
+      state.gt = { ...s.gt };
+      state.err = { spin: 0, roll: 0, dx: 0, ray: 0, ...s.err };
+      state.sym = true;
+      state.occ = s.occ;
+      state.scenario = id;
+      sliders.spin.set(state.err.spin);
+      sliders.roll.set(state.err.roll);
+      sliders.dx.set(state.err.dx);
+      sliders.ray.set(state.err.ray);
+      sliders.z.set(state.gt.z);
+      symBox.checked = true;
+      occBox.checked = s.occ;
+      modelGroup.setActive(s.model);
+      scenarioGroup.setActive(id);
+      dirty = true;
+    }
+    [['predict1', 'deep'], ['predict2', 'box'], ['predict3', 'occluded']].forEach(([btn, id]) => {
+      document.getElementById(btn).addEventListener('click', () => loadScenario(id));
+    });
+
+    // ---- geometry of the scene ----
+    // The occluder keeps the same footprint in the image at every GT depth.
+    function occluderPrim(Z) {
+      const zo = Z - 120;
+      const k = zo / Z;
+      return { type: 'box', c: [61.4 * k, 0, zo], half: [47.7 * k, 109 * k, 10] };
+    }
+    // A 4:3 window (image pixels) that contains both silhouettes.
+    function windowFor(Pe, Pg, model) {
+      let u0 = Infinity;
+      let u1 = -Infinity;
+      let v0 = Infinity;
+      let v1 = -Infinity;
+      [Pe, Pg].forEach((Q) => model.verts.forEach((x) => {
+        const p = projectPx(pose.apply(Q, x), cam);
+        u0 = Math.min(u0, p[0]);
+        u1 = Math.max(u1, p[0]);
+        v0 = Math.min(v0, p[1]);
+        v1 = Math.max(v1, p[1]);
+      }));
+      let w = Math.max(320 * cam.r, u1 - u0 + 48);
+      let h = Math.max(240 * cam.r, v1 - v0 + 48);
+      if (w / h > 4 / 3) h = w * 3 / 4;
+      else w = h * 4 / 3;
+      return roiAround([(u0 + u1) / 2, (v0 + v1) / 2], w, h);
+    }
+
+    // ---- all heavy work happens here, only when the state changed ----
+    function compute() {
+      const model = models[state.model];
+      const Pg = gtPose({ az: rad(state.gt.az), tilt: rad(state.gt.tilt), z: state.gt.z });
+      const Pe = perturb(Pg, { spin: rad(state.err.spin), roll: rad(state.err.roll), dx: state.err.dx, ray: state.err.ray });
+      const errs = surfaceErrors(Pe, Pg, model, cam, state.sym);
+      const roi = windowFor(Pe, Pg, model);
+      const occ = state.occ ? [occluderPrim(state.gt.z)] : [];
+      const dGt = renderDistance(model.prims, Pg, cam, MAP_W, MAP_H, roi);
+      const dEst = renderDistance(model.prims, Pe, cam, MAP_W, MAP_H, roi);
+      const dTest = sceneDistance(dGt, occ, cam, MAP_W, MAP_H, 1500, roi);
+      const v = vsd(dEst, dGt, dTest, TAU_FRAC * model.diameter);
+      const grid = vsdGrid(dEst, dGt, dTest, model.diameter);
+      const flags = {
+        mssd: passes(errs.mssd.value, mssdThresholds(model.diameter)),
+        mspd: passes(errs.mspd.value, mspdThresholds(cam)),
+        vsd: passes(v.e, FRACS),
+      };
+      const shares = { mssd: share(flags.mssd), mspd: share(flags.mspd), vsd: grid.score };
+      const ar = (shares.vsd + shares.mssd + shares.mspd) / 3;
+      const symsUsed = state.sym ? model.syms : [model.syms[0]];
+      const pair = (e) => {
+        const Pgs = pose.withSym(Pg, symsUsed[e.sym]);
+        const x = model.verts[e.vert];
+        return { est: pose.apply(Pe, x), gt: pose.apply(Pgs, x) };
+      };
+      SCENE.pivot = [0, 0, 0.58 * state.gt.z];
+      SCENE.scale = 6.3 / state.gt.z;
+      result = { model, Pg, Pe, errs, roi, occ, dGt, dEst, dTest, v, grid, flags, shares, ar,
+        band: pair(errs.mssd), shadow: pair(errs.mspd) };
+      updateText();
+      dirty = false;
+    }
+    // Used by the verification script.
+    function summary() {
+      if (dirty || !result) compute();
+      const r = result;
+      return {
+        scenario: state.scenario, model: r.model.kind, mssd: r.errs.mssd.value, mssdPass: r.flags.mssd.filter(Boolean).length,
+        mspd: r.errs.mspd.value, mspdPass: r.flags.mspd.filter(Boolean).length, add: r.errs.add,
+        vsd20: r.v.e, vsdPass: r.flags.vsd.filter(Boolean).length, vsdShare: r.shares.vsd, ar: r.ar,
+      };
+    }
+
+    // ---- text: caption and Math tab ----
+    function verdictBadge(s) {
+      const values = [s.mssd, s.mspd, s.vsd];
+      const spread = Math.max(...values) - Math.min(...values);
+      const mean = (s.mssd + s.mspd + s.vsd) / 3;
+      if (spread >= 0.4) return '<span class="badge warn">the rulers disagree</span>';
+      if (mean >= 0.6) return '<span class="badge good">all three accept</span>';
+      if (mean <= 0.4) return '<span class="badge bad">all three reject</span>';
+      return '<span class="badge warn">borderline on all three</span>';
+    }
+    function updateText() {
+      const r = result;
+      const d = r.model.diameter;
+      const n = (flags) => flags.filter(Boolean).length;
+      const scenario = scenarios.find((s) => s.id === state.scenario);
+      const live = `MSSD <strong>${fmt(r.errs.mssd.value, 1)} mm</strong> passes ${n(r.flags.mssd)}/10 · ` +
+        `MSPD <strong>${fmt(r.errs.mspd.value, 1)} px</strong> passes ${n(r.flags.mspd)}/10 · ` +
+        `VSD share <strong>${fmt(r.shares.vsd, 2)}</strong>`;
+      setCaption(`${verdictBadge(r.shares)} ${scenario ? scenario.text : 'Free play. Compare the three ladders.'}<br>${live}`);
+
+      document.getElementById('verdictTable').innerHTML =
+        '<tr><th></th><th>value</th><th>measured in</th><th>passed</th><th>share</th></tr>' +
+        `<tr><td>MSSD</td><td class="num">${fmt(r.errs.mssd.value, 1)} mm</td><td>3D space</td><td class="num">${n(r.flags.mssd)} / 10</td><td class="num">${fmt(r.shares.mssd, 2)}</td></tr>` +
+        `<tr><td>MSPD</td><td class="num">${fmt(r.errs.mspd.value, 1)} px</td><td>the image</td><td class="num">${n(r.flags.mspd)} / 10</td><td class="num">${fmt(r.shares.mspd, 2)}</td></tr>` +
+        `<tr><td>VSD</td><td class="num">${fmt(r.v.e, 3)} at τ 20%</td><td>visible pixels</td><td class="num">${r.grid.grid.flat().filter(Boolean).length} / 100</td><td class="num">${fmt(r.shares.vsd, 2)}</td></tr>`;
+      document.getElementById('shareLine').innerHTML =
+        `This pose's share of AR = (${fmt(r.shares.vsd, 2)} + ${fmt(r.shares.mssd, 2)} + ${fmt(r.shares.mspd, 2)}) / 3 = <strong>${fmt(r.ar, 2)}</strong>.`;
+      document.getElementById('extraNumbers').innerHTML =
+        `<span>object, diameter d</span><strong>${r.model.label}, ${fmt(d, 1)} mm</strong>` +
+        `<span>symmetries used</span><strong>${state.sym ? r.model.syms.length : 1} of ${r.model.syms.length}</strong>` +
+        `<span>MSSD as % of d</span><strong>${fmt(100 * r.errs.mssd.value / d, 1)}%</strong>` +
+        `<span>ADD (mean, no S)</span><strong>${fmt(r.errs.add, 1)} mm</strong>` +
+        `<span>MSPD thresholds</span><strong>${fmt(5 * cam.r, 0)} .. ${fmt(50 * cam.r, 0)} px</strong>` +
+        `<span>τ = 20% d, δ</span><strong>${fmt(TAU_FRAC * d, 1)} mm, ${VSD_DELTA} mm</strong>` +
+        `<span>ballots (union)</span><strong>${r.v.nUnion} px</strong>` +
+        `<span>match / too far</span><strong>${r.v.nMatch} / ${r.v.nMismatch}</strong>` +
+        `<span>GT only / est only</span><strong>${r.v.nGtOnly} / ${r.v.nEstOnly}</strong>` +
+        `<span>VSD for τ 5%..50%</span><strong>${r.grid.errors.map((e) => fmt(e, 2)).join(' ')}</strong>`;
+    }
+
+    // ---- drawing ----
+    function drawCameraInset(x, y, w, h) {
+      const r = result;
+      const toInset = (X) => {
+        const p = projectPx(X, cam);
+        return [x + (p[0] - r.roi.u0) / r.roi.w * w, y + (p[1] - r.roi.v0) / r.roi.h * h];
+      };
+      const seg = (a, b, color, width) => {
+        const pa = toInset(a);
+        const pb = toInset(b);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(pa[0], pa[1]);
+        ctx.lineTo(pb[0], pb[1]);
+        ctx.stroke();
+      };
+      ctx.save();
+      ctx.fillStyle = `rgb(${EMPTY_RGB.join(',')})`;
+      ctx.fillRect(x, y, w, h);
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      r.model.wire.forEach(([a, b]) => seg(pose.apply(r.Pg, a), pose.apply(r.Pg, b), 'rgba(90, 166, 255, 0.9)', 1));
+      r.model.wire.forEach(([a, b]) => seg(pose.apply(r.Pe, a), pose.apply(r.Pe, b), 'rgba(240, 143, 60, 0.9)', 1));
+      r.occ.forEach((prim) => boxWire(prim.c, prim.half).forEach(([a, b]) => seg(a, b, 'rgba(200, 210, 225, 0.55)', 1)));
+      seg(r.shadow.gt, r.shadow.est, '#ff8a8a', 2.5);
+      const tip = toInset(r.shadow.est);
+      ctx.fillStyle = '#ff8a8a';
+      ctx.beginPath();
+      ctx.arc(tip[0], tip[1], 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.strokeStyle = 'rgba(132, 160, 202, 0.55)';
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+      ctx.font = '600 11px Inter, sans-serif';
+      const title = `camera view · ${fmt(r.errs.mspd.value, 1)} px`;
+      ctx.fillStyle = 'rgba(7, 17, 31, 0.78)';
+      ctx.fillRect(x + 1, y + 1, ctx.measureText(title).width + 12, 17);
+      ctx.fillStyle = 'rgba(235, 242, 255, 0.92)';
+      ctx.fillText(title, x + 6, y + 13);
+      ctx.restore();
+    }
+
+    app.draw = () => {
+      if (dirty || !result) compute();
+      const r = result;
+      background();
+      const vp = app.mainViewport();
+      const Z = state.gt.z;
+
+      drawFrustum(cam, vp, Z / 3, { reach: 3.4 });
+      r.occ.forEach((prim) => drawBoxPrim(prim, vp, { color: 'rgba(200, 210, 225, 0.7)', width: 1.2 }));
+      if (r.occ.length) text3(toView(v3.add(r.occ[0].c, [0, r.occ[0].half[1] + 12, 0])), vp, 'occluder', { color: 'rgba(200, 210, 225, 0.85)', font: '12px Inter, sans-serif', align: 'center' });
+      drawWire(r.model, r.Pg, vp, { color: '#5aa6ff', width: 1.4, alpha: 0.9 });
+      drawWire(r.model, r.Pe, vp, { color: '#f08f3c', width: 1.4, alpha: 0.9 });
+      line3(toView(r.band.gt), toView(r.band.est), vp, { color: '#ff8a8a', width: 3 });
+      dot3(toView(r.band.est), vp, { color: '#ff8a8a', r: 4, label: `longest band ${fmt(r.errs.mssd.value, 1)} mm` });
+
+      // insets, ladders and the AR line, top right
+      const w = canvas.clientWidth;
+      const gap = 8;
+      const iw = clamp((w - 552) / 3, 96, 150);
+      const ih = iw * 0.75;
+      const total = 3 * iw + 2 * gap;
+      const x0 = w - total - 16;
+      const near = Z - 130;
+      const far = Z + 130;
+      drawMapInset('dtest', x0, 16, iw, ih, 'D_I test image', MAP_W, MAP_H, (n) => distShade(r.dTest[n], near, far, [182, 206, 245]));
+      drawMapInset('votes', x0 + iw + gap, 16, iw, ih, 'VSD votes', MAP_W, MAP_H, (n) => LABEL_RGB[r.v.labels[n]]);
+      drawCameraInset(x0 + 2 * (iw + gap), 16, iw, ih);
+      let y = 16 + ih + 14;
+      const d = r.model.diameter;
+      y += drawLadder(x0, y, total, 'MSSD · longest band', `${fmt(r.errs.mssd.value, 1)} mm = ${fmt(100 * r.errs.mssd.value / d, 0)}% d`, r.flags.mssd, '5% d', '50% d') + 8;
+      y += drawLadder(x0, y, total, 'MSPD · longest shadow', `${fmt(r.errs.mspd.value, 1)} px`, r.flags.mspd, `${fmt(5 * cam.r, 0)} px`, `${fmt(50 * cam.r, 0)} px`) + 8;
+      y += drawLadder(x0, y, total, 'VSD at τ = 20% d · failed ballots', fmt(r.v.e, 3), r.flags.vsd, 'θ 0.05', 'θ 0.5') + 10;
+      screenText(`this pose's share of AR = (${fmt(r.shares.vsd, 2)} + ${fmt(r.shares.mssd, 2)} + ${fmt(r.shares.mspd, 2)}) / 3 = ${fmt(r.ar, 2)}`,
+        x0, y + 4, { font: '600 12px Inter, sans-serif' });
+      screenText('share_VSD over 100 (τ, θ) settings · share_MSSD · share_MSPD', x0, y + 20,
+        { font: '11px Inter, sans-serif', color: 'rgba(138, 161, 192, 0.95)' });
+    };
+
+    loadScenario('deep');
+  </script>
+</body>
+</html>

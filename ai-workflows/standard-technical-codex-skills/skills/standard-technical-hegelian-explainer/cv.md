@@ -1,0 +1,19 @@
+{\bf Bachelor of Engineering (Computing)}, Imperial College London \hfill {2025 - Expected 2028}\\
+Achieved First Class Honours overall in year 1, with First Class grades in Calculus, Graphs and Algorithms, Computing Practical and Databases.   
+{\bf Singapore-Cambridge GCE “A” Levels}, Hwa Chong Institution,  Singapore \hfill {2018 - 2023}\\
+Achieved A grades (UK A* equivalent) for H2 Mathematics, H2 Chemistry, H2 Physics and H2 Knowledge and Inquiry.  Achieved Distinction in Higher 3 Mathematics, an advanced module focused on non-routine problem solving and mathematical proof.
+\begin{rSection}{Skills}
+Programming Languages & Python, C/C++, Haskell, Kotlin, Java, C\#, Javascript, SQL\\
+Frameworks & PyTorch, NumPy, Pandas, Flask, Git, Docker, Unity, Neo4j Graph Database\\
+Language Skills & English, Chinese-Mandarin, Bahasa Indonesia (Foreign Language),\\
+ & Hokkien and Cantonese (Chinese Dialects) \\
+\begin{rSection}{Work Experience}
+{\bf Corporal, Air Defence Weapon Operator}, Republic of Singapore Air Force \hfill {2024 - 2025}\\
+Full-time National Serviceman responsible for providing 24/7 air defence according to national operational and security protocols. Operated side-by-side with foreign militaries in exercises, strengthening Singapore’s global defence relations. Trained and mentored 40 junior servicemen, ensuring continued operational readiness. \\
+{\bf Software Development Intern}, RSAF Agile Innovation Digital \hfill {2026}\\
+Independently refactored a multi-agent reinforcement learning control system for unmanned platforms performing critical asset protection in dynamic environments. Designed custom loss and rewards functions and rectified reward hacking behaviour. Performed comparably to classical algorithms while significantly reducing inter-agent collisions, improving fleet reliability. \\
+\item \textbf{CryptoCatalyst, UK AI Agent Hackathon EP3 by Artificial Superintelligence Alliance, 2025.} {Created an agentic cryptocurrency trading strategy generator with team, enabling liquidity providers to reduce impermanence losses and profit from market-making. Built a Flask service enforcing user-defined risk and exposure limits on trades. Won the ``Unibase Bounty and Liquidity Support'' prize for achieving autonomous cross-platform knowledge sharing via a decentralized memory layer, enabling persistent, sovereign intelligence.}
+\item \textbf{RagTagAI, Google Cloud AI in Action Hackathon 2025.} {Led team to create a Gemini-powered fashion copilot. Used Retrieval Augmented Generation to compare outfits to trending posts and provide customised advice. Fine-tuned transformer models for image embedding and provided context-aware ratings.}
+\item \textbf{DSTA Brainhack TIL-AI (Today I Learnt - Artificial Intelligence) 2024.} {Organised and led team to emerge as Champions, in the contest organised by Defence Science Technology Agency, Singapore. Designed and fine-tuned deep learning models for Automatic Speech Recognition, Natural Language Processing and Vision Language Modelling, within the context of command and control of an automatic air defence turret. Achieved 95\% accuracy in locating and identifying target aircraft.}
+\item \textbf{Mathematical Modelling and Simulation, A*STAR, 2022-2023. } {Applied graph data analysis algorithms to investigate correlations between different diabetes complications to optimise hospital resource allocation, under the mentorship of Dr Helen Erdt, Machine Intellection Scientist at A*STAR, Singapore. }
+\item \textbf{Mathematical Olympiads.} {Achieved National 3rd placing in the Singapore Mathematical Olympiad 2022 (Open Section), Singapore's biggest nationwide Mathematical Olympiad with over 4,000 participants. Achieved National 6th Place and Bronze Award at the Asian Pacific Mathematics Olympiad 2021. Selected into the 30-member Singapore International Mathematical Olympiad (SIMO) National Team squad from 2020-2023. }

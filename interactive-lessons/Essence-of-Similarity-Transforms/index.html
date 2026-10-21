@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of Similarity Transforms</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f; --bg-2: #0a1627; --ink: #ebf2ff; --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24); --blue-1: #86d4ff; --blue-2: #5aa6ff;
+      --warm-1: #d3a35f; --warm-2: #f08f3c; --green: #a0e7a0; --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.86); --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    canvas#bg { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; }
+    .page { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 48px 24px 80px; }
+    .eyebrow { color: var(--blue-1); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+    h1 { margin: 10px 0 0; font-size: clamp(34px, 5vw, 60px); line-height: 1; }
+    .lead { margin-top: 14px; max-width: 40rem; color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .quote {
+      margin-top: 22px; max-width: 46rem; padding: 14px 18px; border-left: 3px solid var(--warm-2);
+      border-radius: 8px; background: var(--panel); backdrop-filter: blur(12px);
+      color: var(--ink); font-size: 15px; line-height: 1.55;
+    }
+    .quote .src { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; }
+    .quote em { color: var(--warm-2); font-style: normal; font-weight: 600; }
+    h2 { margin: 44px 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--blue-1); }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+    a.card {
+      display: grid; gap: 8px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px;
+      background: var(--panel); backdrop-filter: blur(12px); color: var(--ink); text-decoration: none;
+      transition: transform 0.14s ease, border-color 0.14s ease;
+    }
+    a.card:hover { transform: translateY(-2px); border-color: rgba(134, 212, 255, 0.8); }
+    .card .num { font-family: var(--mono); font-size: 12px; color: var(--warm-1); }
+    .card .title { font-size: 19px; font-weight: 700; line-height: 1.15; }
+    .card .hook { color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .card .after { font-size: 13px; line-height: 1.5; color: var(--ink); }
+    .card .after::before { content: "After this you can say: "; color: var(--green); font-weight: 600; }
+    .card.core { border-color: rgba(240, 143, 60, 0.55); }
+    .how { color: var(--muted); font-size: 13px; line-height: 1.6; max-width: 46rem; }
+    .how strong { color: var(--ink); }
+    .checklist { display: grid; gap: 8px; max-width: 46rem; }
+    .checklist label {
+      display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line);
+      border-radius: 10px; background: var(--panel); color: var(--muted); font-size: 14px; line-height: 1.45; cursor: pointer;
+    }
+    .checklist input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--blue-2); flex: none; }
+    .checklist label.done { color: var(--ink); border-color: rgba(160, 231, 160, 0.45); }
+    .checklist .ch { font-family: var(--mono); font-size: 11px; color: var(--warm-1); margin-left: auto; white-space: nowrap; }
+    .score { margin-top: 10px; color: var(--muted); font-size: 13px; }
+    .score strong { color: var(--green); font-family: var(--mono); }
+    .bar { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.b { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.w { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.g { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .state { position: fixed; right: 18px; bottom: 14px; z-index: 1; color: var(--muted); font-size: 12px; font-family: var(--mono); pointer-events: none; }
+    .state .good { color: var(--green); }
+    .state .bad { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <canvas id="bg"></canvas>
+  <div class="page">
+    <div class="eyebrow">Interactive notes · in the spirit of 3Blue1Brown's Essence of Linear Algebra</div>
+    <h1>Essence of Similarity Transforms</h1>
+    <p class="lead">
+      Five short chapters. Each one asks a visual question first, lets you drag the picture,
+      and only then writes the formula. The goal: check your mental picture of
+      <strong>linear transforms</strong>, and see exactly what makes a
+      <strong>similarity</strong> different from a generic one.
+    </p>
+    <div class="quote">
+      In GigaPose, the mapping M<sub>t→q</sub> from template coordinates x<sub>t</sub> to query
+      coordinates x<sub>q</sub> is constrained to a <em>similarity transform</em>: a rigid rotation,
+      uniform scaling, and translation without shearing.
+      <span class="src">The sentence every chapter comes back to.</span>
+    </div>
+
+    <h2>Chapters</h2>
+    <div class="cards">
+      <a class="card" href="Ch1-Grid-Lands-Somewhere.html">
+        <span class="num">Chapter 1 · about 10 min</span>
+        <span class="title">A Transform Is Where the Grid Lands</span>
+        <span class="hook">Where do i-hat and j-hat land? That is the whole matrix. Drag them and watch the grid follow.</span>
+        <span class="after">a similarity lands them as a perpendicular, equal-length pair, so squares stay squares.</span>
+      </a>
+      <a class="card" href="Ch2-The-Transform-Hierarchy.html">
+        <span class="num">Chapter 2 · about 10 min</span>
+        <span class="title">The Transform Hierarchy</span>
+        <span class="hook">Rotation ⊂ Rigid ⊂ Similarity ⊂ Affine ⊂ Projective. Each step adds freedom and loses an invariant.</span>
+        <span class="after">similarity is the last family in which a circle stays a circle.</span>
+      </a>
+      <a class="card" href="Ch3-Anatomy-Of-A-Similarity.html">
+        <span class="num">Chapter 3 · about 10 min</span>
+        <span class="title">Anatomy of a Similarity</span>
+        <span class="hook">x<sub>q</sub> = s·R(α)·x<sub>t</sub> + t. Four numbers. Add shear or a squash and see the test fail.</span>
+        <span class="after">A<sup>T</sup>A = s<sup>2</sup>I, or equally, both singular values are equal.</span>
+      </a>
+      <a class="card core" href="Ch4-Why-GigaPose-Uses-Similarity.html">
+        <span class="num">Chapter 4 · about 15 min · the answer</span>
+        <span class="title">Why GigaPose Uses a Similarity</span>
+        <span class="hook">A pinhole camera, a template pose and a query pose. Move the object in-plane, in depth, sideways. Then tilt it.</span>
+        <span class="after">the template fixes the viewpoint; the leftover 4 DoF are exactly a similarity.</span>
+      </a>
+      <a class="card" href="Ch5-Two-Meanings-Of-Similar.html">
+        <span class="num">Chapter 5 · about 8 min</span>
+        <span class="title">Two Meanings of "Similar"</span>
+        <span class="hook">B<sup>-1</sup>AB versus s·R·x + t. Same word, different objects. Do not mix them up in your notes.</span>
+        <span class="after">similar matrices change the description; a similarity transform changes the picture.</span>
+      </a>
+    </div>
+
+    <h2>How to use these pages</h2>
+    <p class="how">
+      <strong>Drag</strong> empty space to orbit the scene. <strong>Scroll</strong> to zoom.
+      <strong>Drag arrow tips</strong> where the hint at the bottom says you can.
+      Every number in the <strong>Math</strong> tab is computed live from the picture, so if the two disagree, the picture wins.
+      Read <strong>Takeaways</strong> last. The background here is Chapter 1's grid cycling through a similarity and a shear.
+    </p>
+    <div class="bar">
+      <span class="legend"><span class="dot b"></span>i-hat / template</span>
+      <span class="legend"><span class="dot w"></span>j-hat / query</span>
+      <span class="legend"><span class="dot g"></span>probe vector</span>
+    </div>
+
+    <h2>Mental picture checklist</h2>
+    <div id="checklist" class="checklist"></div>
+    <div id="score" class="score"></div>
+  </div>
+  <div id="state" class="state"></div>
+
+  <script>
+    const items = [
+      ['A matrix is two landing spots: column 1 is where i-hat lands, column 2 is where j-hat lands.', 'Ch 1'],
+      ['Linear means grid lines stay parallel and evenly spaced, and the origin stays fixed.', 'Ch 1'],
+      ['det A is the area factor. A negative sign means the orientation flipped.', 'Ch 1'],
+      ['Rotation ⊂ Rigid ⊂ Similarity ⊂ Affine ⊂ Projective, with 1, 3, 4, 6, 8 degrees of freedom in 2D.', 'Ch 2'],
+      ['Affine keeps parallel lines. Similarity also keeps angles and length ratios. Rigid also keeps lengths.', 'Ch 2'],
+      ['A similarity has linear part s·R(α), so AᵀA = s²I and both singular values equal s.', 'Ch 3'],
+      ['Shear and anisotropic scale are the two ways to break a similarity. Both make σ1 ≠ σ2.', 'Ch 3'],
+      ['Translation is not linear. It needs the +t, or the third column of a homogeneous matrix (the last row stays 0 0 1).', 'Ch 3'],
+      ['In GigaPose the template fixes the out-of-plane rotation. M_{t→q} carries the other 4 DoF: α, s, t_x, t_y.', 'Ch 4'],
+      ['Scale s encodes depth (s ≈ Z_t / Z_q); α is in-plane rotation; t is where the object centre sits.', 'Ch 4'],
+      ['A shear in the image would mean the viewpoint changed. That is a different template, not a different M.', 'Ch 4'],
+      ['Similar matrices (B⁻¹AB) share eigenvalues and describe one map in two coordinate systems.', 'Ch 5'],
+      ['B⁻¹AB is a relation between matrices. A similarity transform is a map on points. Different things.', 'Ch 5'],
+    ];
+    const KEY = 'essence-similarity-checklist';
+    let done = {};
+    try { done = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { done = {}; }
+    const list = document.getElementById('checklist');
+    const score = document.getElementById('score');
+    function renderScore() {
+      const n = items.filter((_, i) => done[i]).length;
+      score.innerHTML = `Confirmed <strong>${n} / ${items.length}</strong> statements. Ticks are saved in this browser only.`;
+    }
+    items.forEach(([text, ch], i) => {
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.checked = Boolean(done[i]);
+      label.classList.toggle('done', box.checked);
+      const span = document.createElement('span');
+      span.textContent = text;
+      const tag = document.createElement('span');
+      tag.className = 'ch';
+      tag.textContent = ch;
+      box.addEventListener('change', () => {
+        done[i] = box.checked;
+        label.classList.toggle('done', box.checked);
+        try { localStorage.setItem(KEY, JSON.stringify(done)); } catch (e) { /* private mode */ }
+        renderScore();
+      });
+      label.append(box, span, tag);
+      list.appendChild(label);
+    });
+    renderScore();
+
+    // ---- ambient background: Chapter 1's grid cycling through maps ----
+    const canvas = document.getElementById('bg');
+    const ctx = canvas.getContext('2d');
+    const stateEl = document.getElementById('state');
+    const cycle = [
+      { A: [[1, 0], [0, 1]], name: 'identity', sim: true },
+      { A: [[1.3 * Math.cos(0.6), -1.3 * Math.sin(0.6)], [1.3 * Math.sin(0.6), 1.3 * Math.cos(0.6)]], name: 'rotation + uniform scale', sim: true },
+      { A: [[1, 0.8], [0, 1]], name: 'shear', sim: false },
+      { A: [[1.5, 0], [0, 0.6]], name: 'anisotropic scale', sim: false },
+      { A: [[0.9 * Math.cos(-0.9), -0.9 * Math.sin(-0.9)], [0.9 * Math.sin(-0.9), 0.9 * Math.cos(-0.9)]], name: 'rotation + uniform scale', sim: true },
+    ];
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const ease = (t) => t * t * (3 - 2 * t);
+    let yaw = -0.5;
+    const pitch = 0.34;
+    function rotate([x, y, z]) {
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      return [x1, cp * y + sp * z1, -sp * y + cp * z1];
+    }
+    function project(v, cx, cy, px) {
+      const r = rotate(v);
+      const f = px * 10 / (10 + r[2]);
+      return [cx + r[0] * f, cy - r[1] * f];
+    }
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(innerWidth * dpr);
+      canvas.height = Math.round(innerHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function draw(ts) {
+      const w = innerWidth, h = innerHeight;
+      ctx.clearRect(0, 0, w, h);
+      const period = 4200;
+      const k = Math.floor(ts / period) % cycle.length;
+      const next = (k + 1) % cycle.length;
+      const u = ease(Math.min(1, ((ts % period) / period) * 1.6));
+      const A = [
+        [lerp(cycle[k].A[0][0], cycle[next].A[0][0], u), lerp(cycle[k].A[0][1], cycle[next].A[0][1], u)],
+        [lerp(cycle[k].A[1][0], cycle[next].A[1][0], u), lerp(cycle[k].A[1][1], cycle[next].A[1][1], u)],
+      ];
+      yaw = -0.5 + 0.25 * Math.sin(ts / 9000);
+      const cx = w * 0.72, cy = h * 0.5, px = Math.min(w, h) / 11;
+      const map = (p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]];
+      ctx.lineWidth = 1;
+      for (let i = -4; i <= 4; i += 1) {
+        const axis = i === 0;
+        ctx.strokeStyle = axis ? 'rgba(134, 212, 255, 0.35)' : 'rgba(90, 166, 255, 0.13)';
+        [[[i, -4], [i, 4]], [[-4, i], [4, i]]].forEach(([a, b]) => {
+          const pa = project([...map(a), 0], cx, cy, px);
+          const pb = project([...map(b), 0], cx, cy, px);
+          ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.lineTo(pb[0], pb[1]); ctx.stroke();
+        });
+      }
+      const o = project([0, 0, 0], cx, cy, px);
+      [['#86d4ff', map([1, 0])], ['#f08f3c', map([0, 1])]].forEach(([color, tip]) => {
+        const s = project([...tip, 0], cx, cy, px);
+        ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.globalAlpha = 0.6;
+        ctx.beginPath(); ctx.moveTo(o[0], o[1]); ctx.lineTo(s[0], s[1]); ctx.stroke();
+        ctx.fillStyle = color; ctx.beginPath(); ctx.arc(s[0], s[1], 4, 0, Math.PI * 2); ctx.fill();
+        ctx.globalAlpha = 1;
+      });
+      const target = u < 0.5 ? cycle[k] : cycle[next];
+      stateEl.innerHTML = `background map: ${target.name} · <span class="${target.sim ? 'good' : 'bad'}">${target.sim ? 'similarity' : 'not a similarity'}</span>`;
+      requestAnimationFrame(draw);
+    }
+    addEventListener('resize', resize);
+    resize();
+    requestAnimationFrame(draw);
+  </script>
+</body>
+</html>

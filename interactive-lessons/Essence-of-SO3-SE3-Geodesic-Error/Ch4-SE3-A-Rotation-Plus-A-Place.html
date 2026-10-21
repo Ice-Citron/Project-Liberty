@@ -1,0 +1,1412 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch4 · SE(3): A Rotation Plus a Place</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --blue-3: #6fe3ff;
+      --warm-1: #d3a35f;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 380px; }
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: 52dvh minmax(0, 1fr); }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+    .stage { position: relative; min-height: 0; overflow: hidden; }
+    canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+    canvas.dragging { cursor: grabbing; }
+    .overlay { position: absolute; left: 20px; top: 18px; max-width: 480px; pointer-events: none; }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 10px 0 0; font-size: clamp(26px, 3.2vw, 42px); line-height: 1; }
+    .lead { margin-top: 10px; max-width: 31rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .caption {
+      position: absolute; left: 20px; bottom: 58px; max-width: 540px;
+      padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+      background: rgba(8, 18, 32, 0.78); backdrop-filter: blur(10px);
+      color: var(--muted); font-size: 13px; line-height: 1.5; pointer-events: none;
+    }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { position: absolute; left: 20px; bottom: 16px; color: var(--muted); font-size: 12px; line-height: 1.5; pointer-events: none; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; display: inline-block; }
+    .dot.ihat { background: var(--blue-1); box-shadow: 0 0 12px rgba(134, 212, 255, 0.8); }
+    .dot.jhat { background: var(--warm-2); box-shadow: 0 0 12px rgba(240, 143, 60, 0.8); }
+    .dot.probe { background: var(--green); box-shadow: 0 0 12px rgba(160, 231, 160, 0.8); }
+    .dot.template { background: var(--blue-2); box-shadow: 0 0 12px rgba(90, 166, 255, 0.8); }
+    .dot.query { background: var(--warm-1); box-shadow: 0 0 12px rgba(211, 163, 95, 0.8); }
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 12px; font-weight: 700; letter-spacing: 0.02em;
+      border: 1px solid var(--line); color: var(--ink);
+    }
+    .badge.good { color: var(--green); border-color: rgba(160, 231, 160, 0.5); }
+    .badge.warn { color: var(--warm-2); border-color: rgba(240, 143, 60, 0.5); }
+    .badge.bad { color: var(--danger); border-color: rgba(255, 138, 138, 0.5); }
+    .good { color: var(--green); }
+    .warn { color: var(--warm-2); }
+    .bad { color: var(--danger); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .preset-grid, .action-grid, .toggle-grid, .input-grid { display: grid; gap: 8px; }
+    .preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .input-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .action-grid, .toggle-grid { grid-template-columns: 1fr; }
+    button, input, select { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: default; transform: none; }
+    .action-grid button { text-align: left; }
+    input[type="number"] {
+      width: 100%; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 8px 10px; font-family: var(--mono);
+    }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body, .narrative { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong, .narrative strong { color: var(--ink); font-weight: 600; }
+    .body em { color: var(--blue-1); font-style: normal; }
+    .matrix-display {
+      font-family: var(--mono); font-size: 13px; line-height: 1.5; color: var(--ink);
+      white-space: pre; overflow-x: auto; padding: 8px 10px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+    .checks li::before { content: "•"; margin-right: 6px; color: var(--muted); }
+    .checks li.ok::before { content: "✓"; color: var(--green); }
+    .checks li.no::before { content: "✗"; color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    table.dof { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.dof th, table.dof td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+    table.dof th { color: var(--blue-1); font-weight: 700; }
+    table.dof td strong { color: var(--ink); font-family: var(--mono); }
+    .formula {
+      font-family: var(--mono); font-size: 13px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; font-size: 13px; }
+  </style>
+
+</head>
+<body>
+  <style>
+    .chips { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+    .chip { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); font-family: var(--mono); font-weight: 600; font-size: 12px; color: var(--ink); }
+    .chip.point { border-color: rgba(134, 212, 255, 0.6); color: var(--blue-1); }
+    .chip.place { border-color: rgba(160, 231, 160, 0.6); color: var(--green); }
+    .chip.total { border-color: rgba(240, 143, 60, 0.6); color: var(--warm-2); }
+    .chip.off { opacity: 0.35; text-decoration: line-through; }
+    .dot.xax { background: #ff8a8a; box-shadow: 0 0 12px rgba(255, 138, 138, 0.8); }
+    .dot.trap { background: #ff8a8a; box-shadow: 0 0 12px rgba(255, 138, 138, 0.8); }
+    .essence a, .body a { color: var(--blue-1); }
+    .trap { color: var(--danger); }
+  </style>
+  <div class="app">
+    <section class="stage">
+      <canvas id="scene"></canvas>
+      <div class="overlay">
+        <div class="eyebrow">Essence of Rotations and Rigid Motions · Chapter 4</div>
+        <h1>SE(3): a rotation plus a place</h1>
+        <p class="lead">
+          A rotation says which way the plane <strong>points</strong>. It never says where the plane <strong>is</strong>.
+          Add a place t and you get a pose: turn the object, then carry it.
+        </p>
+      </div>
+      <div id="caption" class="caption"></div>
+      <div class="hint">
+        <span class="legend"><span class="dot template"></span>object and its frame</span>
+        <span class="legend"><span class="dot probe"></span>probe point: t, then R·p_obj</span>
+        <span class="legend"><span class="dot trap"></span>the trap</span><br>
+        Camera axes: x red, y green, z blue. Units are millimetres. Drag to orbit. Scroll to zoom.
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch3-Geodesic-Error-The-Arc-Not-The-Chord.html">← Ch 3</a>
+        <span>Chapter 4 of 5</span>
+        <a href="Ch5-Pose-Error-On-SE3.html">Ch 5 →</a>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Six degrees of freedom</div>
+          <div class="chips">
+            <span class="chip point">3 pointing</span>+
+            <span id="chipPlace" class="chip place">3 placing</span>=
+            <span id="chipTotal" class="chip total">6</span>
+          </div>
+          <label class="checkbox"><input id="so3Only" type="checkbox"> SO(3) only (forget the place)</label>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Presets</div>
+          <div id="presetGrid" class="preset-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Demos · about 2 seconds each</div>
+          <div class="body">A pose is a two-step instruction. Watch the order. Then watch what goes wrong when you swap it.</div>
+          <div id="demoGrid" class="action-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and press its button.</div>
+          <details class="predict">
+            <summary>1 · Where does the object's own origin land, in camera coordinates?</summary>
+            <div class="answer">Exactly at <strong>t</strong>. The origin is p_obj = 0, and R·0 = 0, so p_cam = t.
+              Here that is <strong id="p1t"></strong> mm. So t answers "where is the object?".</div>
+            <button id="p1btn">Set it up: probe the model origin</button>
+          </details>
+          <details class="predict">
+            <summary>2 · Is the translation of T⁻¹ equal to −t?</summary>
+            <div class="answer">No. It is <strong>−Rᵀt</strong>. T⁻¹ describes the camera as seen from the object.
+              So the walk back must be written along the object's axes.
+              Here −Rᵀt = <strong id="p2good"></strong> but −t = <span class="trap" id="p2bad"></span>.
+              Walking −t along the object's axes misses the camera by <strong id="p2gap"></strong> mm. They agree only when R = I.</div>
+            <button id="p2btn">Set it up: turned 60°, then undo</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Rotate the plane about its nose. It is a pure rotation. Is t zero?</summary>
+            <div class="answer">No. The motion is (Q, (I − Q)c), where c is the nose in camera coordinates.
+              After an 80° turn its t part is <strong id="p3t"></strong>, length <strong id="p3len"></strong> mm.
+              Only a turn about the origin has t = 0.</div>
+            <button id="p3btn">Set it up: turn about the nose</button>
+          </details>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pointing · the rotation R</div>
+          <div id="rotSliders"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Placing · the translation t</div>
+          <div id="transSliders"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Probe point on the model</div>
+          <div id="probeGrid" class="preset-grid"></div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The structure</div>
+          <div class="formula">T = [ R  t ]     R ∈ SO(3)
+    [ 0  1 ]     t ∈ ℝ³
+
+p_cam = R · p_obj + t
+degrees of freedom: 3 + 3 = 6</div>
+          <div class="body">The bottom row 0 0 0 1 is padding. It turns "rotate, then add t" into one matrix product.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">The pose on screen</div>
+          <div id="matT" class="matrix-display"></div>
+          <div id="colsKv" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">The inverse</div>
+          <div class="formula">T⁻¹ = ( Rᵀ,  −Rᵀ t )
+not   ( Rᵀ,  −t )</div>
+          <div class="body">T⁻¹ is the camera's pose, seen from the object. So −Rᵀt is where the camera sits in the object's coordinates.</div>
+          <div id="matTinv" class="matrix-display"></div>
+          <div id="invKv" class="kv"></div>
+        </section>
+        <section class="section">
+          <div class="section-title">Composition couples turn and carry</div>
+          <div class="formula">A ∘ B = ( R_A R_B ,  R_A t_B + t_A )
+B acts first, then A</div>
+          <div id="composeBox" class="matrix-display"></div>
+          <div class="body">The numbers use your R and t sliders. The first turn swings the second carry.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">A turn about a point c</div>
+          <div class="formula">M = ( Q ,  (I − Q) c )
+M · c = c, so c stays fixed</div>
+          <div id="pointKv" class="kv"></div>
+          <div class="src">Sources: Solà, Deray, Atchuthan, A micro Lie theory for state estimation in robotics (2018). Huynh, Metrics for 3D Rotations: Comparison and Analysis, JMIV 2009. Park, Distance Metrics on the Rigid-Body Motions with Applications to Mechanism Design, J. Mech. Design 1995.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>A pose is a turn and a place.</strong> T = (R, t). Three numbers point the object. Three more place it. That makes six degrees of freedom.</div>
+          <div class="essence"><strong>Why a 4×4 matrix?</strong> So that chaining poses is plain matrix multiplication. The bottom row 0 0 0 1 makes the "+ t" happen.</div>
+          <div class="essence"><strong>Read T like a label.</strong> The columns of R are the object's axes, seen from the camera. t is the object's origin, seen from the camera.</div>
+          <div class="essence"><strong>Turn and place are coupled.</strong> Compose and you get (R_A R_B, R_A t_B + t_A). The first turn swings the second carry. So SE(3) is not SO(3) and ℝ³ side by side.</div>
+          <div class="essence"><strong>The inverse is (Rᵀ, −Rᵀt).</strong> It is the camera's pose seen from the object. −t is the same walk written in the wrong axes. They agree only when R = I.</div>
+          <div class="essence"><strong>SO(3) says where it points. SE(3) says where it points and where it is.</strong>
+            GigaPose recovers t from the 2D shift and the scale of M<sub>t→q</sub>; see
+            <a href="../Essence-of-Similarity-Transforms/Ch4-Why-GigaPose-Uses-Similarity.html">that chapter</a>.
+            Caveat: R and t have different units, so a pose error needs care. Chapter 5 covers that.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== SHARED CORE (copy verbatim) =====================
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const captionEl = document.getElementById('caption');
+
+    const EPS = 1e-6;
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const deg = (rad) => rad * 180 / Math.PI;
+    const rad = (d) => d * Math.PI / 180;
+
+    function fmt(v, digits = 2) {
+      const x = Math.abs(v) < 5e-4 ? 0 : v;
+      return x.toFixed(digits);
+    }
+    function fmtVec(v, digits = 2) {
+      return '(' + v.map((x) => fmt(x, digits)).join(', ') + ')';
+    }
+    function fmtMatrix(M, title = '', digits = 2) {
+      const cells = M.map((row) => row.map((x) => fmt(x, digits)));
+      const w = Math.max(...cells.flat().map((s) => s.length));
+      const body = cells.map((row) => '[ ' + row.map((s) => s.padStart(w)).join('  ') + ' ]');
+      return (title ? title + '\n' : '') + body.join('\n');
+    }
+
+    // ---- 2x2 matrices and 2-vectors (plane coordinates) ----
+    const v2 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1]],
+      scale: (a, s) => [a[0] * s, a[1] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1],
+      len: (a) => Math.hypot(a[0], a[1]),
+      lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t)],
+      angle: (a, b) => Math.atan2(a[0] * b[1] - a[1] * b[0], a[0] * b[0] + a[1] * b[1]),
+    };
+    const m2 = {
+      I: () => [[1, 0], [0, 1]],
+      rot: (a) => [[Math.cos(a), -Math.sin(a)], [Math.sin(a), Math.cos(a)]],
+      scale: (sx, sy) => [[sx, 0], [0, sy]],
+      shear: (k) => [[1, k], [0, 1]],
+      mul: (A, B) => [
+        [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+        [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+      ],
+      apply: (A, p) => [A[0][0] * p[0] + A[0][1] * p[1], A[1][0] * p[0] + A[1][1] * p[1]],
+      det: (A) => A[0][0] * A[1][1] - A[0][1] * A[1][0],
+      T: (A) => [[A[0][0], A[1][0]], [A[0][1], A[1][1]]],
+      inv: (A) => {
+        const d = m2.det(A);
+        if (Math.abs(d) < EPS) return null;
+        return [[A[1][1] / d, -A[0][1] / d], [-A[1][0] / d, A[0][0] / d]];
+      },
+      lerp: (A, B, t) => [
+        [lerp(A[0][0], B[0][0], t), lerp(A[0][1], B[0][1], t)],
+        [lerp(A[1][0], B[1][0], t), lerp(A[1][1], B[1][1], t)],
+      ],
+      col: (A, j) => [A[0][j], A[1][j]],
+      fromCols: (c0, c1) => [[c0[0], c1[0]], [c0[1], c1[1]]],
+      // Singular values of a 2x2 matrix, largest first.
+      singularValues: (A) => {
+        const G = m2.mul(m2.T(A), A);
+        const e = (G[0][0] + G[1][1]) / 2;
+        const f = Math.hypot((G[0][0] - G[1][1]) / 2, G[0][1]);
+        return [Math.sqrt(Math.max(e + f, 0)), Math.sqrt(Math.max(e - f, 0))];
+      },
+      // Classify the linear part of a transform.
+      classify: (A, tol = 1e-3) => {
+        const c0 = m2.col(A, 0);
+        const c1 = m2.col(A, 1);
+        const l0 = v2.len(c0);
+        const l1 = v2.len(c1);
+        const d = m2.det(A);
+        const orthogonal = Math.abs(v2.dot(c0, c1)) < tol * Math.max(1, l0 * l1);
+        const equalLength = Math.abs(l0 - l1) < tol * Math.max(1, l0, l1);
+        const isSimilarity = orthogonal && equalLength && Math.abs(d) > EPS;
+        const s = isSimilarity ? l0 : NaN;
+        const alpha = Math.atan2(c0[1], c0[0]);
+        let name = 'general affine (shear or anisotropic scale)';
+        if (isSimilarity && d < 0) name = 'reflection + scale (improper similarity)';
+        else if (isSimilarity && Math.abs(s - 1) < tol) {
+          name = Math.abs(alpha) < tol ? 'identity' : 'rotation (rigid)';
+        } else if (isSimilarity) {
+          name = Math.abs(alpha) < tol ? 'uniform scale' : 'rotation + uniform scale';
+        }
+        return { name, isSimilarity, s, alpha, orthogonal, equalLength, det: d, l0, l1 };
+      },
+    };
+    // ---- 3x3 homogeneous matrices for plane maps ----
+    const h3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      fromAffine: (A, t) => [[A[0][0], A[0][1], t[0]], [A[1][0], A[1][1], t[1]], [0, 0, 1]],
+      similarity: (s, a, tx, ty) => h3.fromAffine(m2.mul(m2.scale(s, s), m2.rot(a)), [tx, ty]),
+      mul: (A, B) => {
+        const out = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        for (let i = 0; i < 3; i += 1) {
+          for (let j = 0; j < 3; j += 1) {
+            for (let k = 0; k < 3; k += 1) out[i][j] += A[i][k] * B[k][j];
+          }
+        }
+        return out;
+      },
+      apply: (M, p) => {
+        const x = M[0][0] * p[0] + M[0][1] * p[1] + M[0][2];
+        const y = M[1][0] * p[0] + M[1][1] * p[1] + M[1][2];
+        const w = M[2][0] * p[0] + M[2][1] * p[1] + M[2][2];
+        return [x / w, y / w];
+      },
+      linear: (M) => [[M[0][0], M[0][1]], [M[1][0], M[1][1]]],
+      translation: (M) => [M[0][2], M[1][2]],
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => lerp(x, B[i][j], t))),
+    };
+
+    // ---- 3D view: world x right, y up, z away from the viewer ----
+    const view = { yaw: -0.5, pitch: 0.34, zoom: 1, home: { yaw: -0.5, pitch: 0.34 } };
+    const CAM_DIST = 10;
+
+    function rotate(v) {
+      const [x, y, z] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const x1 = cy * x + sy * z;
+      const z1 = -sy * x + cy * z;
+      const y2 = cp * y + sp * z1;
+      const z2 = -sp * y + cp * z1;
+      return [x1, y2, z2];
+    }
+    function unrotate(v) {
+      const [x1, y2, z2] = v;
+      const cy = Math.cos(view.yaw);
+      const sy = Math.sin(view.yaw);
+      const cp = Math.cos(view.pitch);
+      const sp = Math.sin(view.pitch);
+      const y = cp * y2 - sp * z2;
+      const z1 = sp * y2 + cp * z2;
+      const x = cy * x1 - sy * z1;
+      const z = sy * x1 + cy * z1;
+      return [x, y, z];
+    }
+    // A viewport: screen centre (cx, cy) and pixels per world unit px.
+    function viewport(cx, cy, px) {
+      return { cx, cy, px };
+    }
+    function project(v, vp) {
+      const r = rotate(v);
+      const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + r[2]);
+      return { x: vp.cx + r[0] * f, y: vp.cy - r[1] * f, depth: r[2] };
+    }
+    // Screen point -> world point on the plane z = planeZ, or null.
+    function unprojectToPlane(sx, sy, vp, planeZ = 0) {
+      const k = vp.px * view.zoom;
+      const dir = unrotate([(sx - vp.cx) / k, -(sy - vp.cy) / k, CAM_DIST]);
+      const cam = unrotate([0, 0, -CAM_DIST]);
+      if (Math.abs(dir[2]) < EPS) return null;
+      const t = (planeZ - cam[2]) / dir[2];
+      if (t < 0) return null;
+      return [cam[0] + t * dir[0], cam[1] + t * dir[1]];
+    }
+    const P = (p, z = 0) => [p[0], p[1], z];  // plane point -> world point
+
+    // ---- drawing primitives (all take world 3D points) ----
+    function line3(a, b, vp, o = {}) {
+      const pa = project(a, vp);
+      const pb = project(b, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = o.color || 'rgba(235, 242, 255, 0.8)';
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function polyline3(pts, vp, o = {}) {
+      if (pts.length < 2) return;
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.lineWidth = o.width || 1;
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const s = project(p, vp);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      });
+      if (o.close) ctx.closePath();
+      if (o.fill) {
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      }
+      if (o.color) {
+        ctx.strokeStyle = o.color;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function arrow3(from, to, vp, o = {}) {
+      const a = project(from, vp);
+      const b = project(to, vp);
+      const color = o.color || '#86d4ff';
+      const width = o.width || 2.6;
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 8;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+      if (len > 1) {
+        const ux = dx / len;
+        const uy = dy / len;
+        const h = 9 + width;
+        ctx.beginPath();
+        ctx.moveTo(b.x, b.y);
+        ctx.lineTo(b.x - ux * h - uy * h * 0.5, b.y - uy * h + ux * h * 0.5);
+        ctx.lineTo(b.x - ux * h + uy * h * 0.5, b.y - uy * h - ux * h * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = (o.font || '600 13px Inter, sans-serif');
+        ctx.fillText(o.label, b.x + 8, b.y - 8);
+      }
+      ctx.restore();
+    }
+    function dot3(p, vp, o = {}) {
+      const s = project(p, vp);
+      const color = o.color || '#a0e7a0';
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = o.glow ?? 10;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, o.r || 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      if (o.label) {
+        ctx.font = o.font || '12px Inter, sans-serif';
+        ctx.fillText(o.label, s.x + 8, s.y - 6);
+      }
+      ctx.restore();
+    }
+    function text3(p, vp, str, o = {}) {
+      const s = project(p, vp);
+      ctx.save();
+      ctx.globalAlpha = o.alpha ?? 1;
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.9)';
+      ctx.font = o.font || '13px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, s.x + (o.dx || 0), s.y + (o.dy || 0));
+      ctx.restore();
+    }
+    // Draw the plane grid after mapping each plane point with `map`.
+    // Lines stay lines under linear, affine and projective maps, so two
+    // endpoints per line are enough.
+    function grid3(vp, o = {}) {
+      const map = o.map || ((p) => p);
+      const range = o.range ?? 4;
+      const step = o.step ?? 1;
+      const z = o.z ?? 0;
+      for (let i = -range; i <= range + EPS; i += step) {
+        const axis = Math.abs(i) < EPS;
+        const style = {
+          color: axis ? (o.axisColor || 'rgba(182, 206, 245, 0.55)') : (o.color || 'rgba(110, 156, 224, 0.22)'),
+          width: axis ? (o.axisWidth || 1.6) : (o.width || 1),
+          alpha: o.alpha ?? 1,
+        };
+        line3(P(map([i, -range]), z), P(map([i, range]), z), vp, style);
+        line3(P(map([-range, i]), z), P(map([range, i]), z), vp, style);
+      }
+    }
+    function background() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      const g = ctx.createLinearGradient(0, 0, 0, h);
+      g.addColorStop(0, '#06101c');
+      g.addColorStop(1, '#0a1527');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+    function screenText(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || 'rgba(235, 242, 255, 0.92)';
+      ctx.font = o.font || '600 14px Inter, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+
+    // ---- UI helpers ----
+    function makeSlider(parent, o) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = o.label;
+      const value = document.createElement('strong');
+      label.append(name, value);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = o.min;
+      input.max = o.max;
+      input.step = o.step;
+      input.value = o.value;
+      const format = o.format || ((v) => fmt(v));
+      const sync = () => { value.textContent = format(Number(input.value)); };
+      input.addEventListener('input', () => { sync(); o.onInput?.(Number(input.value)); });
+      row.append(label, input);
+      parent.appendChild(row);
+      sync();
+      return {
+        get: () => Number(input.value),
+        set: (v) => { input.value = v; sync(); },
+        input,
+      };
+    }
+    function makeButtonGroup(parent, items, onPick, o = {}) {
+      const buttons = items.map((item) => {
+        const b = document.createElement('button');
+        b.textContent = item.label;
+        b.title = item.title || '';
+        b.addEventListener('click', () => { setActive(item.value); onPick(item.value, item); });
+        parent.appendChild(b);
+        return { b, item };
+      });
+      function setActive(value) {
+        buttons.forEach(({ b, item }) => b.classList.toggle('active', item.value === value));
+      }
+      if (o.active !== undefined) setActive(o.active);
+      return { setActive };
+    }
+    function setupTabs() {
+      const buttons = [...document.querySelectorAll('[data-tab-button]')];
+      const panes = [...document.querySelectorAll('[data-tab-pane]')];
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          buttons.forEach((b) => b.classList.toggle('active', b === button));
+          panes.forEach((p) => p.classList.toggle('active', p.dataset.tabPane === button.dataset.tabButton));
+        });
+      });
+    }
+    function setCaption(html) {
+      captionEl.innerHTML = html;
+    }
+
+    // ---- app loop and pointer handling ----
+    // A chapter fills in these hooks.
+    const app = {
+      draw: () => {},
+      onFrame: (dt) => {},
+      // Return a drag handle (any truthy object) when the pointer hits one.
+      hitTest: (planePt, screenPt) => null,
+      onDrag: (handle, planePt, screenPt) => {},
+      onDragEnd: (handle) => {},
+      mainViewport: () => viewport(canvas.clientWidth / 2, canvas.clientHeight / 2, Math.min(canvas.clientWidth, canvas.clientHeight) / 9),
+      dragPlaneZ: 0,
+    };
+    const pointer = { down: false, handle: null, lastX: 0, lastY: 0 };
+
+    function resizeCanvas() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.round(rect.width * dpr);
+      canvas.height = Math.round(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    canvas.addEventListener('pointerdown', (event) => {
+      const rect = canvas.getBoundingClientRect();
+      const sx = event.clientX - rect.left;
+      const sy = event.clientY - rect.top;
+      pointer.down = true;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+      pointer.handle = app.hitTest(planePt, [sx, sy]);
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(event.pointerId);
+    });
+    canvas.addEventListener('pointermove', (event) => {
+      if (!pointer.down) return;
+      const dx = event.clientX - pointer.lastX;
+      const dy = event.clientY - pointer.lastY;
+      pointer.lastX = event.clientX;
+      pointer.lastY = event.clientY;
+      if (pointer.handle) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = event.clientX - rect.left;
+        const sy = event.clientY - rect.top;
+        const planePt = unprojectToPlane(sx, sy, app.mainViewport(), app.dragPlaneZ);
+        if (planePt) app.onDrag(pointer.handle, planePt, [sx, sy]);
+        return;
+      }
+      view.yaw += dx * 0.008;
+      view.pitch = clamp(view.pitch - dy * 0.008, -1.4, 1.4);
+    });
+    function endDrag(event) {
+      if (pointer.handle) app.onDragEnd(pointer.handle);
+      pointer.down = false;
+      pointer.handle = null;
+      canvas.classList.remove('dragging');
+      if (event && event.pointerId !== undefined && canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+    }
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      view.zoom = clamp(view.zoom * (event.deltaY > 0 ? 0.94 : 1.06), 0.5, 2.2);
+    }, { passive: false });
+    function resetView() {
+      view.yaw = view.home.yaw;
+      view.pitch = view.home.pitch;
+      view.zoom = 1;
+    }
+    let lastTime = 0;
+    function frame(ts) {
+      if (!lastTime) lastTime = ts;
+      const dt = Math.min((ts - lastTime) / 1000, 0.05);
+      lastTime = ts;
+      app.onFrame(dt);
+      if (canvas.clientWidth && canvas.clientHeight) app.draw();
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setupTabs();
+    resizeCanvas();
+    requestAnimationFrame(frame);
+    // ===================== END SHARED CORE =====================
+
+    // ===================== LIE KIT (copy verbatim) =====================
+    // Pure maths, no DOM. Rotations are 3x3 arrays, vectors are [x, y, z].
+    // Conventions follow Sola et al., "A micro Lie theory for state estimation
+    // in robotics" (2018): Exp / Log map between R^3 (or R^6) and the group.
+    const v3 = {
+      add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+      sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+      scale: (a, s) => [a[0] * s, a[1] * s, a[2] * s],
+      dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+      cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      len: (a) => Math.hypot(a[0], a[1], a[2]),
+      dist: (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]),
+      norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+      lerp: (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t],
+    };
+    const m3 = {
+      I: () => [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+      mul: (A, B) => A.map((row) => [0, 1, 2].map((j) => row[0] * B[0][j] + row[1] * B[1][j] + row[2] * B[2][j])),
+      apply: (A, v) => [
+        A[0][0] * v[0] + A[0][1] * v[1] + A[0][2] * v[2],
+        A[1][0] * v[0] + A[1][1] * v[1] + A[1][2] * v[2],
+        A[2][0] * v[0] + A[2][1] * v[1] + A[2][2] * v[2],
+      ],
+      T: (A) => [[A[0][0], A[1][0], A[2][0]], [A[0][1], A[1][1], A[2][1]], [A[0][2], A[1][2], A[2][2]]],
+      add: (A, B) => A.map((row, i) => row.map((x, j) => x + B[i][j])),
+      sub: (A, B) => A.map((row, i) => row.map((x, j) => x - B[i][j])),
+      scale: (A, s) => A.map((row) => row.map((x) => x * s)),
+      lerp: (A, B, t) => A.map((row, i) => row.map((x, j) => x + (B[i][j] - x) * t)),
+      trace: (A) => A[0][0] + A[1][1] + A[2][2],
+      frob: (A) => Math.sqrt(A.flat().reduce((s, x) => s + x * x, 0)),
+      col: (A, j) => [A[0][j], A[1][j], A[2][j]],
+      fromCols: (a, b, c) => [[a[0], b[0], c[0]], [a[1], b[1], c[1]], [a[2], b[2], c[2]]],
+      det: (A) => A[0][0] * (A[1][1] * A[2][2] - A[1][2] * A[2][1])
+        - A[0][1] * (A[1][0] * A[2][2] - A[1][2] * A[2][0])
+        + A[0][2] * (A[1][0] * A[2][1] - A[1][1] * A[2][0]),
+      rotX: (a) => [[1, 0, 0], [0, Math.cos(a), -Math.sin(a)], [0, Math.sin(a), Math.cos(a)]],
+      rotY: (a) => [[Math.cos(a), 0, Math.sin(a)], [0, 1, 0], [-Math.sin(a), 0, Math.cos(a)]],
+      rotZ: (a) => [[Math.cos(a), -Math.sin(a), 0], [Math.sin(a), Math.cos(a), 0], [0, 0, 1]],
+    };
+
+    // ---- so(3): hat, vee, Exp (Rodrigues), Log ----
+    const hat = (w) => [[0, -w[2], w[1]], [w[2], 0, -w[0]], [-w[1], w[0], 0]];
+    const vee = (K) => [K[2][1], K[0][2], K[1][0]];
+    // Rotation vector w = theta * axis  ->  rotation matrix.
+    function expSO3(w) {
+      const th = v3.len(w);
+      if (th < 1e-10) return m3.add(m3.I(), hat(w));
+      const K = hat(v3.scale(w, 1 / th));
+      return m3.add(m3.I(), m3.add(m3.scale(K, Math.sin(th)), m3.scale(m3.mul(K, K), 1 - Math.cos(th))));
+    }
+    // Angle of a rotation matrix, in [0, pi]. The atan2 form stays accurate
+    // near 0, where arccos((tr - 1) / 2) loses precision.
+    function rotAngle(R) {
+      const s = v3.len(vee(m3.sub(R, m3.T(R)))) / 2;  // = sin(theta)
+      const c = (m3.trace(R) - 1) / 2;                 // = cos(theta)
+      return Math.atan2(s, c);
+    }
+    // Rotation matrix -> rotation vector with angle in [0, pi].
+    function logSO3(R) {
+      const sv = v3.scale(vee(m3.sub(R, m3.T(R))), 0.5);  // sin(theta) * axis
+      const th = rotAngle(R);
+      if (th < 1e-8) return sv;
+      if (Math.PI - th < 1e-4) {
+        // Near pi the skew part vanishes. Read the axis from the symmetric part:
+        // (R + R^T) / 2 = cos I + (1 - cos) n n^T.
+        const c = Math.cos(th);
+        const M = m3.scale(m3.sub(m3.scale(m3.add(R, m3.T(R)), 0.5), m3.scale(m3.I(), c)), 1 / (1 - c));
+        let k = 0;
+        if (M[1][1] > M[k][k]) k = 1;
+        if (M[2][2] > M[k][k]) k = 2;
+        const nk = Math.sqrt(Math.max(M[k][k], 0));
+        let n = [M[0][k] / nk, M[1][k] / nk, M[2][k] / nk];
+        if (v3.dot(n, sv) < 0) n = v3.scale(n, -1);
+        return v3.scale(v3.norm(n), th);
+      }
+      return v3.scale(sv, th / Math.sin(th));
+    }
+    const axisAngle = (axis, th) => expSO3(v3.scale(v3.norm(axis), th));
+    // Unit direction from azimuth (about y, from +x towards +z) and elevation. y is up.
+    const dirFromAzEl = (az, el) => [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
+
+    // ---- distances between rotations ----
+    // Geodesic: the angle of dR = R_est R_gt^T. (R_gt^T R_est has the same angle.)
+    const deltaR = (Re, Rg) => m3.mul(Re, m3.T(Rg));
+    const geodesicAngle = (Re, Rg) => rotAngle(deltaR(Re, Rg));
+    // Chordal: straight line through the 9-D space of matrices.
+    const chordalDist = (Re, Rg) => m3.frob(m3.sub(Re, Rg));
+    // Walk from R_gt to R_est along the geodesic (s in [0, 1]).
+    const slerpR = (Rg, Re, s) => m3.mul(expSO3(v3.scale(logSO3(deltaR(Re, Rg)), s)), Rg);
+    // Straight blend of the matrices. It leaves SO(3) on the way.
+    const lerpR = (Rg, Re, s) => m3.lerp(Rg, Re, s);
+    // How far a 3x3 matrix is from being a rotation.
+    function rotationCheck(R, tol = 1e-6) {
+      const G = m3.mul(m3.T(R), R);
+      const orthoError = m3.frob(m3.sub(G, m3.I()));
+      const det = m3.det(R);
+      const orthogonal = orthoError < tol;
+      const inSO3 = orthogonal && det > 0;
+      let name = 'not orthogonal: the sticks are bent or stretched';
+      if (inSO3) name = 'a rotation, in SO(3)';
+      else if (orthogonal) name = 'orthogonal with det -1: a mirror image, in O(3) but not SO(3)';
+      return { G, orthoError, det, orthogonal, inSO3, name, colLengths: [0, 1, 2].map((j) => v3.len(m3.col(R, j))) };
+    }
+
+    // ---- SE(3): T = (R, t), p_cam = R p_obj + t ----
+    const se3 = {
+      I: () => ({ R: m3.I(), t: [0, 0, 0] }),
+      apply: (T, p) => v3.add(m3.apply(T.R, p), T.t),
+      // compose(A, B) applies B first, then A.
+      compose: (A, B) => ({ R: m3.mul(A.R, B.R), t: v3.add(m3.apply(A.R, B.t), A.t) }),
+      inv: (T) => { const Rt = m3.T(T.R); return { R: Rt, t: v3.scale(m3.apply(Rt, T.t), -1) }; },
+      toMatrix: (T) => [[...T.R[0], T.t[0]], [...T.R[1], T.t[1]], [...T.R[2], T.t[2]], [0, 0, 0, 1]],
+    };
+    // Left Jacobian V of SO(3) and its inverse: t = V(w) rho.
+    function leftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, 0.5), m3.scale(K2, 1 / 6)));
+      return m3.add(m3.I(), m3.add(m3.scale(K, (1 - Math.cos(th)) / (th * th)), m3.scale(K2, (th - Math.sin(th)) / (th * th * th))));
+    }
+    function invLeftJacobian(w) {
+      const th = v3.len(w);
+      const K = hat(w);
+      const K2 = m3.mul(K, K);
+      if (th < 1e-6) return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, 1 / 12)));
+      const k = 1 / (th * th) - 1 / (2 * th * Math.tan(th / 2));
+      return m3.add(m3.I(), m3.add(m3.scale(K, -0.5), m3.scale(K2, k)));
+    }
+    // Twist xi = { rho, w } in R^6  <->  rigid motion. Exp traces a screw.
+    const expSE3 = (xi) => ({ R: expSO3(xi.w), t: m3.apply(leftJacobian(xi.w), xi.rho) });
+    function logSE3(T) {
+      const w = logSO3(T.R);
+      return { w, rho: m3.apply(invLeftJacobian(w), T.t) };
+    }
+    // The estimate as seen from the true object frame: T_gt^-1 T_est.
+    const relativePose = (Te, Tg) => se3.compose(se3.inv(Tg), Te);
+    // Two ways to walk from T_gt to T_est.
+    const screwInterp = (Tg, Te, s) => {
+      const xi = logSE3(relativePose(Te, Tg));
+      return se3.compose(Tg, expSE3({ rho: v3.scale(xi.rho, s), w: v3.scale(xi.w, s) }));
+    };
+    const decoupledInterp = (Tg, Te, s) => ({ R: slerpR(Tg.R, Te.R, s), t: v3.lerp(Tg.t, Te.t, s) });
+    // Move the model's origin to the model point c. Same physical object pose.
+    const shiftOrigin = (T, c) => ({ R: T.R, t: se3.apply(T, c) });
+    // All the error numbers. L is the characteristic length (same unit as t).
+    function poseErrors(Te, Tg, L) {
+      const theta = geodesicAngle(Te.R, Tg.R);
+      const dt = v3.dist(Te.t, Tg.t);
+      const xi = logSE3(relativePose(Te, Tg));
+      const rho = v3.len(xi.rho);
+      return { theta, dt, xi, rho, twist: Math.hypot(rho, L * theta), decoupledCombined: Math.hypot(dt, L * theta) };
+    }
+    // ===================== END LIE KIT =====================
+
+    // ===================== LIE DRAW (copy verbatim) =====================
+    // World units -> orbit-view units. Chapters may change pivot and scale.
+    const SCENE = { pivot: [0, 0, 0], scale: 2.4 };
+    const toView = (X) => [
+      (X[0] - SCENE.pivot[0]) * SCENE.scale,
+      (X[1] - SCENE.pivot[1]) * SCENE.scale,
+      (X[2] - SCENE.pivot[2]) * SCENE.scale,
+    ];
+    const XYZ_COLORS = ['#ff8a8a', '#a0e7a0', '#86d4ff'];  // one frame: x red, y green, z blue
+    const GT_COLORS = ['#5aa6ff', '#5aa6ff', '#5aa6ff'];   // true frame: blue
+    const EST_COLORS = ['#f08f3c', '#f08f3c', '#f08f3c'];  // estimated frame: warm
+    // Three arrows: the columns of R, drawn from `origin`.
+    function drawTriad(R, origin, vp, o = {}) {
+      const len = o.len ?? 1;
+      const colors = o.colors || XYZ_COLORS;
+      const labels = o.labels || ['x', 'y', 'z'];
+      for (let j = 0; j < 3; j += 1) {
+        const tip = v3.add(origin, v3.scale(m3.col(R, j), len));
+        arrow3(toView(origin), toView(tip), vp, { color: colors[j], label: labels[j], alpha: o.alpha ?? 1, width: o.width ?? 2.6, glow: o.glow ?? 8 });
+      }
+    }
+    // Sample a path s -> point for s in [0, 1] and draw it.
+    function drawPath(fn, vp, o = {}) {
+      const n = o.samples || 48;
+      const pts = [];
+      for (let i = 0; i <= n; i += 1) pts.push(toView(fn(i / n)));
+      polyline3(pts, vp, o);
+    }
+    function drawSphereWire(center, radius, vp, o = {}) {
+      const color = o.color || 'rgba(132, 160, 202, 0.22)';
+      const ring = (f) => drawPath((s) => v3.add(center, v3.scale(f(s * Math.PI * 2), radius)), vp, { color, width: o.width || 1, samples: 64 });
+      ring((a) => [Math.cos(a), 0, Math.sin(a)]);
+      ring((a) => [Math.cos(a), Math.sin(a), 0]);
+      ring((a) => [0, Math.sin(a), Math.cos(a)]);
+      (o.latitudes || [-60, -30, 30, 60]).forEach((d) => {
+        const el = d * Math.PI / 180;
+        ring((a) => [Math.cos(el) * Math.cos(a), Math.sin(el), Math.cos(el) * Math.sin(a)]);
+      });
+    }
+    // A toy plane: nose along +x, fin along +y. Green light on the +z wing tip,
+    // red light on the -z wing tip, so a mirror image is easy to spot.
+    const PLANE_WIRE = (() => {
+      const seg = [];
+      const h = [1.0, 0.12, 0.12];
+      const c = (sx, sy, sz) => [sx * h[0], sy * h[1], sz * h[2]];
+      [-1, 1].forEach((a) => [-1, 1].forEach((b) => {
+        seg.push([c(-1, a, b), c(1, a, b)]);
+        seg.push([c(a, -1, b), c(a, 1, b)]);
+        seg.push([c(a, b, -1), c(a, b, 1)]);
+        seg.push([c(1, a, b), [1.5, 0, 0]]);
+      }));
+      [1, -1].forEach((s) => {
+        const w = [[0.3, 0, 0.12 * s], [-0.3, 0, 1.2 * s], [-0.6, 0, 1.2 * s], [-0.4, 0, 0.12 * s]];
+        for (let i = 0; i < 3; i += 1) seg.push([w[i], w[i + 1]]);
+      });
+      seg.push([[-1, 0.12, 0], [-1, 0.7, 0]], [[-1, 0.7, 0], [-0.6, 0.12, 0]]);
+      return seg;
+    })();
+    const PLANE_LIGHTS = [{ p: [-0.45, 0, 1.2], color: '#a0e7a0' }, { p: [-0.45, 0, -1.2], color: '#ff8a8a' }];
+    // Draw the plane with pose (R, t). o.size scales the model.
+    function drawPlane(R, t, vp, o = {}) {
+      const size = o.size ?? 1;
+      const at = (p) => toView(v3.add(m3.apply(R, v3.scale(p, size)), t));
+      PLANE_WIRE.forEach(([a, b]) => line3(at(a), at(b), vp, { color: o.color || '#ebf2ff', width: o.width || 1.3, alpha: o.alpha ?? 0.9 }));
+      if (o.lights !== false) PLANE_LIGHTS.forEach((l) => dot3(at(l.p), vp, { color: l.color, r: 3.2, alpha: o.alpha ?? 0.9 }));
+    }
+    // A small readout box on the canvas: rows of [label, value].
+    function drawReadout(x, y, w, title, rows, o = {}) {
+      const lineH = 17;
+      const hgt = 26 + rows.length * lineH;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.82)';
+      ctx.strokeStyle = o.border || 'rgba(132, 160, 202, 0.4)';
+      ctx.fillRect(x, y, w, hgt);
+      ctx.strokeRect(x + 0.5, y + 0.5, w, hgt);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = o.titleColor || '#86d4ff';
+      ctx.fillText(title, x + 10, y + 17);
+      rows.forEach(([label, value, color], i) => {
+        const yy = y + 36 + i * lineH;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.fillStyle = 'rgba(138, 161, 192, 0.95)';
+        ctx.textAlign = 'left';
+        ctx.fillText(label, x + 10, yy);
+        ctx.font = '600 12px ui-monospace, Menlo, monospace';
+        ctx.fillStyle = color || 'rgba(235, 242, 255, 0.95)';
+        ctx.textAlign = 'right';
+        ctx.fillText(value, x + w - 10, yy);
+      });
+      ctx.restore();
+      return hgt;
+    }
+    // ===================== END LIE DRAW =====================
+
+    // ===================== CHAPTER 4: SE(3), A ROTATION PLUS A PLACE =====================
+    const SIZE = 70;               // mm per model unit of the toy plane
+    const NOSE_TURN = rad(80);     // the "turn about the nose" demo
+    const DEMO_SECONDS = 2.2;
+    const GREEN = '#a0e7a0';
+    const TRAP = '#ff8a8a';
+    const OBJ = '#5aa6ff';
+    SCENE.scale = 0.0115;
+    SCENE.pivot = [50, 10, 235];
+    view.home = { yaw: -0.62, pitch: 0.26 };
+    resetView();
+    app.mainViewport = () => viewport(canvas.clientWidth * 0.5, canvas.clientHeight * 0.58,
+      Math.min(canvas.clientWidth, canvas.clientHeight) / 9);
+
+    const PROBES = {
+      nose: { label: 'Nose', p: [1.5 * SIZE, 0, 0] },
+      light: { label: 'Green wing light', p: v3.scale(PLANE_LIGHTS[0].p, SIZE) },
+      fin: { label: 'Fin top', p: [-1 * SIZE, 0.7 * SIZE, 0] },
+      origin: { label: 'Model origin', p: [0, 0, 0] },
+    };
+    const PRESETS = {
+      straight: { label: 'Straight ahead', az: 0, el: 90, angle: 0, t: [0, 0, 400], so3: false },
+      turned: { label: 'Turned 60° about y', az: 0, el: 90, angle: 60, t: [0, 0, 400], so3: false },
+      upright: { label: 'Up and to the right', az: 30, el: 40, angle: 35, t: [160, 110, 450], so3: false },
+      close: { label: 'Close and rolled', az: 90, el: 0, angle: 50, t: [-40, -20, 220], so3: false },
+      so3: { label: 'SO(3) only', az: 30, el: 40, angle: 35, t: [160, 110, 450], so3: true },
+    };
+    const DEMOS = [
+      { value: 'turnCarry', label: '▶ Turn, then carry  (this is T)' },
+      { value: 'carryTurn', label: '▶ Carry, then turn about the camera' },
+      { value: 'nose', label: '▶ Turn about the nose' },
+      { value: 'undo', label: '▶ Undo: where is the camera, seen from the object?' },
+    ];
+    const state = { az: 0, el: 0, angle: 0, t: [0, 0, 400], so3Only: false, probe: 'nose', demo: null };
+
+    // ---- pose from the controls ----
+    const rotVecOf = (o) => v3.scale(dirFromAzEl(o.az, o.el), o.angle);
+    const poseOf = (o) => ({ R: expSO3(rotVecOf(o)), t: o.so3Only ? [0, 0, 0] : o.t.slice() });
+    const presetState = (key) => {
+      const p = PRESETS[key];
+      return { az: rad(p.az), el: rad(p.el), angle: rad(p.angle), t: p.t.slice(), so3Only: p.so3 };
+    };
+    const ease = (u) => u * u * (3 - 2 * u);
+    // A turn Q about the fixed point c is the rigid motion (Q, (I - Q) c).
+    const turnAbout = (Q, c) => ({ R: Q, t: v3.sub(c, m3.apply(Q, c)) });
+    const mm = (v) => fmtVec(v, 1);
+
+    // ---- controls ----
+    const $ = (id) => document.getElementById(id);
+    const sliders = {};
+    const touch = () => { state.demo = null; demoGroup.setActive(null); presetGroup.setActive(null); };
+    const rotHost = $('rotSliders');
+    sliders.az = makeSlider(rotHost, { label: 'Axis azimuth', min: -180, max: 180, step: 1, value: 0, format: (v) => v + '°', onInput: (v) => { state.az = rad(v); touch(); } });
+    sliders.el = makeSlider(rotHost, { label: 'Axis elevation', min: -90, max: 90, step: 1, value: 0, format: (v) => v + '°', onInput: (v) => { state.el = rad(v); touch(); } });
+    sliders.angle = makeSlider(rotHost, { label: 'Turn angle', min: 0, max: 180, step: 1, value: 0, format: (v) => v + '°', onInput: (v) => { state.angle = rad(v); touch(); } });
+    const transHost = $('transSliders');
+    sliders.tx = makeSlider(transHost, { label: 't_x  (camera right)', min: -250, max: 250, step: 5, value: 0, format: (v) => v + ' mm', onInput: (v) => { state.t[0] = v; touch(); } });
+    sliders.ty = makeSlider(transHost, { label: 't_y  (camera up)', min: -250, max: 250, step: 5, value: 0, format: (v) => v + ' mm', onInput: (v) => { state.t[1] = v; touch(); } });
+    sliders.tz = makeSlider(transHost, { label: 't_z  (along the view)', min: 150, max: 700, step: 5, value: 400, format: (v) => v + ' mm', onInput: (v) => { state.t[2] = v; touch(); } });
+    const so3Box = $('so3Only');
+    function setSo3Only(on) {
+      state.so3Only = on;
+      so3Box.checked = on;
+      $('chipPlace').classList.toggle('off', on);
+      $('chipTotal').textContent = on ? '3' : '6';
+    }
+    so3Box.addEventListener('change', () => { setSo3Only(so3Box.checked); touch(); });
+
+    function applyPreset(key) {
+      const p = PRESETS[key];
+      Object.assign(state, presetState(key));
+      sliders.az.set(p.az);
+      sliders.el.set(p.el);
+      sliders.angle.set(p.angle);
+      sliders.tx.set(p.t[0]);
+      sliders.ty.set(p.t[1]);
+      sliders.tz.set(p.t[2]);
+      setSo3Only(p.so3);
+      state.demo = null;
+      demoGroup.setActive(null);
+      presetGroup.setActive(key);
+    }
+    function startDemo(kind) {
+      if (state.so3Only) setSo3Only(false);   // every demo needs a place to carry to
+      state.demo = { kind, s: 0 };
+      demoGroup.setActive(kind);
+    }
+    function setProbe(key) {
+      state.probe = key;
+      probeGroup.setActive(key);
+    }
+    const presetGroup = makeButtonGroup($('presetGrid'), Object.keys(PRESETS).map((k) => ({ label: PRESETS[k].label, value: k })), (k) => applyPreset(k));
+    const demoGroup = makeButtonGroup($('demoGrid'), DEMOS, (k) => startDemo(k));
+    const probeGroup = makeButtonGroup($('probeGrid'), Object.keys(PROBES).map((k) => ({ label: PROBES[k].label, value: k })), (k) => { state.probe = k; });
+
+    $('p1btn').addEventListener('click', () => { applyPreset('upright'); setProbe('origin'); });
+    $('p2btn').addEventListener('click', () => { applyPreset('turned'); setProbe('nose'); startDemo('undo'); });
+    $('p3btn').addEventListener('click', () => { applyPreset('straight'); setProbe('nose'); startDemo('nose'); });
+
+    // Predict-card numbers come from the kit, for the exact scenes the buttons set up.
+    (function fillPredictAnswers() {
+      const T1 = poseOf(presetState('upright'));
+      $('p1t').textContent = mm(se3.apply(T1, PROBES.origin.p));
+      const T2 = poseOf(presetState('turned'));
+      const inv2 = se3.inv(T2);
+      $('p2good').textContent = mm(inv2.t);
+      $('p2bad').textContent = mm(v3.scale(T2.t, -1));
+      $('p2gap').textContent = fmt(v3.len(v3.sub(T2.t, m3.apply(T2.R, T2.t))), 1);
+      const T3 = poseOf(presetState('straight'));
+      const c3 = se3.apply(T3, PROBES.nose.p);
+      const M3 = turnAbout(axisAngle([0, 1, 0], NOSE_TURN), c3);
+      $('p3t').textContent = mm(M3.t);
+      $('p3len').textContent = fmt(v3.len(M3.t), 1);
+    })();
+
+    // ---- what is on screen right now ----
+    function currentFrame() {
+      const T0 = poseOf(state);
+      const w = rotVecOf(state);
+      if (!state.demo) return { kind: null, T: T0, T0, w };
+      const { kind, s } = state.demo;
+      const a = ease(clamp(s / 0.5, 0, 1));
+      const b = ease(clamp((s - 0.5) / 0.5, 0, 1));
+      const stage = s < 0.5 ? 1 : 2;
+      if (kind === 'turnCarry') return { kind, stage, s, T0, w, T: { R: expSO3(v3.scale(w, a)), t: v3.scale(T0.t, b) } };
+      if (kind === 'carryTurn') {
+        const Q = expSO3(v3.scale(w, b));
+        return { kind, stage, s, T0, w, T: { R: Q, t: m3.apply(Q, v3.scale(T0.t, a)) }, end: { R: T0.R, t: m3.apply(T0.R, T0.t) } };
+      }
+      if (kind === 'nose') {
+        const u = ease(s);
+        const c = se3.apply(T0, PROBES.nose.p);
+        const M = turnAbout(axisAngle([0, 1, 0], u * NOSE_TURN), c);
+        return { kind, stage, s, T0, w, c, M, turned: u * NOSE_TURN, T: se3.compose(M, T0) };
+      }
+      // undo: T^-1 is the camera seen from the object. Its translation is the walk
+      // from the object back to the camera, written along the object's own axes.
+      // Walking -t along those axes instead ends at t - R t, away from the camera.
+      return { kind, stage, s, T0, w, T: T0, goodSteps: se3.inv(T0).t, badSteps: v3.scale(T0.t, -1), a, b,
+        missBy: v3.len(v3.sub(T0.t, m3.apply(T0.R, T0.t))) };
+    }
+    app.onFrame = (dt) => {
+      if (state.demo && state.demo.s < 1) state.demo.s = Math.min(1, state.demo.s + dt / DEMO_SECONDS);
+    };
+
+    // ---- drawing ----
+    function drawFloor(vp) {
+      const y = -170;
+      const style = { color: 'rgba(110, 156, 224, 0.13)' };
+      for (let x = -300; x <= 300; x += 100) line3(toView([x, y, 0]), toView([x, y, 700]), vp, style);
+      for (let z = 0; z <= 700; z += 100) line3(toView([-300, y, z]), toView([300, y, z]), vp, style);
+    }
+    function drawCamera(vp) {
+      const z = 110;
+      const corners = [[-60, -45, z], [60, -45, z], [60, 45, z], [-60, 45, z]];
+      polyline3(corners.map(toView), vp, { close: true, color: 'rgba(182, 206, 245, 0.5)', fill: 'rgba(90, 166, 255, 0.05)', width: 1.1 });
+      corners.forEach((c) => line3(toView([0, 0, 0]), toView(c), vp, { color: 'rgba(182, 206, 245, 0.28)' }));
+      drawTriad(m3.I(), [0, 0, 0], vp, { len: 80, labels: ['x_c', 'y_c', 'z_c'], width: 2.2, glow: 5 });
+      dot3(toView([0, 0, 0]), vp, { color: '#ebf2ff', r: 3.5 });
+      text3(toView([0, -28, 0]), vp, 'camera', { color: 'rgba(235, 242, 255, 0.85)', font: '12px Inter, sans-serif', dx: -18, dy: 14 });
+    }
+    function drawGhost(T, vp, color, label) {
+      drawPlane(T.R, T.t, vp, { size: SIZE, color, alpha: 0.32, width: 1.1, lights: false });
+      if (label) text3(toView(T.t), vp, label, { color, font: '12px Inter, sans-serif', dx: 10, dy: 22 });
+    }
+    // Walk from the object's origin along x_o, then y_o, then z_o, by `steps`.
+    // `u` in [0, 1] is how much of the walk is drawn. Returns the end point.
+    function drawStaircase(T, steps, u, vp, color, label) {
+      const pts = [T.t.slice()];
+      for (let j = 0; j < 3; j += 1) pts.push(v3.add(pts[j], v3.scale(m3.col(T.R, j), steps[j])));
+      const drawn = [pts[0]];
+      for (let j = 0; j < 3; j += 1) {
+        const k = clamp(u * 3 - j, 0, 1);
+        if (k <= 0) break;
+        drawn.push(v3.lerp(pts[j], pts[j + 1], k));
+      }
+      if (drawn.length > 1) polyline3(drawn.map(toView), vp, { color, width: 2.4 });
+      const end = drawn[drawn.length - 1];
+      if (u > 0) dot3(toView(end), vp, { color, r: 4.5, label: u >= 1 ? label : '' });
+      return pts[3];
+    }
+    function drawChain(T, vp, o = {}) {
+      const p = PROBES[state.probe].p;
+      const turned = m3.apply(T.R, p);
+      const pc = v3.add(turned, T.t);
+      if (v3.len(T.t) > 1) {
+        line3(toView([0, 0, 0]), toView(T.t), vp, { color: GREEN, dash: [6, 5], width: 1.6 });
+        if (o.tLabel) text3(toView(v3.scale(T.t, 0.5)), vp, o.tLabel, { color: GREEN, font: '600 14px Inter, sans-serif', dx: 8, dy: -6 });
+      }
+      dot3(toView(T.t), vp, { color: '#ebf2ff', r: 3, glow: 4 });
+      if (v3.len(p) > 1e-6) arrow3(toView(T.t), toView(pc), vp, { color: GREEN, width: 2.2, glow: 5 });
+      const label = v3.len(p) > 1e-6 ? 'p_cam = R·p_obj + t' : 'p_cam = t';
+      dot3(toView(pc), vp, { color: GREEN, r: 5, label: o.pointLabel === false ? '' : label });
+    }
+    function drawMatrixBox(x, y, w, title, T) {
+      const M = se3.toMatrix(T);
+      const lineH = 17;
+      const hgt = 30 + 4 * lineH;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.82)';
+      ctx.strokeStyle = 'rgba(132, 160, 202, 0.4)';
+      ctx.fillRect(x, y, w, hgt);
+      ctx.strokeRect(x + 0.5, y + 0.5, w, hgt);
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.fillStyle = '#86d4ff';
+      ctx.fillText(title, x + 10, y + 17);
+      ctx.font = '600 12px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'right';
+      const colX = [0.24, 0.45, 0.66, 0.96].map((k) => x + w * k);
+      for (let i = 0; i < 4; i += 1) {
+        for (let j = 0; j < 4; j += 1) {
+          const isR = i < 3 && j < 3;
+          const isT = i < 3 && j === 3;
+          ctx.fillStyle = isR ? '#86d4ff' : (isT ? GREEN : 'rgba(138, 161, 192, 0.8)');
+          const str = isR ? fmt(M[i][j], 2) : (isT ? fmt(M[i][j], 1) : String(M[i][j]));
+          ctx.fillText(str, colX[j], y + 38 + i * lineH);
+        }
+      }
+      ctx.restore();
+      return hgt;
+    }
+
+    function readoutFor(f) {
+      const p = PROBES[state.probe].p;
+      if (f.kind === 'carryTurn') {
+        return { title: 'Carry, then turn: where does it end?', rows: [
+          ['t  (turn, then carry)', mm(f.T0.t)],
+          ['R·t  (carry, then turn)', mm(f.end.t), TRAP],
+          ['gap ‖R·t − t‖', fmt(v3.dist(f.end.t, f.T0.t), 1) + ' mm', TRAP],
+          ['origin now', mm(f.T.t)],
+        ] };
+      }
+      if (f.kind === 'nose') {
+        return { title: 'A pure turn, about the nose c', rows: [
+          ['turned so far', fmt(deg(f.turned), 0) + '°'],
+          ['c = nose (camera)', mm(f.c)],
+          ['motion t = (I − Q)c', mm(f.M.t), TRAP],
+          ['‖t‖', fmt(v3.len(f.M.t), 1) + ' mm', TRAP],
+          ['check ‖M·c − c‖', fmt(v3.dist(se3.apply(f.M, f.c), f.c), 3) + ' mm', GREEN],
+        ] };
+      }
+      if (f.kind === 'undo') {
+        const inv = se3.inv(f.T0);
+        const pc = se3.apply(f.T0, p);
+        const back = se3.apply(inv, pc);
+        return { title: 'Undo: T⁻¹ = (Rᵀ, −Rᵀt)', rows: [
+          ['−Rᵀt  (correct)', mm(inv.t), GREEN],
+          ['−t  (the trap)', mm(v3.scale(f.T0.t, -1)), TRAP],
+          ['trap misses the camera by', fmt(f.missBy, 1) + ' mm', TRAP],
+          ['T⁻¹ · p_cam', mm(back)],
+          ['p_obj', mm(p)],
+          ['round-trip error', fmt(v3.dist(back, p), 3) + ' mm', GREEN],
+        ] };
+      }
+      return { title: 'p_cam = R · p_obj + t', rows: [
+        ['p_obj  (' + PROBES[state.probe].label.toLowerCase() + ')', mm(p)],
+        ['R · p_obj', mm(m3.apply(f.T.R, p))],
+        ['t', mm(f.T.t), GREEN],
+        ['p_cam', mm(se3.apply(f.T, p)), GREEN],
+      ] };
+    }
+
+    function captionFor(f) {
+      const T = f.T;
+      if (f.kind === 'turnCarry') {
+        return f.stage === 1
+          ? `<span class="badge good">turn, then carry</span> Step 1: turn the plane where it stands, at the origin. Now at <strong>${fmt(deg(rotAngle(T.R)), 0)}°</strong> of ${fmt(deg(state.angle), 0)}°.`
+          : `<span class="badge good">turn, then carry</span> Step 2: carry it along t. It ends with its origin at t = <strong>${mm(f.T0.t)}</strong>. This order is what T = (R, t) means.`;
+      }
+      if (f.kind === 'carryTurn') {
+        return f.stage === 1
+          ? '<span class="badge bad">carry, then turn</span> Step 1: carry the unturned plane to t. So far, so good.'
+          : `<span class="badge bad">carry, then turn</span> Step 2: turn about the camera. The carry swings too. It ends at R·t = <strong>${mm(f.end.t)}</strong>, which is <strong>${fmt(v3.dist(f.end.t, f.T0.t), 1)} mm</strong> from t.`;
+      }
+      if (f.kind === 'nose') {
+        return `<span class="badge warn">a rotation with t ≠ 0</span> The nose stays fixed. Yet the motion is (Q, (I − Q)c), and its t part is now <strong>${mm(f.M.t)}</strong>. Only a turn about the origin has t = 0.`;
+      }
+      if (f.kind === 'undo') {
+        if (f.stage === 1) {
+          return `<span class="badge good">undo</span> T⁻¹ is the camera seen from the object. Walk back to the camera along the object's own axes. The steps are −Rᵀt = <strong>${mm(f.goodSteps)}</strong>.`;
+        }
+        return f.missBy < 0.05
+          ? '<span class="badge good">undo</span> Here R = I. The object\'s axes match the camera\'s axes, so −t and −Rᵀt agree.'
+          : `<span class="badge bad">the trap</span> The red walk takes the steps −t = <strong>${mm(f.badSteps)}</strong> along the same axes. Those numbers belong to the camera's axes. It misses the camera by <strong>${fmt(f.missBy, 1)} mm</strong>.`;
+      }
+      if (state.so3Only) {
+        return '<span class="badge warn">SO(3) only</span> Pointing without placing. The plane sits on the camera origin. Three of the six numbers are gone.';
+      }
+      const label = PROBES[state.probe].label.toLowerCase();
+      return `<span class="badge good">a pose in SE(3)</span> Turn by <strong>${fmt(deg(state.angle), 0)}°</strong>, then carry to t = <strong>${mm(T.t)}</strong>. The ${label} lands at p_cam = <strong>${mm(se3.apply(T, PROBES[state.probe].p))}</strong>.`;
+    }
+
+    // DOM writes only when the text changes, so selection and scrolling stay calm.
+    const lastText = {};
+    function put(id, str, html) {
+      if (lastText[id] === str) return;
+      lastText[id] = str;
+      if (html) $(id).innerHTML = str;
+      else $(id).textContent = str;
+    }
+    function updateMathTab(f) {
+      const T = f.T;
+      const inv = se3.inv(T);
+      const p = PROBES[state.probe].p;
+      put('matT', fmtMatrix(se3.toMatrix(T), 'T =', 2));
+      put('colsKv',
+        `<span>x_o seen from the camera</span><strong>${fmtVec(m3.col(T.R, 0), 2)}</strong>` +
+        `<span>y_o seen from the camera</span><strong>${fmtVec(m3.col(T.R, 1), 2)}</strong>` +
+        `<span>z_o seen from the camera</span><strong>${fmtVec(m3.col(T.R, 2), 2)}</strong>` +
+        `<span>object origin = t</span><strong>${mm(T.t)}</strong>` +
+        `<span>RᵀR = I, det R</span><strong>${rotationCheck(T.R).inSO3 ? 'yes' : 'no'}, ${fmt(m3.det(T.R), 3)}</strong>`, true);
+      put('matTinv', fmtMatrix(se3.toMatrix(inv), 'T⁻¹ =', 2));
+      const back = se3.apply(inv, se3.apply(T, p));
+      put('invKv',
+        `<span>−Rᵀt  (correct)</span><strong class="good">${mm(inv.t)}</strong>` +
+        `<span>−t  (the trap)</span><strong class="bad">${mm(v3.scale(T.t, -1))}</strong>` +
+        `<span>T⁻¹ · p_cam</span><strong>${mm(back)}</strong>` +
+        `<span>p_obj</span><strong>${mm(p)}</strong>`, true);
+      // Composition, with the slider values of R and t.
+      const turn = { R: expSO3(rotVecOf(state)), t: [0, 0, 0] };
+      const carry = { R: m3.I(), t: state.t.slice() };
+      const turnFirst = se3.compose(carry, turn);   // turn acts first
+      const carryFirst = se3.compose(turn, carry);  // carry acts first
+      put('composeBox',
+        'turn = (R, 0)      carry = (I, t)\n\n' +
+        'carry ∘ turn   turn first, then carry\n' +
+        '  = (I·R, I·0 + t) = (R, t)\n' +
+        `  t part = ${mm(turnFirst.t)}\n\n` +
+        'turn ∘ carry   carry first, then turn\n' +
+        '  = (R·I, R·t + 0) = (R, R·t)\n' +
+        `  t part = ${mm(carryFirst.t)}\n\n` +
+        `gap between the two ends = ${fmt(v3.dist(turnFirst.t, carryFirst.t), 1)} mm`);
+      const T0 = poseOf(state);
+      const c = se3.apply(T0, PROBES.nose.p);
+      const M = turnAbout(axisAngle([0, 1, 0], NOSE_TURN), c);
+      put('pointKv',
+        `<span>Q</span><strong>${fmt(deg(NOSE_TURN), 0)}° about camera y</strong>` +
+        `<span>c = nose (camera)</span><strong>${mm(c)}</strong>` +
+        `<span>(I − Q) c</span><strong>${mm(M.t)}</strong>` +
+        `<span>‖M·c − c‖</span><strong>${fmt(v3.dist(se3.apply(M, c), c), 3)} mm</strong>`, true);
+    }
+
+    app.draw = () => {
+      background();
+      const vp = app.mainViewport();
+      const f = currentFrame();
+      drawFloor(vp);
+      drawCamera(vp);
+
+      if (f.kind === 'turnCarry') drawGhost(f.T0, vp, OBJ, 'ends here: origin at t');
+      if (f.kind === 'carryTurn') {
+        drawGhost(f.T0, vp, OBJ, 'turn, then carry: t');
+        drawPath((s) => m3.apply(expSO3(v3.scale(f.w, s)), f.T0.t), vp, { color: TRAP, dash: [5, 5], width: 1.4 });
+        if (f.s < 0.98) drawGhost(f.end, vp, TRAP, 'carry, then turn: R·t');
+        else text3(toView(f.end.t), vp, 'carry, then turn: R·t', { color: TRAP, font: '12px Inter, sans-serif', dx: 10, dy: 22 });
+      }
+      if (f.kind === 'nose') {
+        drawGhost(f.T0, vp, OBJ, null);
+        line3(toView(v3.add(f.c, [0, -150, 0])), toView(v3.add(f.c, [0, 150, 0])), vp, { color: 'rgba(235, 242, 255, 0.5)', dash: [6, 6] });
+        dot3(toView(f.c), vp, { color: TRAP, r: 5, label: 'c: the nose stays here' });
+      }
+
+      drawPlane(f.T.R, f.T.t, vp, { size: SIZE, color: OBJ, width: 1.6 });
+      drawTriad(f.T.R, f.T.t, vp, { len: 62, labels: ['x_o', 'y_o', 'z_o'], width: 1.8, glow: 4, alpha: 0.9 });
+      const plain = f.kind === null || f.kind === 'turnCarry';
+      if (f.kind === 'undo') {
+        drawStaircase(f.T0, f.goodSteps, f.a, vp, GREEN, '−Rᵀt: at the camera');
+        if (f.missBy >= 0.05) drawStaircase(f.T0, f.badSteps, f.b, vp, TRAP, '−t ends here');
+      } else {
+        drawChain(f.T, vp, { tLabel: plain ? 't' : '', pointLabel: f.kind !== 'nose' });
+      }
+
+      const cw = canvas.clientWidth;
+      const boxW = 300;
+      const x0 = cw - boxW - 18;
+      let y0 = cw < 880 ? 230 : 16;
+      const r = readoutFor(f);
+      y0 += drawReadout(x0, y0, boxW, r.title, r.rows) + 10;
+      drawMatrixBox(x0, y0, boxW, 'T as a 4×4:  R blue,  t green', f.T);
+
+      put('caption', captionFor(f), true);
+      updateMathTab(f);
+    };
+
+    applyPreset('upright');
+    setProbe('nose');
+    // Optional state in the URL hash: #preset=turned&probe=fin&demo=undo&s=1&tab=math
+    (function readHash() {
+      const q = new URLSearchParams(location.hash.slice(1));
+      if (PRESETS[q.get('preset')]) applyPreset(q.get('preset'));
+      if (PROBES[q.get('probe')]) setProbe(q.get('probe'));
+      if (DEMOS.some((d) => d.value === q.get('demo'))) {
+        startDemo(q.get('demo'));
+        if (q.has('s')) state.demo.s = clamp(Number(q.get('s')) || 0, 0, 1);
+      }
+      if (q.has('tab')) document.querySelector(`[data-tab-button="${q.get('tab')}"]`)?.click();
+    })();
+  </script>
+</body>
+</html>
