@@ -42,7 +42,8 @@ Contents:
 - `prompts/handoff.md`, `prompts/qscha.md`, `prompts/handoff-swarm.md`,
   `prompts/hegelian.md` — the `/handoff`, `/qscha`, `/handoff-swarm`,
   and `/hegelian` prompts.
-- `AGENTS.md` — always-on pointers to coding-practices and english, and
+- `AGENTS.md` — always-on pointers to karpathy (top priority),
+  coding-practices and english, and
   the swarm trigger line.
 
 Note: this port matches the Claude Code version, with three

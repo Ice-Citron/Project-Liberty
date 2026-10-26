@@ -30,7 +30,8 @@ Contents:
 - `commands/handoff.md`, `commands/qscha.md`, `commands/handoff-swarm.md`,
   `commands/hegelian.md` — the `/handoff`, `/qscha`, `/handoff-swarm`,
   and `/hegelian` aliases.
-- `CLAUDE.md` — always-on pointers to coding-practices and english, and
+- `CLAUDE.md` — always-on pointers to karpathy (top priority),
+  coding-practices and english, and
   the swarm trigger line.
 
 For Codex on the same PC: copy the seven `skills/` folders into
