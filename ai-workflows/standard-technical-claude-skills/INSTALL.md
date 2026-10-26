@@ -25,11 +25,13 @@ Contents:
   every live agent and session (coordinator + receiver roles).
 - `skills/standard-technical-hegelian-explainer/` — research paper as
   a Hegelian dialectic tree of its references.
+- `skills/standard-technical-karpathy/` — Andrej Karpathy's coding
+  guidelines: think first, simplicity, surgical changes, verifiable goals.
 - `commands/handoff.md`, `commands/qscha.md`, `commands/handoff-swarm.md`,
   `commands/hegelian.md` — the `/handoff`, `/qscha`, `/handoff-swarm`,
   and `/hegelian` aliases.
 - `CLAUDE.md` — always-on pointers to coding-practices and english, and
   the swarm trigger line.
 
-For Codex on the same PC: copy the six `skills/` folders into
+For Codex on the same PC: copy the seven `skills/` folders into
 `~/.agents/skills/` as well. Codex reads that location.

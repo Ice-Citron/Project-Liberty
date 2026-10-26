@@ -3,7 +3,7 @@
 These files go into `~/.codex/` on each PC.
 
 1. Unzip this archive into a temporary folder.
-2. Copy the six folders from `skills/` into `~/.codex/skills/`.
+2. Copy the seven folders from `skills/` into `~/.codex/skills/`.
 3. Copy the four files in `prompts/` into `~/.codex/prompts/`. Create
    the `prompts` folder if it is absent.
 4. Caution: if `~/.codex/AGENTS.md` already exists, do not overwrite
@@ -37,6 +37,8 @@ Contents:
   is unverified).
 - `skills/standard-technical-hegelian-explainer/` — research paper as
   a Hegelian dialectic tree of its references.
+- `skills/standard-technical-karpathy/` — Andrej Karpathy's coding
+  guidelines: think first, simplicity, surgical changes, verifiable goals.
 - `prompts/handoff.md`, `prompts/qscha.md`, `prompts/handoff-swarm.md`,
   `prompts/hegelian.md` — the `/handoff`, `/qscha`, `/handoff-swarm`,
   and `/hegelian` prompts.
