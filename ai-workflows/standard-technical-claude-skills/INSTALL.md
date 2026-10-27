@@ -27,6 +27,8 @@ Contents:
   a Hegelian dialectic tree of its references.
 - `skills/standard-technical-karpathy/` — Andrej Karpathy's coding
   guidelines: think first, simplicity, surgical changes, verifiable goals.
+- `skills/standard-technical-wandb/` — W&B link to a minimal PDF
+  training report of Ultralytics runs (scripts in `scripts/`).
 - `commands/handoff.md`, `commands/qscha.md`, `commands/handoff-swarm.md`,
   `commands/hegelian.md` — the `/handoff`, `/qscha`, `/handoff-swarm`,
   and `/hegelian` aliases.
@@ -34,5 +36,5 @@ Contents:
   coding-practices and english, and
   the swarm trigger line.
 
-For Codex on the same PC: copy the seven `skills/` folders into
+For Codex on the same PC: copy the eight `skills/` folders into
 `~/.agents/skills/` as well. Codex reads that location.
