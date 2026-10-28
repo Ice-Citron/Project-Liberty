@@ -1,0 +1,1776 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Density · Area Is Probability</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: var(--blue-1); }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .verdict { color: var(--blue-1); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 13px; margin-left: 8px; }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.curve { width: 14px; height: 2px; border-radius: 0; background: var(--left); }
+    .swatch.area { background: rgba(61, 149, 236, 0.5); }
+    .swatch.hist { background: rgba(221, 116, 37, 0.4); border-top: 2px solid var(--right); border-radius: 0; }
+    .swatch.strip { background: rgba(221, 116, 37, 0.18); border: 1px solid var(--right); border-radius: 0; }
+    .swatch.ecdf, .swatch.secant { width: 14px; height: 2px; border-radius: 0; background: var(--right); }
+    .swatch.tangent { width: 14px; height: 2px; border-radius: 0; background: var(--ink); }
+    .swatch.handle { width: 0; height: 12px; border-radius: 0; border-left: 2px dashed var(--ink); }
+    .swatch.one { width: 14px; height: 0; border-radius: 0; border-top: 1px dashed var(--muted); }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .chip {
+      font-family: var(--mono); font-size: 12px; color: var(--ink); padding: 6px 10px; white-space: nowrap; overflow-x: auto;
+      border: 1px solid var(--line); border-radius: 8px; background: rgba(8, 23, 40, 0.7);
+    }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .preset-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.head { color: var(--blue-1); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith div.neg { box-shadow: inset 3px 0 0 var(--danger); }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    table.forms { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.forms th, table.forms td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    table.forms th { color: var(--blue-1); font-weight: 700; }
+    table.forms td.f { font-family: var(--mono); color: var(--ink); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 1</div>
+        <h1>Density: area is probability</h1>
+        <p class="lead">
+          A continuous X can land anywhere on a line.
+          So no single value can hold any probability.
+          Probability lives in <strong>areas</strong> under a curve f.
+          The height of f is a <strong>density</strong>: probability per unit of x.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="index.html">← Index</a>
+        <span>Chapter 1 of 5</span>
+        <a href="Ch2-Mean-Variance-And-Quantiles.html">Ch 2 →</a>
+      </nav>
+      <div class="chip">P(a &lt; X ≤ b) = F(b) − F(a) = ∫ₐᵇ f(x) dx</div>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · from bars to areas</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 4 pick a view.
+            The Arithmetic tab writes out every number on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a shape</div>
+          <div id="shapeGrid" class="preset-grid three"></div>
+          <div id="candHost" style="display: grid; gap: 8px;" hidden>
+            <div class="body">Two rules make a valid pdf. f(x) ≥ 0 for every x. The total area is exactly 1.</div>
+            <div id="candGrid" class="preset-grid"></div>
+            <div id="candVerdict" class="live-line"></div>
+          </div>
+          <div id="paramHost" style="display: grid; gap: 8px;"></div>
+          <label id="compareRow" class="checkbox" hidden><input id="compareBox" type="checkbox"> Compare with an Exponential of the same mean</label>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Choose a view</div>
+          <div id="viewGrid" class="preset-grid four"></div>
+          <div id="viewNote" class="body"></div>
+          <div id="histHost" style="display: grid; gap: 8px;" hidden>
+            <div class="slider-row">
+              <div class="slider-label"><span>h, the bin width</span><strong id="hOut"></strong></div>
+              <input id="hIn" type="range" min="0" max="9" step="1">
+            </div>
+            <label class="checkbox"><input id="divideBox" type="checkbox"> Divide each bar by h</label>
+            <div class="preset-grid four">
+              <button data-sample="100">+100</button>
+              <button data-sample="1000">+1000</button>
+              <button data-sample="10000">+10 000</button>
+              <button id="resetSamples">Reset</button>
+            </div>
+            <div id="sampleLine" class="live-line"></div>
+          </div>
+          <div id="stripHost" style="display: grid; gap: 8px;" hidden>
+            <div class="slider-row">
+              <div class="slider-label"><span>N, the number of strips</span><strong id="nOut"></strong></div>
+              <input id="nIn" type="range" min="1" max="200" step="1">
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The interval (a, b]</div>
+          <div class="body">Drag a or b on either chart. The sliders do the same.</div>
+          <div class="slider-row">
+            <div class="slider-label"><span>a, the left end</span><strong id="aOut"></strong></div>
+            <input id="aIn" type="range">
+          </div>
+          <div class="slider-row">
+            <div class="slider-label"><span>b, the right end</span><strong id="bOut"></strong></div>
+            <input id="bIn" type="range">
+          </div>
+          <div class="pair">
+            <button id="shrinkBtn">Shrink to a point</button>
+            <button id="intervalReset">Reset the interval</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · U(0, 0.25) is a valid pdf. How tall is it?</summary>
+            <div class="answer"><strong>4.</strong> The width is 0.25. So the height must be 4 for an area of 1.
+              A density may exceed 1.</div>
+            <button data-predict="0">Set it up: U(0, 0.25)</button>
+          </details>
+          <details class="predict">
+            <summary>2 · X ~ Exp(1). Which is larger: P(X ≤ 1) or P(X &lt; 1)?</summary>
+            <div class="answer"><strong>Neither.</strong> Both equal 1 − e^(−1) ≈ 0.632.
+              The single point x = 1 adds zero area.</div>
+            <button data-predict="1">Set it up: Exp(1) up to b = 1</button>
+          </details>
+          <details class="predict">
+            <summary>3 · f(x) = c·x² on [0, 1]. Which c makes it a pdf?</summary>
+            <div class="answer"><strong>c = 3.</strong> The area is c/3. Set c/3 = 1.
+              Slide c to 3 and watch the verdict change.</div>
+            <button data-predict="2">Set it up: c = 1</button>
+          </details>
+          <details class="predict">
+            <summary>4 · Where does the cdf of N(0, 1) rise fastest?</summary>
+            <div class="answer"><strong>At x = 0.</strong> The slope of F is f.
+              The density peaks at 0 with f(0) = 1/√(2π) ≈ 0.399.</div>
+            <button data-predict="3">Set it up: the Slope view. Then drag b.</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Pareto with k = 1 and α = 2. What is P(X &gt; 10)?</summary>
+            <div class="answer"><strong>0.01.</strong> P(X &gt; x) = (k/x)^α = (1/10)² = 0.01.
+              An Exponential with the same mean gives only about 0.0067.</div>
+            <button data-predict="4">Set it up: Pareto(k = 1, α = 2)</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Density and the cdf</div>
+          <div class="formula">F(x) = P(X ≤ x) = ∫ from −∞ to x of f(u) du
+f(x) = d/dx F(x) = F′(x)</div>
+          <div class="body">The slide Probability Density Function defines f through F.
+            The slide pdf as the Derivative of the cdf turns it round.
+            Integrate f to get F. Differentiate F to get f.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Interval probabilities</div>
+          <div class="formula">P(a &lt; X ≤ b) = P(X ≤ b) − P(X ≤ a)
+             = F(b) − F(a)
+             = ∫ from a to b of f(x) dx</div>
+          <div class="body">Everything up to b minus everything up to a leaves the part in between.
+            That part is the area under f from a to b.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why one point has probability 0</div>
+          <div class="formula">{X = b} lies inside {b − h &lt; X ≤ b} for every h &gt; 0
+P(X = b) ≤ F(b) − F(b − h)  →  0  as h → 0
+so P(X = b) = 0 and P(X ≤ b) = P(X &lt; b)
+
+countable set: P(X ∈ {x₁, x₂, …}) = 0 + 0 + … = 0</div>
+          <div class="body">F is continuous. So the thin strips that end at b hold less and less.
+            Countably many zeros still add up to 0. So the support of a continuous X must be uncountable.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Density is probability per unit of x</div>
+          <div class="formula">P(x ≤ X &lt; x + h) = F(x + h) − F(x)
+                 ≈ F′(x)·h = f(x)·h  for small h
+f(x) = lim as h → 0 of P(x ≤ X &lt; x + h) / h</div>
+          <div class="body">A density of 2 puts about 0.02 of probability in a strip of width 0.01.
+            So f(x) may exceed 1. Only areas must stay at or below 1.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Discrete against continuous</div>
+          <table class="forms">
+            <tr><th></th><th>Discrete</th><th>Continuous</th></tr>
+            <tr><td>You plot</td><td>p(x), a probability</td><td>f(x), a density</td></tr>
+            <tr><td>Largest value</td><td>at most 1</td><td>any size</td></tr>
+            <tr><td>P(a &lt; X ≤ b)</td><td class="f">Σ p(x), a &lt; x ≤ b</td><td class="f">∫ₐᵇ f(x) dx</td></tr>
+            <tr><td>P(X = x)</td><td class="f">p(x)</td><td class="f">0</td></tr>
+            <tr><td>The cdf F</td><td>jumps at each x</td><td>continuous</td></tr>
+            <tr><td>P(X ≤ x) and P(X &lt; x)</td><td>differ by p(x)</td><td>equal</td></tr>
+            <tr><td>Valid when</td><td class="f">p ≥ 0, Σ p = 1</td><td class="f">f ≥ 0, ∫ f = 1</td></tr>
+          </table>
+          <div class="body">Each row on the right is the limit of the row on the left.
+            Slice the line into strips of width h. Each strip acts like a pmf bar with p ≈ f(x)h.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Two worked answers</div>
+          <div class="formula">Find c for f(x) = c x² on [0, 1]:
+∫ from 0 to 1 of c x² dx = c [x³/3] from 0 to 1
+                         = c/3
+c/3 = 1  ⇒  c = 3</div>
+          <button data-load="0">Load c · x² with c = 1</button>
+          <div class="formula">Q&amp;A, Pareto: f(x) = α k^α / x^(α+1) for x ≥ k
+F(x) = ∫ from k to x of α k^α u^(−α−1) du
+     = [−k^α u^(−α)] from k to x
+     = 1 − (k/x)^α
+P(X &gt; x) = 1 − F(x) = (k/x)^α</div>
+          <button data-load="1">Load Pareto(k = 1, α = 2)</button>
+          <div class="body">The Pareto tail (k/x)^α shrinks like a power of x.
+            An Exponential tail e^(−λx) shrinks much faster. So the Pareto tail is called heavy.</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale. 50008 Probability and Statistics. L04 Continuous Random Variables.
+            Slides: Probability Density Function · Interval Probabilities · Consequences · pdf as the Derivative of the cdf ·
+            Properties of a pdf · Contrast with discrete random variable cdfs · Q&amp;A: Pareto distribution.
+            The Uniform, Exponential and Normal formulas come from their own L04 slides.
+            The triangle, the candidate functions and the Pareto mean αk/(α − 1) are standard results.
+            Every number on this page comes from one maths block. A Node test checks it.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Area is probability.</strong> P(a &lt; X ≤ b) is the area under f from a to b.
+            The height of f is not a probability.</div>
+          <div class="essence"><strong>Height is density.</strong> f(x) is probability per unit of x.
+            A thin strip of width h holds about f(x)·h.</div>
+          <div class="essence"><strong>Points are free.</strong> A single point has zero width.
+            So it has zero area and P(X = x) = 0.</div>
+          <div class="essence"><strong>F collects area and f is its slope.</strong> F(x) adds up area from the left.
+            The steepness of F at x is f(x).</div>
+          <div class="essence"><strong>Two rules make a pdf.</strong> f(x) ≥ 0 everywhere and a total area of 1.
+            A height above 1 breaks no rule.</div>
+          <div class="essence"><strong>Σ becomes ∫.</strong> Slice the line into strips of width h.
+            Each strip acts like a pmf bar. Shrink h and the sum becomes an integral.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can say why a density can exceed 1 but a probability cannot.</label>
+            <label><input type="checkbox"> I can turn P(a &lt; X ≤ b) into F(b) − F(a) and into an area.</label>
+            <label><input type="checkbox"> I can explain why P(X = x) = 0 for a continuous X.</label>
+            <label><input type="checkbox"> I can get f from F by differentiation and F from f by integration.</label>
+            <label><input type="checkbox"> I can test a candidate f against the two rules of a pdf.</label>
+            <label><input type="checkbox"> I can derive the Pareto cdf 1 − (k/x)^α from its pdf.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Not every random variable has a pdf.</strong>
+            A wait that is exactly 0 with probability 0.3 gives F a jump. The slides call the pdf case absolutely continuous.</div>
+          <div class="body"><strong>f(x)·h needs f to be smooth near x.</strong>
+            At a jump of f the rectangle uses the height on one side only.</div>
+          <div class="body"><strong>A histogram is noisy.</strong> Narrow bins catch few samples.
+            So they need many samples to settle.</div>
+          <div class="body"><strong>The value of f at one point does not matter.</strong>
+            A change of f at a single x changes no area. So a &lt; x &lt; b and a ≤ x ≤ b give the same Uniform.</div>
+          <div class="body"><strong>The Pareto mean is finite only for α &gt; 1.</strong>
+            It equals αk/(α − 1). This is a standard result and not on the slides.</div>
+          <div class="body"><strong>The Normal cdf here comes from a series.</strong>
+            Chapter 4 shows the table method from the slides.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Where next</div>
+          <div class="body"><a href="Ch2-Mean-Variance-And-Quantiles.html">Chapter 2</a> builds the mean, the variance and the quantiles from the same strips.</div>
+          <div class="body">The discrete pages: <a href="../Essence-of-Skewness.html">Skewness</a> ·
+            <a href="../Essence-of-Geometric.html">Geometric</a> · <a href="../Essence-of-Poisson.html">Poisson</a>.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by l04/test_ch1.js) =====================
+    // KIT START
+    const SQRT2PI = Math.sqrt(2 * Math.PI);
+
+    // Seeded uniform generator on [0, 1), for repeatable tests.
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return () => {
+        t = (t + 0x6d2b79f5) >>> 0;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // Composite Simpson's rule with n (even) panels.
+    function simpson(f, a, b, n = 4000) {
+      const h = (b - a) / n;
+      let s = f(a) + f(b);
+      for (let i = 1; i < n; i += 1) s += (i % 2 ? 4 : 2) * f(a + i * h);
+      return (s * h) / 3;
+    }
+
+    const phi = (z) => Math.exp(-0.5 * z * z) / SQRT2PI;
+    // Standard Normal cdf from the series Φ(z) = 1/2 + φ(z)(z + z³/3 + z⁵/(3·5) + …).
+    function Phi(z) {
+      if (z > 8.5) return 1;
+      if (z < -8.5) return 0;
+      const z2 = z * z;
+      let term = Math.abs(z);
+      let sum = term;
+      for (let n = 1; n < 2000 && term > 1e-17 * sum; n += 1) {
+        term *= z2 / (2 * n + 1);
+        sum += term;
+      }
+      const half = phi(z) * sum;
+      return z >= 0 ? 0.5 + half : 0.5 - half;
+    }
+
+    // The "is it a pdf?" game. Each f lives on [lo, hi).
+    const CANDIDATE_F = {
+      cx2: (P) => ({ lo: 0, hi: 1, f: (x) => P.c * x * x, F: (x) => (P.c * x ** 3) / 3, total: P.c / 3, inv: (u) => Math.cbrt(u) }),
+      line: () => ({ lo: 0, hi: 1, f: (x) => 3 - 4 * x, F: (x) => 3 * x - 2 * x * x, total: 1, extra: [0.75] }),
+      two: () => ({ lo: 0, hi: 1, f: () => 2, F: (x) => 2 * x, total: 2 }),
+      tall: () => ({ lo: 0, hi: 0.25, f: () => 4, F: (x) => 4 * x, total: 1, inv: (u) => u / 4 }),
+    };
+
+    // pdf, cdf and sampler for one shape. `breaks` are the x values where f jumps or bends.
+    function makeDist(shape, P) {
+      if (shape === 'uniform') {
+        const l = P.l;
+        const r = P.l + P.w;
+        return {
+          shape, P, lo: l, hi: r, breaks: [l, r], far: [l, r], total: 1,
+          pdf: (x) => (x >= l && x < r ? 1 / P.w : 0),
+          cdf: (x) => (x <= l ? 0 : x >= r ? 1 : (x - l) / P.w),
+          sample: (rng) => l + P.w * rng(),
+        };
+      }
+      if (shape === 'triangle') {
+        const { w } = P;
+        const m = P.s * w;
+        return {
+          shape, P, m, lo: 0, hi: w, breaks: [0, m, w], far: [0, w], total: 1,
+          pdf: (x) => (x <= 0 || x >= w ? 0 : x < m ? (2 * x) / (w * m) : (2 * (w - x)) / (w * (w - m))),
+          cdf: (x) => (x <= 0 ? 0 : x >= w ? 1 : x <= m ? (x * x) / (w * m) : 1 - (w - x) ** 2 / (w * (w - m))),
+          sample: (rng) => {
+            const u = rng();
+            return u < m / w ? Math.sqrt(u * w * m) : w - Math.sqrt((1 - u) * w * (w - m));
+          },
+        };
+      }
+      if (shape === 'exponential') {
+        const L = P.lambda;
+        return {
+          shape, P, lo: 0, hi: Infinity, breaks: [0], far: [0, 40 / L], total: 1,
+          pdf: (x) => (x < 0 ? 0 : L * Math.exp(-L * x)),
+          cdf: (x) => (x <= 0 ? 0 : 1 - Math.exp(-L * x)),
+          sample: (rng) => -Math.log(1 - rng()) / L,
+        };
+      }
+      if (shape === 'normal') {
+        const { mu, sigma } = P;
+        return {
+          shape, P, lo: -Infinity, hi: Infinity, breaks: [], far: [mu - 12 * sigma, mu + 12 * sigma], total: 1,
+          pdf: (x) => phi((x - mu) / sigma) / sigma,
+          cdf: (x) => Phi((x - mu) / sigma),
+          sample: (rng) => mu + sigma * Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng()),
+        };
+      }
+      if (shape === 'pareto') {
+        const { k, alpha } = P;
+        return {
+          shape, P, lo: k, hi: Infinity, breaks: [k], far: [k, k * Math.exp(40 / alpha)], total: 1,
+          pdf: (x) => (x < k ? 0 : (alpha * k ** alpha) / x ** (alpha + 1)),
+          cdf: (x) => (x <= k ? 0 : 1 - (k / x) ** alpha),
+          sample: (rng) => k * (1 - rng()) ** (-1 / alpha),
+        };
+      }
+      const C = CANDIDATE_F[P.which](P);
+      return {
+        shape, P, lo: C.lo, hi: C.hi, breaks: [C.lo, C.hi, ...(C.extra || [])], far: [C.lo, C.hi], total: C.total,
+        pdf: (x) => (x >= C.lo && x < C.hi ? C.f(x) : 0),
+        cdf: (x) => (x <= C.lo ? 0 : x >= C.hi ? C.total : C.F(x)),
+        sample: C.inv ? (rng) => C.inv(rng()) : null,
+      };
+    }
+
+    // ∫ f from a to b: Simpson on each smooth piece between breaks.
+    // Pareto pieces use s = ln x, where the integrand α(k/x)^α is smooth.
+    function area(D, a, b, n = 4000) {
+      if (!(b > a)) return 0;
+      const inside = D.breaks.filter((x) => x > a && x < b).sort((u, v) => u - v);
+      const cuts = [a, ...inside, b];
+      let s = 0;
+      for (let i = 0; i + 1 < cuts.length; i += 1) {
+        const u = cuts[i];
+        const v = cuts[i + 1];
+        if (D.shape === 'pareto' && u > 0) {
+          const su = Math.log(u);
+          const sv = Math.log(v);
+          const e = (sv - su) * 1e-12;
+          s += simpson((t) => D.pdf(Math.exp(t)) * Math.exp(t), su + e, sv - e, n);
+        } else {
+          const e = Math.max((v - u) * 1e-12, 1e-15 * (Math.abs(u) + Math.abs(v)));
+          s += simpson(D.pdf, u + e, v - e, n);
+        }
+      }
+      return s;
+    }
+    const totalArea = (D) => area(D, D.far[0], D.far[1]);
+
+    // Left-endpoint Riemann sum: N strips of width h, heights f(a + i h).
+    function riemann(f, a, b, N) {
+      const h = (b - a) / N;
+      const xs = [];
+      const fs = [];
+      let sum = 0;
+      for (let i = 0; i < N; i += 1) {
+        const x = a + i * h;
+        xs.push(x);
+        fs.push(f(x));
+        sum += f(x) * h;
+      }
+      return { h, xs, fs, sum };
+    }
+
+    // Counts in bins [start + j h, start + (j + 1) h) that cover [x0, x1].
+    function histogram(samples, x0, x1, h) {
+      const start = Math.floor(x0 / h + 1e-9) * h;
+      const n = Math.ceil((x1 - start) / h - 1e-9);
+      const counts = new Array(n).fill(0);
+      let outside = 0;
+      samples.forEach((s) => {
+        const j = Math.floor((s - start) / h);
+        if (j >= 0 && j < n) counts[j] += 1;
+        else outside += 1;
+      });
+      return { start, h, counts, outside, N: samples.length };
+    }
+
+    // Difference quotients of F at x. A corner shows as left ≠ right.
+    function slopeAt(D, x, h = 1e-5) {
+      const F = D.cdf;
+      return {
+        left: (F(x) - F(x - h)) / h,
+        right: (F(x + h) - F(x)) / h,
+        central: (F(x + h) - F(x - h)) / (2 * h),
+      };
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fx = (v) => minus(String(+v.toFixed(3)));
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step) + 1e-9))));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const num10 = (v) => minus(String(+v.toPrecision(10)));
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of cells padded into aligned columns. A trailing { cls } object styles the row.
+    function gridHtml(rows) {
+      const cells = rows.map((r) => r.filter((c) => typeof c === 'string'));
+      const widths = [];
+      cells.forEach((r) => r.forEach((c, i) => { widths[i] = Math.max(widths[i] || 0, c.length); }));
+      return rows.map((r, k) => {
+        const cls = (r.find((c) => typeof c === 'object') || {}).cls || '';
+        const line = cells[k].map((c, i) => (i < cells[k].length - 1 ? c.padEnd(widths[i]) : c)).join('  ');
+        return `<div class="${cls}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+
+    // ===================== STATE =====================
+    const CANDIDATES = {
+      cx2: { label: 'c · x² on [0, 1]', name: (P) => `f(x) = ${fx(P.c)}x² on [0, 1]`, support: '[0, 1]' },
+      line: { label: '3 − 4x on [0, 1]', name: () => 'f(x) = 3 − 4x on [0, 1]', support: '[0, 1]' },
+      two: { label: '2 on [0, 1]', name: () => 'f(x) = 2 on [0, 1]', support: '[0, 1]' },
+      tall: { label: '4 on [0, 0.25]', name: () => 'f(x) = 4 on [0, 0.25]', support: '[0, 0.25]' },
+    };
+    const SHAPES = {
+      uniform: {
+        label: 'Uniform', range: [-1.5, 3.5],
+        params: [
+          { key: 'l', label: 'ℓ, the left end', min: -1, max: 2, step: 0.05 },
+          { key: 'w', label: 'r − ℓ, the width', min: 0.1, max: 3, step: 0.05 },
+        ],
+        name: (P) => `U(${fx(P.l)}, ${fx(P.l + P.w)})`, support: (P) => `[${fx(P.l)}, ${fx(P.l + P.w)}]`,
+        interval: (P) => [P.l + 0.25 * P.w, P.l + 0.75 * P.w],
+      },
+      triangle: {
+        label: 'Triangle', range: [-0.5, 4.5],
+        params: [
+          { key: 'w', label: 'w, the width', min: 0.5, max: 4, step: 0.05 },
+          { key: 's', label: 'peak m as a share of w', min: 0, max: 1, step: 0.05 },
+        ],
+        name: (P) => `Triangle on [0, ${fx(P.w)}] with its peak at ${fx(P.s * P.w)}`, support: (P) => `[0, ${fx(P.w)}]`,
+        interval: (P) => [0.25 * P.w, 0.6 * P.w],
+      },
+      exponential: {
+        label: 'Exponential', range: [-0.5, 10],
+        params: [{ key: 'lambda', label: 'λ, the rate', min: 0.2, max: 4, step: 0.05 }],
+        name: (P) => `Exp(${fx(P.lambda)})`, support: () => '[0, ∞)',
+        interval: (P) => [0.5 / P.lambda, 1.5 / P.lambda],
+      },
+      normal: {
+        label: 'Normal', range: [-5, 5],
+        params: [
+          { key: 'mu', label: 'μ, the centre', min: -2, max: 2, step: 0.05 },
+          { key: 'sigma', label: 'σ, the spread', min: 0.2, max: 2, step: 0.05 },
+        ],
+        name: (P) => `N(${fx(P.mu)}, ${fx(P.sigma ** 2)})`, support: () => 'all of ℝ',
+        interval: (P) => [P.mu - P.sigma, P.mu + P.sigma],
+      },
+      pareto: {
+        label: 'Pareto', range: [0, 12],
+        params: [
+          { key: 'k', label: 'k, the scale', min: 0.5, max: 2, step: 0.05 },
+          { key: 'alpha', label: 'α, the shape', min: 0.5, max: 4, step: 0.05 },
+        ],
+        name: (P) => `Pareto(k = ${fx(P.k)}, α = ${fx(P.alpha)})`, support: (P) => `[${fx(P.k)}, ∞)`,
+        interval: (P) => [2 * P.k, 4 * P.k],
+      },
+      candidate: {
+        label: 'Is it a pdf?', range: [-0.25, 1.75],
+        params: [{ key: 'c', label: 'c, the constant', min: 0.5, max: 5, step: 0.1 }],
+        name: (P) => CANDIDATES[P.which].name(P), support: (P) => CANDIDATES[P.which].support,
+        interval: () => [0.5, 1],
+      },
+    };
+    const params = {
+      uniform: { l: 0, w: 1 }, triangle: { w: 2, s: 0.5 }, exponential: { lambda: 1 },
+      normal: { mu: 0, sigma: 1 }, pareto: { k: 1, alpha: 2 }, candidate: { which: 'cx2', c: 2 },
+    };
+    const VIEWS = [
+      { key: 'area', word: 'Area', note: 'Drag a or b on either chart. The shaded area and the rise of F are the same number.' },
+      { key: 'hist', word: 'Histogram', note: 'Draw samples. Then narrow the bins. Untick the box to see raw fractions.' },
+      { key: 'strips', word: 'Strips', note: 'Raise N. The rectangles hug the curve and their sum nears the area.' },
+      { key: 'slope', word: 'Slope', note: 'Drag b along the cdf. The slope of the tangent always equals the height of f at b.' },
+    ];
+    const H_STEPS = [0.02, 0.025, 0.05, 0.1, 0.125, 0.2, 0.25, 0.5, 1, 2];
+    const TOUR = [
+      { title: 'Bars as raw fractions', shape: 'exponential', P: { lambda: 1 }, view: 'hist', hIdx: 7, divide: false, samples: 4000, a: 0.5, b: 1.5,
+        note: 'Each bar shows the fraction of 4000 samples in its bin. Now pick a narrower bin width. Each bar shrinks with it. Raw fractions never settle on one shape.' },
+      { title: 'Divide by the bin width', shape: 'exponential', P: { lambda: 1 }, view: 'hist', hIdx: 7, divide: true, samples: 4000, a: 0.5, b: 1.5,
+        note: 'Now each bar is its fraction ÷ h. Narrow the bins again. The bars keep their height and hug the curve. That limit is the density f(x).' },
+      { title: 'Narrow bins and many samples', shape: 'exponential', P: { lambda: 1 }, view: 'hist', hIdx: 3, divide: true, samples: 40000, a: 0.5, b: 1.5,
+        note: 'With h = 0.1 and 40 000 samples the bars trace f(x) = e^(−x). So the y-axis means probability per unit of x.' },
+      { title: 'Area is probability', shape: 'exponential', P: { lambda: 1 }, view: 'area', a: 0.5, b: 1.5,
+        note: 'The shaded area is P(0.5 < X ≤ 1.5) = 0.383. The cdf below rises by the same 0.383 from a to b. Drag a or b and watch both charts.' },
+      { title: 'A density above 1', shape: 'uniform', P: { l: 0, w: 0.5 }, view: 'area', a: 0, b: 0.25,
+        note: 'U(0, 0.5) has height 2. That breaks no rule. Its area is 0.5 × 2 = 1. A height is not a probability. Only an area is.' },
+      { title: 'One point holds nothing', shape: 'normal', P: { mu: 0, sigma: 1 }, view: 'area', a: 1, b: 1.001,
+        note: 'This strip is 0.001 wide. Its area is only 0.00024. Press "Shrink to a point" and the area reaches 0. So P(X = 1) = 0.' },
+      { title: 'f is the slope of F', shape: 'normal', P: { mu: 0, sigma: 1 }, view: 'slope', a: -1, b: 0,
+        note: 'The cdf is steepest at 0. Its slope there is f(0) = 0.399. The orange secant from a to b has slope 0.341. Drag a toward b and the two slopes meet.' },
+      { title: 'f(x)·h for a thin strip', shape: 'exponential', P: { lambda: 1 }, view: 'strips', N: 1, a: 1, b: 1.1,
+        note: 'One rectangle with height f(1) and width 0.1 has area 0.0368. The exact strip has area 0.0350. Make the strip thinner and the gap closes.' },
+      { title: 'From Σ to ∫', shape: 'exponential', P: { lambda: 1 }, view: 'strips', N: 20, a: 0, b: 3,
+        note: 'Twenty rectangles give 1.023. The exact area is 0.950. Raise N and the sum closes in. This is Σ p(x) turning into ∫ f(x) dx.' },
+      { title: 'Find the constant c', shape: 'candidate', P: { which: 'cx2', c: 2 }, view: 'area', a: 0.5, b: 1,
+        note: 'f(x) = 2x² has area 2/3 on [0, 1]. That is too little. Slide c until the area is exactly 1. The answer is c = 3.' },
+      { title: 'Area 1 is not enough', shape: 'candidate', P: { which: 'line' }, view: 'area', a: 0.75, b: 1,
+        note: 'f(x) = 3 − 4x has a total area of 1. Yet it dips below 0 after x = 0.75. That strip would get probability −0.125. So the cdf climbs above 1 and then falls.' },
+      { title: 'The Pareto Q&A', shape: 'pareto', P: { k: 1, alpha: 2 }, view: 'area', a: 2, b: 4, compare: true,
+        note: 'UNIX process lifetimes follow this law. Its cdf is F(x) = 1 − (k/x)^α. So P(X > 2) = (1/2)² = 0.25. The orange Exponential has the same mean. Far out the Pareto tail is much heavier.' },
+    ];
+    const PREDICT = [
+      { shape: 'uniform', P: { l: 0, w: 0.25 }, view: 'area', a: 0, b: 0.25 },
+      { shape: 'exponential', P: { lambda: 1 }, view: 'area', a: -0.5, b: 1 },
+      { shape: 'candidate', P: { which: 'cx2', c: 1 }, view: 'area', a: 0, b: 1 },
+      { shape: 'normal', P: { mu: 0, sigma: 1 }, view: 'slope', a: -2, b: -1 },
+      { shape: 'pareto', P: { k: 1, alpha: 2 }, view: 'area', a: 10, b: 12, compare: true },
+    ];
+    const LOADS = [
+      { shape: 'candidate', P: { which: 'cx2', c: 1 }, view: 'area', a: 0, b: 1 },
+      { shape: 'pareto', P: { k: 1, alpha: 2 }, view: 'area', a: 2, b: 4 },
+    ];
+
+    const state = {
+      shape: 'exponential', view: 'area', a: 0.5, b: 1.5, hIdx: 7, divide: true, N: 10,
+      samples: [], sorted: null, compare: false, tour: 0, hoverX: null,
+    };
+    let model = null;
+    let dirty = true;
+    let drag = null;
+    let shrinkId = 0;
+
+    // ===================== MODEL =====================
+    // x values for curves: an even grid plus both sides of every break.
+    function curvePoints(D, x0, x1, n) {
+      const xs = [];
+      for (let i = 0; i <= n; i += 1) xs.push(x0 + ((x1 - x0) * i) / n);
+      const e = (x1 - x0) * 1e-7;
+      D.breaks.forEach((x) => {
+        if (x - e > x0) xs.push(x - e);
+        if (x + e < x1) xs.push(x + e);
+        if (x > x0 && x < x1) xs.push(x);
+      });
+      return xs.sort((u, v) => u - v);
+    }
+
+    function buildModel() {
+      const P = params[state.shape];
+      const spec = SHAPES[state.shape];
+      const D = makeDist(state.shape, P);
+      const [x0, x1] = spec.range;
+      state.a = clamp(state.a, x0, x1);
+      state.b = clamp(state.b, state.a, x1);
+      const { a, b } = state;
+      const xs = curvePoints(D, x0, x1, 800);
+      let peak = 0;
+      let low = 0;
+      let argLow = 0;
+      let fTop = 1;
+      xs.forEach((x) => {
+        const v = D.pdf(x);
+        peak = Math.max(peak, v);
+        if (v < low) {
+          low = v;
+          argLow = x;
+        }
+        fTop = Math.max(fTop, D.cdf(x));
+      });
+      const total = totalArea(D);
+      const valid = low >= -1e-12 && Math.abs(total - 1) < 1e-6;
+      const h = H_STEPS[state.hIdx];
+      const hist = state.samples.length ? histogram(state.samples, x0, x1, h) : null;
+      let yMax = Math.max(1.25, peak * 1.15);
+      if (hist) {
+        const top = Math.max(...hist.counts) / hist.N / (state.divide ? h : 1);
+        yMax = Math.max(yMax, top * 1.08);
+      }
+      let E = null;
+      if (state.shape === 'pareto' && state.compare && P.alpha > 1) {
+        E = makeDist('exponential', { lambda: (P.alpha - 1) / (P.alpha * P.k) });
+        yMax = Math.max(yMax, E.pdf(0) * 1.15);
+      }
+      const Fa = D.cdf(a);
+      const Fb = D.cdf(b);
+      return {
+        D, P, x0, x1, xs, a, b, Fa, Fb, exact: Fb - Fa, numeric: area(D, a, b),
+        peak, low, argLow, total, valid, hist, E,
+        yMin: low < 0 ? low * 1.25 : 0, yMax, cMin: 0, cMax: fTop > 1.0001 ? fTop * 1.12 : 1.06,
+        strips: riemann(D.pdf, a, b, state.N), slope: slopeAt(D, b),
+        name: spec.name(P), support: spec.support(P),
+      };
+    }
+
+    function sortedSamples() {
+      if (!state.sorted) state.sorted = Float64Array.from(state.samples).sort();
+      return state.sorted;
+    }
+    // Share of samples ≤ x.
+    function ecdf(x) {
+      const s = sortedSamples();
+      let lo = 0;
+      let hi = s.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (s[mid] <= x) lo = mid + 1;
+        else hi = mid;
+      }
+      return s.length ? lo / s.length : 0;
+    }
+    function addSamples(n) {
+      if (!model.valid || !model.D.sample) return;
+      const room = Math.min(n, 200000 - state.samples.length);
+      for (let i = 0; i < room; i += 1) state.samples.push(model.D.sample(Math.random));
+      state.sorted = null;
+    }
+    // A new distribution gets fresh samples of the same count.
+    function resample() {
+      const n = state.samples.length;
+      state.samples = [];
+      state.sorted = null;
+      if (n) {
+        model = buildModel();
+        addSamples(n);
+      }
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', ink: '#ebf2ff', muted: '#8aa1c0', danger: '#ff8a8a',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)',
+    };
+    const BOLD = '600 12px Inter, ui-sans-serif, system-ui, sans-serif';
+    const SMALL = '11px Inter, ui-sans-serif, system-ui, sans-serif';
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const titleH = 18;
+      const labelsH = 24;
+      const gap = 10;
+      const avail = Math.max(160, H - 2 * titleH - 2 * labelsH - gap);
+      const top = { y: titleH, h: avail * 0.56 };
+      const bot = { y: top.y + top.h + labelsH + gap + titleH, h: avail * 0.44 };
+      const x = W < 520 ? 44 : 56;
+      return { x, w: W - x - 16, top, bot };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || '12px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function line(x0, y0, x1, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function dot(x, y, r, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#07111f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    function clipped(x, y, w, h, paint) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      paint();
+      ctx.restore();
+    }
+    function yGrid(g, lo, hi, toY) {
+      const step = niceStep(hi - lo, 4);
+      for (let t = Math.ceil(lo / step) * step; t <= hi * 1.0001; t += step) {
+        const y = toY(t);
+        if (Math.abs(t) > step * 1e-6) line(g.x, y, g.x + g.w, y, C.grid);
+        text(fmtTick(t, step), g.x - 8, y + 4, { align: 'right' });
+      }
+    }
+    function xLabels(g, y, px) {
+      const M = model;
+      const step = niceStep(M.x1 - M.x0, Math.max(4, Math.floor(g.w / 70)));
+      for (let t = Math.ceil(M.x0 / step) * step; t <= M.x1 + 1e-9; t += step) {
+        text(fmtTick(t, step), px(t), y, { align: 'center', font: SMALL });
+      }
+    }
+    function curve(fn, px, toY, color) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      model.xs.forEach((x, i) => {
+        const X = px(x);
+        const Y = toY(fn(x));
+        if (i) ctx.lineTo(X, Y);
+        else ctx.moveTo(X, Y);
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+    // Shade between f and 0 on [a, b]: positive parts blue, negative parts red.
+    function fillUnder(fn, a, b, px, toY, alpha) {
+      const pts = [a, ...model.xs.filter((x) => x > a && x < b), b];
+      [[(v) => Math.max(0, v), C.left], [(v) => Math.min(0, v), C.danger]].forEach(([cut, color]) => {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(px(a), toY(0));
+        pts.forEach((x) => ctx.lineTo(px(x), toY(cut(fn(x)))));
+        ctx.lineTo(px(b), toY(0));
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+    function rect(x0, x1, y0, y1, fill, stroke) {
+      const w = x1 - x0;
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.fillRect(x0, Math.min(y0, y1), w, Math.abs(y1 - y0));
+      if (stroke) {
+        ctx.strokeStyle = stroke;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(x0, Math.min(y0, y1), w, Math.abs(y1 - y0));
+      }
+      ctx.restore();
+    }
+
+    const TOP_TITLES = {
+      area: () => 'f(x), the density · height = probability per unit of x',
+      hist: () => (state.divide ? 'f(x) and the histogram · bar = fraction ÷ h' : 'f(x) and the histogram · bar = raw fraction'),
+      strips: () => 'f(x) and N rectangles of height f(xᵢ)',
+      slope: () => 'f(x), the density',
+    };
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!model || W < 50) return;
+      const g = geom();
+      const M = model;
+      const { D } = M;
+      const px = (x) => g.x + ((x - M.x0) / (M.x1 - M.x0)) * g.w;
+      const ty = (v) => g.top.y + g.top.h - ((v - M.yMin) / (M.yMax - M.yMin)) * g.top.h;
+      const by = (v) => g.bot.y + g.bot.h - ((v - M.cMin) / (M.cMax - M.cMin)) * g.bot.h;
+      const ax = px(M.a);
+      const bx = px(M.b);
+
+      // ---- top chart: f(x) ----
+      text(g.w < 420 ? 'f(x), the density' : TOP_TITLES[state.view](), g.x, g.top.y - 6, { color: C.ink, font: BOLD });
+      yGrid(g, M.yMin, M.yMax, ty);
+      if (M.yMax > 1.05) {
+        line(g.x, ty(1), g.x + g.w, ty(1), 'rgba(235, 242, 255, 0.4)', 1, [3, 5]);
+        text('density 1', g.x + g.w - 4, ty(1) - 4, { align: 'right', font: SMALL });
+      }
+      clipped(g.x, g.top.y, g.w, g.top.h, () => {
+        if (state.view === 'area' || state.view === 'slope') fillUnder(D.pdf, M.a, M.b, px, ty, state.view === 'area' ? 0.34 : 0.18);
+        if (state.view === 'strips') {
+          fillUnder(D.pdf, M.a, M.b, px, ty, 0.24);
+          const R = M.strips;
+          const wide = px(M.a + R.h) - px(M.a) > 3;
+          R.xs.forEach((x, i) => rect(px(x), px(x + R.h), ty(0), ty(R.fs[i]), 'rgba(221, 116, 37, 0.16)', wide ? C.right : null));
+        }
+        if (state.view === 'hist' && M.hist) {
+          const { start, h, counts, N } = M.hist;
+          const gapPx = px(h) - px(0) > 5 ? 1 : 0;
+          counts.forEach((c, j) => {
+            if (!c) return;
+            const x = start + j * h;
+            const v = c / N / (state.divide ? h : 1);
+            rect(px(x) + gapPx, px(x + h) - gapPx, ty(0), ty(v), 'rgba(221, 116, 37, 0.38)');
+            line(px(x) + gapPx, ty(v), px(x + h) - gapPx, ty(v), C.right, 1.5);
+          });
+        }
+        if (M.E) curve(M.E.pdf, px, ty, C.right);
+        curve(D.pdf, px, ty, C.left);
+        if (state.view === 'slope' && M.b > M.a) {
+          const avg = M.exact / (M.b - M.a);
+          line(ax, ty(avg), bx, ty(avg), C.right, 2, [5, 4]);
+          const label = `average height ${num(avg)}`;
+          ctx.font = SMALL;
+          const room = ax - g.x > ctx.measureText(label).width + 12;
+          text(label, room ? ax - 6 : (ax + bx) / 2, room ? ty(avg) + 4 : ty(avg) + 16, { align: room ? 'right' : 'center', color: C.ink, font: SMALL });
+        }
+        if (state.view === 'slope') {
+          dot(bx, ty(D.pdf(M.b)), 4.5, C.ink);
+          text(`f(b) = ${num(D.pdf(M.b))}`, bx + 8, ty(D.pdf(M.b)) - 8, { color: C.ink, font: BOLD });
+        }
+      });
+      line(g.x, ty(0), g.x + g.w, ty(0), C.axis);
+      xLabels(g, g.top.y + g.top.h + 16, px);
+
+      // ---- bottom chart: F(x) ----
+      text('F(x) = P(X ≤ x), the cdf', g.x, g.bot.y - 6, { color: C.ink, font: BOLD });
+      yGrid(g, M.cMin, M.cMax, by);
+      if (M.cMax > 1.07) {
+        line(g.x, by(1), g.x + g.w, by(1), 'rgba(235, 242, 255, 0.4)', 1, [3, 5]);
+        text('F = 1, the most a probability can be', g.x + g.w - 4, by(1) - 4, { align: 'right', font: SMALL });
+      }
+      clipped(g.x, g.bot.y, g.w, g.bot.h, () => {
+        if (state.view === 'hist' && state.samples.length) curve(ecdf, px, by, C.right);
+        if (M.E) curve(M.E.cdf, px, by, C.right);
+        curve(D.cdf, px, by, C.left);
+        line(g.x, by(M.Fb), bx, by(M.Fb), 'rgba(235, 242, 255, 0.45)', 1, [4, 4]);
+        line(g.x, by(M.Fa), ax, by(M.Fa), 'rgba(235, 242, 255, 0.45)', 1, [4, 4]);
+        if (state.view === 'slope') {
+          const span = 0.12 * (M.x1 - M.x0);
+          const s = M.slope;
+          line(px(M.b - span), by(M.Fb - s.left * span), bx, by(M.Fb), C.ink, 1.5);
+          line(bx, by(M.Fb), px(M.b + span), by(M.Fb + s.right * span), C.ink, 1.5);
+          if (M.b > M.a) {
+            line(ax, by(M.Fa), bx, by(M.Fb), C.right, 2);
+            dot(ax, by(M.Fa), 3.5, C.right);
+          }
+          dot(bx, by(M.Fb), 3.5, C.ink);
+        }
+      });
+      const fbY = by(M.Fb);
+      const faY = by(M.Fa);
+      const near = Math.abs(fbY - faY) < 14;
+      text(`F(b) = ${num(M.Fb)}`, g.x + 6, fbY - 4, { color: C.ink, font: SMALL });
+      text(`F(a) = ${num(M.Fa)}`, g.x + 6, near ? faY + 13 : faY - 4, { color: C.ink, font: SMALL });
+      if (state.view !== 'slope' && Math.abs(fbY - faY) > 2) {
+        const label = `rise = ${num(M.exact)}`;
+        ctx.font = BOLD;
+        const lw = ctx.measureText(label).width;
+        const right = bx + 12 + lw + 8 < g.x + g.w;
+        const xb = right ? bx + 8 : ax - 8;
+        line(xb, faY, xb, fbY, C.ink, 1.5);
+        line(xb - 3, faY, xb + 3, faY, C.ink, 1.5);
+        line(xb - 3, fbY, xb + 3, fbY, C.ink, 1.5);
+        text(label, right ? xb + 6 : xb - 6, (faY + fbY) / 2 + 4, { align: right ? 'left' : 'right', color: C.ink, font: BOLD });
+      }
+      line(g.x, by(0), g.x + g.w, by(0), C.axis);
+      xLabels(g, g.bot.y + g.bot.h + 16, px);
+
+      // ---- the a and b handles through both charts ----
+      [ax, bx].forEach((x) => line(x, g.top.y, x, g.bot.y + g.bot.h, 'rgba(235, 242, 255, 0.6)', 1.5, [5, 4]));
+      const close = bx - ax < 26;
+      [[ax, 'a', close ? -1 : 0], [bx, 'b', close ? 1 : 0]].forEach(([x, name, side]) => {
+        const cx = x + side * 11;
+        ctx.save();
+        ctx.fillStyle = '#13345c';
+        ctx.strokeStyle = 'rgba(235, 242, 255, 0.7)';
+        ctx.beginPath();
+        ctx.roundRect(cx - 9, g.top.y + 2, 18, 17, 6);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        text(name, cx, g.top.y + 14.5, { align: 'center', color: C.ink, font: BOLD });
+      });
+
+      drawHover(g, px, ty, by);
+    }
+
+    function drawHover(g, px, ty, by) {
+      const x = state.hoverX;
+      if (x === null || drag) return;
+      const M = model;
+      const { D } = M;
+      const X = px(x);
+      line(X, g.top.y, X, g.bot.y + g.bot.h, 'rgba(134, 212, 255, 0.35)', 1);
+      dot(X, ty(D.pdf(x)), 3.5, C.left);
+      dot(X, by(D.cdf(x)), 3.5, C.left);
+      const lines = [`x = ${num(x)}`, `f(x) = ${num(D.pdf(x))}`, `F(x) = ${num(D.cdf(x))}`];
+      if (state.view === 'hist' && M.hist) {
+        const { start, h, counts, N } = M.hist;
+        const j = Math.floor((x - start) / h);
+        if (j >= 0 && j < counts.length) {
+          const lo = start + j * h;
+          lines.push(`bin [${num(lo)}, ${num(lo + h)}): ${counts[j]} samples`);
+          lines.push(`fraction ${num(counts[j] / N)} · ÷ h = ${num(counts[j] / N / h)}`);
+        }
+      }
+      if (M.E) lines.push(`Exponential: f = ${num(M.E.pdf(x))}, F = ${num(M.E.cdf(x))}`);
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let left = X + 12;
+      if (left + w > g.x + g.w) left = X - 12 - w;
+      left = Math.max(4, left);
+      const top = g.top.y + 24;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(left, top, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, left + 10, top + 20 + i * 17, { color: i ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    function frame() {
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function xAt(px) {
+      const g = geom();
+      const M = model;
+      const v = M.x0 + ((px - g.x) / g.w) * (M.x1 - M.x0);
+      const step = niceStep(M.x1 - M.x0, 500);
+      return clamp(Math.round(v / step) * step, M.x0, M.x1);
+    }
+    function moveHandle(px) {
+      const v = xAt(px);
+      if (drag === 'a') state.a = Math.min(v, state.b);
+      else state.b = Math.max(v, state.a);
+      update();
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      const { x, y } = local(e);
+      const g = geom();
+      if (y < g.top.y - 4 || y > g.bot.y + g.bot.h + 4 || x < g.x - 8 || x > g.x + g.w + 8) return;
+      stopShrink();
+      const span = model.x1 - model.x0;
+      const ax = g.x + ((state.a - model.x0) / span) * g.w;
+      const bx = g.x + ((state.b - model.x0) / span) * g.w;
+      drag = Math.abs(x - ax) < Math.abs(x - bx) || (Math.abs(x - ax) === Math.abs(x - bx) && x < ax) ? 'a' : 'b';
+      canvas.setPointerCapture(e.pointerId);
+      moveHandle(x);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const { x } = local(e);
+      if (drag) moveHandle(x);
+      const g = geom();
+      state.hoverX = x >= g.x && x <= g.x + g.w ? xAt(x) : null;
+      dirty = true;
+    });
+    const endDrag = () => {
+      drag = null;
+      dirty = true;
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('pointerleave', () => {
+      state.hoverX = null;
+      dirty = true;
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = minus(v.toFixed(decimals)); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-shape]').forEach((b) => b.classList.toggle('active', b.dataset.shape === state.shape));
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
+      document.querySelectorAll('[data-cand]').forEach((b) => b.classList.toggle('active', b.dataset.cand === params.candidate.which));
+      const P = params[state.shape];
+      const host = $('paramHost');
+      host.innerHTML = '';
+      const specs = state.shape === 'candidate' && P.which !== 'cx2' ? [] : SHAPES[state.shape].params;
+      specs.forEach((spec) => host.append(makeSlider(spec, P[spec.key], (v) => {
+        P[spec.key] = v;
+        resample();
+        update();
+      })));
+      $('candHost').hidden = state.shape !== 'candidate';
+      $('compareRow').hidden = state.shape !== 'pareto';
+      $('compareBox').checked = state.compare;
+      $('histHost').hidden = state.view !== 'hist';
+      $('stripHost').hidden = state.view !== 'strips';
+      $('viewNote').textContent = VIEWS.find((v) => v.key === state.view).note;
+      const [x0, x1] = SHAPES[state.shape].range;
+      const step = niceStep(x1 - x0, 500);
+      ['aIn', 'bIn'].forEach((id) => Object.assign($(id), { min: x0, max: x1, step }));
+      $('hIn').value = state.hIdx;
+      $('divideBox').checked = state.divide;
+      $('nIn').value = state.N;
+    }
+
+    function apply(s) {
+      stopShrink();
+      state.shape = s.shape;
+      if (s.P) Object.assign(params[s.shape], s.P);
+      state.view = s.view || 'area';
+      [state.a, state.b] = s.a !== undefined ? [s.a, s.b] : SHAPES[s.shape].interval(params[s.shape]);
+      if (s.hIdx !== undefined) state.hIdx = s.hIdx;
+      if (s.divide !== undefined) state.divide = s.divide;
+      if (s.N) state.N = s.N;
+      state.compare = !!s.compare;
+      state.samples = [];
+      state.sorted = null;
+      model = buildModel();
+      if (s.samples) addSamples(s.samples);
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      const t = TOUR[state.tour];
+      apply(t);
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${esc(t.title)}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(key) {
+      state.view = key;
+      renderControls();
+      update();
+    }
+    function stopShrink() {
+      cancelAnimationFrame(shrinkId);
+      shrinkId = 0;
+    }
+    function shrink() {
+      stopShrink();
+      const step = () => {
+        const gap = state.b - state.a;
+        if (gap < 1e-6 * (model.x1 - model.x0)) {
+          state.b = state.a;
+          update();
+          shrinkId = 0;
+          return;
+        }
+        state.b = state.a + gap * 0.88;
+        update();
+        shrinkId = requestAnimationFrame(step);
+      };
+      shrinkId = requestAnimationFrame(step);
+    }
+
+    function caption() {
+      const M = model;
+      const { D } = M;
+      if (state.shape === 'candidate' && !M.valid) {
+        const why = M.low < -1e-12
+          ? `f dips below 0. A strip near x = ${num(M.argLow)} would get negative probability.`
+          : `The total area is ${num(M.total)} and not 1.`;
+        return `<strong>Not a valid pdf.</strong> ${why} A pdf needs f(x) ≥ 0 everywhere and a total area of exactly 1.`;
+      }
+      if (state.view === 'hist') {
+        const n = state.samples.length;
+        const h = H_STEPS[state.hIdx];
+        if (!n) return '<strong>Histogram.</strong> Press a + button to draw samples. Each sample lands in one bin of width h.';
+        return state.divide
+          ? `<strong>Bar = fraction ÷ h.</strong> ${n} samples fall into bins of width ${h}. Each bar shows probability per unit of x. Narrow bins keep their height. So the bars settle onto f(x).`
+          : `<strong>Bar = raw fraction.</strong> Each bar is the share of ${n} samples in its bin. Halve h and each bar roughly halves. Raw fractions never settle onto a curve.`;
+      }
+      if (state.view === 'strips') {
+        if (!(M.b > M.a)) return '<strong>Σ becomes ∫.</strong> The interval has width 0. So every strip is empty.';
+        return `<strong>Σ becomes ∫.</strong> ${state.N} rectangles of width h = ${num(M.strips.h)} have heights f(xᵢ). Their areas sum to ${num(M.strips.sum)}. The exact area is ${num(M.exact)}. Thinner strips close the gap.`;
+      }
+      if (state.view === 'slope') {
+        const s = M.slope;
+        if (corner(s)) return `<strong>A corner in F.</strong> f jumps at b = ${num(M.b)}. So F turns a corner there. Its slope is ${num(s.left)} from the left and ${num(s.right)} from the right.`;
+        const sec = M.b > M.a ? ` The orange secant from a to b has slope ${num(M.exact / (M.b - M.a))}. That is the average height of f over [a, b].` : '';
+        return `<strong>f is the slope of F.</strong> At b = ${num(M.b)} the tangent to F has slope f(b) = ${num(D.pdf(M.b))}.${sec}`;
+      }
+      if (M.b - M.a < 1e-3 * (M.x1 - M.x0)) {
+        return `<strong>A single point.</strong> The strip is ${num(M.b - M.a)} wide. Its area is ${num(M.exact)}. At zero width the area is 0. So P(X = b) = 0.`;
+      }
+      return `<strong>Area is probability.</strong> The shaded area under f from a = ${num(M.a)} to b = ${num(M.b)} is ${num(M.exact)}. F adds up area from the left. So F rises by exactly ${num(M.exact)} from a to b.`;
+    }
+    const corner = (s) => Math.abs(s.left - s.right) > 1e-3 * Math.max(1e-3, Math.abs(s.central));
+
+    function legendHtml() {
+      const M = model;
+      const items = {
+        area: [['curve', 'f(x) and F(x)'], ['area', 'area = P(a < X ≤ b)'], ['handle', 'a and b']],
+        hist: [['curve', 'f(x) and F(x)'], ['hist', 'histogram of samples'], ['ecdf', 'share of samples ≤ x']],
+        strips: [['area', 'exact area'], ['strip', 'rectangles f(xᵢ) × h'], ['handle', 'a and b']],
+        slope: [['curve', 'f(x) and F(x)'], ['tangent', 'tangent to F at b'], ['secant', 'secant from a to b']],
+      }[state.view].slice();
+      if (M.E) items.push(['secant', 'Exponential with the same mean']);
+      if (M.yMax > 1.05) items.push(['one', 'density 1']);
+      return items.map(([cls, label]) => `<span class="legend"><span class="swatch ${cls}"></span>${esc(label)}</span>`).join('')
+        + ' Hover for exact numbers.';
+    }
+
+    function renderReadouts() {
+      const M = model;
+      const { D, P } = M;
+      const invalid = state.shape === 'candidate' && !M.valid;
+      const head = invalid
+        ? `∫ from a to b of f = F(b) − F(a) = ${num(M.Fb)} − ${num(M.Fa)} = <strong>${num(M.exact)}</strong><span class="verdict">not a probability, since f is not a pdf</span>`
+        : `P(a &lt; X ≤ b) = F(b) − F(a) = ${num(M.Fb)} − ${num(M.Fa)} = <strong>${num(M.exact)}</strong><span class="verdict">${state.view === 'area' ? 'the shaded area' : 'the exact area under f'}</span>`;
+      let third = `P(X = b) = 0 · so P(X ≤ b) = P(X &lt; b) = F(b) = ${num(M.Fb)}`;
+      if (state.view === 'hist') {
+        const n = state.samples.length;
+        const share = n ? ` · share of samples in (a, b] = ${num(ecdf(M.b) - ecdf(M.a))}` : ' · no samples yet';
+        third = `${n} samples · bin width h = ${H_STEPS[state.hIdx]} · ${state.divide ? 'bar = fraction ÷ h' : 'bar = raw fraction'}${share}`;
+      } else if (state.view === 'strips') {
+        third = `Σ f(xᵢ)·h with N = ${state.N} = ${num(M.strips.sum)} · exact ${num(M.exact)} · error ${numS(M.strips.sum - M.exact)}`;
+      } else if (state.view === 'slope') {
+        const sec = M.b > M.a ? ` · secant slope over [a, b] = ${num(M.exact / (M.b - M.a))}` : '';
+        third = corner(M.slope)
+          ? `F has a corner at b: slope ${num(M.slope.left)} from the left and ${num(M.slope.right)} from the right`
+          : `slope of F at b = f(b) = ${num(D.pdf(M.b))}${sec}`;
+      }
+      if (state.shape === 'pareto') third += ` · P(X &gt; a) = (k/a)^α = ${num((P.k / Math.max(M.a, P.k)) ** P.alpha)}`;
+      $('receipt').innerHTML = `
+        <div>${esc(M.name)} · support ${M.support} · a = ${num(M.a)} · b = ${num(M.b)}</div>
+        <div class="big">${head}</div>
+        <div>${third}</div>`;
+      $('caption').innerHTML = caption();
+      $('legend').innerHTML = legendHtml();
+      $('aOut').textContent = num(M.a);
+      $('bOut').textContent = num(M.b);
+      $('aIn').value = M.a;
+      $('bIn').value = M.b;
+      $('hOut').textContent = String(H_STEPS[state.hIdx]);
+      $('nOut').textContent = String(state.N);
+      const canSample = M.valid && !!D.sample;
+      document.querySelectorAll('[data-sample]').forEach((b) => { b.disabled = !canSample; });
+      $('sampleLine').textContent = canSample
+        ? `${state.samples.length} samples so far${M.hist && M.hist.outside ? ` · ${M.hist.outside} fall off the chart` : ''}`
+        : 'f is not a valid pdf. So there is nothing to sample.';
+      if (state.shape === 'candidate') {
+        const rule1 = M.low >= -1e-12 ? 'yes' : `no, f(${num(M.argLow)}) = ${num(M.low)}`;
+        const rule2 = Math.abs(M.total - 1) < 1e-6 ? 'yes' : `no, it is ${num(M.total)}`;
+        $('candVerdict').innerHTML = `f(x) ≥ 0 everywhere: <span class="${rule1 === 'yes' ? 'ok' : 'bad'}">${rule1}</span><br>`
+          + `total area 1: <span class="${rule2 === 'yes' ? 'ok' : 'bad'}">${rule2}</span><br>`
+          + `verdict: <strong class="${M.valid ? 'ok' : 'bad'}">${M.valid ? 'a valid pdf' : 'not a pdf'}</strong>`;
+      }
+      renderArithmetic();
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    function cdfDerivation(D) {
+      const P = D.P;
+      if (D.shape === 'uniform') {
+        return [
+          `f(u) = 1 / (r − ℓ) = 1 / ${num(P.w)} = ${num(1 / P.w)}    for ℓ ≤ u < r`,
+          ...chain('F(x)', ['∫ from ℓ to x of 1 / (r − ℓ) du', '(x − ℓ) / (r − ℓ)    for ℓ ≤ x ≤ r']),
+          'F(x) = 0 left of ℓ and F(x) = 1 right of r',
+          `here ℓ = ${num(P.l)} and r = ${num(P.l + P.w)}`,
+        ];
+      }
+      if (D.shape === 'triangle') {
+        return [
+          'rising side   f(u) = 2u / (w m)',
+          'falling side  f(u) = 2(w − u) / (w (w − m))',
+          ...chain('F(x)', ['∫ from 0 to x of 2u / (w m) du', 'x² / (w m)    for 0 ≤ x ≤ m']),
+          ...chain('F(x)', ['1 − ∫ from x to w of 2(w − u) / (w (w − m)) du', '1 − (w − x)² / (w (w − m))    for m < x ≤ w']),
+          `here w = ${num(P.w)} and m = ${num(D.m)}`,
+        ];
+      }
+      if (D.shape === 'exponential') {
+        return [
+          ...chain('F(x)', ['∫ from 0 to x of λe^(−λu) du', '[−e^(−λu)] from 0 to x', '−e^(−λx) − (−1)', '1 − e^(−λx)    for x ≥ 0']),
+          `here λ = ${num(P.lambda)}`,
+        ];
+      }
+      if (D.shape === 'normal') {
+        return [
+          ...chain('F(x)', ['∫ from −∞ to x of φ((u − μ)/σ) / σ du', 'Φ((x − μ)/σ)']),
+          'Φ has no closed form. This page sums its series.',
+          'Chapter 4 reads Φ from the slide table instead.',
+          `here μ = ${num(P.mu)} and σ = ${num(P.sigma)}`,
+        ];
+      }
+      if (D.shape === 'pareto') {
+        return [
+          ...chain('F(x)', ['∫ from k to x of α k^α u^(−α−1) du', 'α k^α [u^(−α) / (−α)] from k to x',
+            'k^α (k^(−α) − x^(−α))', '1 − (k/x)^α    for x ≥ k']),
+          ...chain('P(X > x)', ['1 − F(x)', '(k/x)^α']),
+          `here k = ${num(P.k)} and α = ${num(P.alpha)}`,
+        ];
+      }
+      return {
+        cx2: [...chain('F(x)', ['∫ from 0 to x of c u² du', 'c x³ / 3    for 0 ≤ x ≤ 1']), `here c = ${num(P.c)}`],
+        line: chain('F(x)', ['∫ from 0 to x of (3 − 4u) du', '3x − 2x²    for 0 ≤ x ≤ 1']),
+        two: chain('F(x)', ['∫ from 0 to x of 2 du', '2x    for 0 ≤ x ≤ 1']),
+        tall: chain('F(x)', ['∫ from 0 to x of 4 du', '4x    for 0 ≤ x ≤ 0.25']),
+      }[P.which];
+    }
+
+    // F(x) with the numbers substituted, as the steps after "F(x) =".
+    function cdfSteps(D, x) {
+      const P = D.P;
+      const F = D.cdf(x);
+      if (D.shape === 'uniform') {
+        if (x <= P.l) return [`0    since x ≤ ℓ = ${num(P.l)}`];
+        if (x >= P.l + P.w) return [`1    since x ≥ r = ${num(P.l + P.w)}`];
+        return [`(${num(x)} − ${paren(P.l)}) / ${num(P.w)}`, num(F)];
+      }
+      if (D.shape === 'triangle') {
+        if (x <= 0) return ['0    since x ≤ 0'];
+        if (x >= P.w) return [`1    since x ≥ w = ${num(P.w)}`];
+        if (x <= D.m) return [`${num(x)}² / (${num(P.w)} × ${num(D.m)})`, num(F)];
+        return [`1 − (${num(P.w)} − ${num(x)})² / (${num(P.w)} × ${num(P.w - D.m)})`, `1 − ${num(1 - F)}`, num(F)];
+      }
+      if (D.shape === 'exponential') {
+        if (x <= 0) return ['0    since x ≤ 0'];
+        return [`1 − e^(−${num(P.lambda)} × ${num(x)})`, `1 − ${num(Math.exp(-P.lambda * x))}`, num(F)];
+      }
+      if (D.shape === 'normal') {
+        return [`Φ((${num(x)} − ${paren(P.mu)}) / ${num(P.sigma)})`, `Φ(${num((x - P.mu) / P.sigma)})`, num(F)];
+      }
+      if (D.shape === 'pareto') {
+        if (x <= P.k) return [`0    since x ≤ k = ${num(P.k)}`];
+        return [`1 − (${num(P.k)} / ${num(x)})^${num(P.alpha)}`, `1 − ${num((P.k / x) ** P.alpha)}`, num(F)];
+      }
+      if (x <= D.lo) return [`0    since x ≤ ${num(D.lo)}`];
+      if (x >= D.hi) return [`${num(D.total)}    since x ≥ ${num(D.hi)}, the whole area`];
+      return {
+        cx2: [`${num(P.c)} × ${num(x)}³ / 3`, num(F)],
+        line: [`3 × ${num(x)} − 2 × ${num(x)}²`, num(F)],
+        two: [`2 × ${num(x)}`, num(F)],
+        tall: [`4 × ${num(x)}`, num(F)],
+      }[P.which];
+    }
+
+    // f(x) with the numbers substituted.
+    function pdfSteps(D, x) {
+      const P = D.P;
+      const f = D.pdf(x);
+      const outside = D.shape === 'triangle' ? x <= 0 || x >= P.w : x < D.lo || x >= D.hi;
+      if (outside) return ['0    outside the support'];
+      if (D.shape === 'uniform') return [`1 / (r − ℓ) = 1 / ${num(P.w)}`, num(f)];
+      if (D.shape === 'triangle') {
+        return x < D.m
+          ? [`2 × ${num(x)} / (${num(P.w)} × ${num(D.m)})`, num(f)]
+          : [`2 × (${num(P.w)} − ${num(x)}) / (${num(P.w)} × ${num(P.w - D.m)})`, num(f)];
+      }
+      if (D.shape === 'exponential') return [`${num(P.lambda)} × e^(−${num(P.lambda)} × ${num(x)})`, `${num(P.lambda)} × ${num(Math.exp(-P.lambda * x))}`, num(f)];
+      if (D.shape === 'normal') {
+        const z = (x - P.mu) / P.sigma;
+        return [`φ(${num(z)}) / ${num(P.sigma)}`, `e^(−${num(z)}²/2) / √(2π) / ${num(P.sigma)}`, `${num(phi(z))} / ${num(P.sigma)}`, num(f)];
+      }
+      if (D.shape === 'pareto') return [`${num(P.alpha)} × ${num(P.k)}^${num(P.alpha)} / ${num(x)}^${num(P.alpha + 1)}`, num(f)];
+      return {
+        cx2: [`${num(P.c)} × ${num(x)}²`, num(f)],
+        line: [`3 − 4 × ${num(x)}`, num(f)],
+        two: ['2'],
+        tall: ['4'],
+      }[P.which];
+    }
+
+    // The closed-form total area, step by step.
+    function totalSteps(D) {
+      const P = D.P;
+      const L = '∫ f';
+      if (D.shape === 'uniform') return chain(L, ['∫ from ℓ to r of 1 / (r − ℓ) dx', '(r − ℓ) × 1 / (r − ℓ)', `${num(P.w)} × ${num(1 / P.w)}`, '1']);
+      if (D.shape === 'triangle') return chain(L, ['½ × base × height', '½ × w × 2/w', `½ × ${num(P.w)} × ${num(2 / P.w)}`, '1']);
+      if (D.shape === 'exponential') return chain(L, ['∫ from 0 to ∞ of λe^(−λx) dx', '[−e^(−λx)] from 0 to ∞', '0 − (−1)', '1']);
+      if (D.shape === 'normal') return chain(L, ['∫ over ℝ of φ((x − μ)/σ) / σ dx', '1    by the Gaussian integral, a standard result']);
+      if (D.shape === 'pareto') return chain(L, ['∫ from k to ∞ of α k^α x^(−α−1) dx', '[−(k/x)^α] from k to ∞', '0 − (−1)', '1']);
+      return {
+        cx2: [...chain(L, ['∫ from 0 to 1 of c x² dx', 'c [x³/3] from 0 to 1', 'c / 3', `${num(P.c)} / 3`, num(P.c / 3)]),
+          '', 'c / 3 = 1 gives c = 3'],
+        line: [...chain(L, ['∫ from 0 to 1 of (3 − 4x) dx', '[3x − 2x²] from 0 to 1', '3 − 2', '1']), '',
+          ...chain('∫ from 0.75 to 1', ['[3x − 2x²] from 0.75 to 1', '(3 − 2) − (2.25 − 1.125)', '1 − 1.125', '−0.125'])],
+        two: chain(L, ['∫ from 0 to 1 of 2 dx', '2 × 1', '2']),
+        tall: chain(L, ['∫ from 0 to 0.25 of 4 dx', '4 × 0.25', '1']),
+      }[P.which];
+    }
+
+    function renderArithmetic() {
+      const M = model;
+      const { D, P, a, b } = M;
+      const F = D.cdf;
+      const parts = [];
+      $('arithHead').innerHTML = `<strong>${esc(M.name)}</strong> with a = ${num(a)} and b = ${num(b)}.
+        Each block writes out one idea with the numbers on screen.`;
+
+      parts.push(block('1 · The cdf from the pdf', 'F(x) = ∫ from −∞ to x of f(u) du', linesHtml(cdfDerivation(D)),
+        D.shape === 'pareto'
+          ? 'This answers the slide Q&amp;A: F(x) = 1 − (k/x)^α and P(X &gt; x) = (k/x)^α.'
+          : 'F adds up the area of f from the left.'));
+
+      const L = (s) => s.padEnd(11);
+      const lines2 = [...chain(L('F(b)'), cdfSteps(D, b)), ...chain(L('F(a)'), cdfSteps(D, a)), '',
+        ...chain(L('F(b) − F(a)'), [`${num(M.Fb)} − ${num(M.Fa)}`, num(M.exact)])];
+      if (D.shape === 'pareto' && a > P.k) {
+        lines2.push('', ...chain(L('P(X > a)'), ['(k/a)^α', `(${num(P.k)} / ${num(a)})^${num(P.alpha)}`, num((P.k / a) ** P.alpha)]));
+      }
+      const ok2 = Math.abs(M.exact - M.numeric) <= 1e-6 * Math.max(1, Math.abs(M.exact));
+      parts.push(block('2 · The interval probability', 'P(a < X ≤ b) = F(b) − F(a) = ∫ from a to b of f(x) dx', linesHtml(lines2),
+        ok2 ? `<span class="ok">✓ Simpson's rule on ∫ f from a to b also gives ${num(M.numeric)}.</span>`
+          : `<span class="bad">✗ Simpson's rule gives ${num(M.numeric)}.</span>`));
+
+      const pointRows = [0.1, 0.01, 0.001, 0.0001].map((h) => [`h = ${h}`, `F(b) − F(b − h) = ${num(F(b))} − ${num(F(b - h))}`, `= ${num(F(b) - F(b - h))}`]);
+      parts.push(block('3 · One point holds nothing', 'P(X = b) ≤ P(b − h < X ≤ b) = F(b) − F(b − h)', gridHtml(pointRows),
+        'Each strip that ends at b holds less as h shrinks. P(X = b) sits below all of them. So P(X = b) = 0.'));
+
+      const hs = b > a ? [b - a, (b - a) / 10, (b - a) / 100] : [0.1, 0.01, 0.001];
+      const fa = D.pdf(a);
+      const stripRows = [['h', 'f(a) × h', 'exact F(a + h) − F(a)', 'ratio', { cls: 'head' }]].concat(hs.map((h) => {
+        const ex = F(a + h) - F(a);
+        return [num(h), `${num(fa)} × ${num(h)} = ${num(fa * h)}`, num(ex), ex !== 0 ? num((fa * h) / ex) : '—'];
+      }));
+      parts.push(block('4 · A thin strip: f(x)·h', 'P(a ≤ X < a + h) ≈ f(a) · h for small h',
+        linesHtml(chain('f(a)', pdfSteps(D, a))) + gridHtml(stripRows),
+        'As h shrinks the ratio heads to 1. So f(a) is probability per unit of x near a.'));
+
+      if (b > a) {
+        const R = M.strips;
+        const show = Math.min(R.xs.length, 20);
+        const rows = [['i', 'xᵢ', 'f(xᵢ) × h', 'area', { cls: 'head' }]];
+        for (let i = 0; i < show; i += 1) {
+          rows.push([String(i), num(R.xs[i]), `${num(R.fs[i])} × ${num(R.h)}`, num(R.fs[i] * R.h), { cls: R.fs[i] < 0 ? 'neg' : '' }]);
+        }
+        if (R.xs.length > show) {
+          let rest = 0;
+          for (let i = show; i < R.xs.length; i += 1) rest += R.fs[i] * R.h;
+          rows.push([`${show}…${R.xs.length - 1}`, `${R.xs.length - show} more strips`, 'summed', num(rest), { cls: 'tail' }]);
+        }
+        parts.push(block(`5 · Σ becomes ∫ with N = ${state.N} strips`, `h = (b − a) / N = ${num(b - a)} / ${state.N} = ${num(R.h)}, xᵢ = a + i·h`,
+          gridHtml(rows),
+          `Σ = <strong>${num(R.sum)}</strong>. Exact area = ${num(M.exact)}. Error = ${numS(R.sum - M.exact)}. More strips shrink the error.`));
+      } else {
+        parts.push(block('5 · Σ becomes ∫', 'h = (b − a) / N', '', 'The interval has width 0. So every strip is empty and the sum is 0.'));
+      }
+
+      const s = M.slope;
+      const h5 = 1e-5;
+      const slopeLines = [
+        ...chain('F(b + h)', [`F(${num10(b + h5)})`, num10(F(b + h5))]),
+        ...chain('F(b − h)', [`F(${num10(b - h5)})`, num10(F(b - h5))]),
+        ...chain('slope', ['(F(b + h) − F(b − h)) / 2h', `(${num10(F(b + h5))} − ${num10(F(b - h5))}) / 0.00002`, num(s.central)]),
+        '', ...chain('f(b)', pdfSteps(D, b)),
+      ];
+      if (b > a) slopeLines.push('', ...chain('secant', ['(F(b) − F(a)) / (b − a)', `${num(M.exact)} / ${num(b - a)}`, num(M.exact / (b - a))]));
+      const fb = D.pdf(b);
+      let result6;
+      if (corner(s)) {
+        result6 = `F has a corner at b. The slope is ${num(s.left)} from the left and ${num(s.right)} from the right. f jumps there.`;
+      } else {
+        const ok6 = Math.abs(s.central - fb) <= 1e-5 * Math.max(1, Math.abs(fb));
+        result6 = ok6 ? `<span class="ok">✓ The slope of F at b equals f(b) = ${num(fb)}.</span>`
+          : `<span class="bad">✗ The slope ${num(s.central)} differs from f(b) = ${num(fb)}.</span>`;
+      }
+      parts.push(block('6 · f is the slope of F', 'f(b) = F′(b) ≈ (F(b + h) − F(b − h)) / 2h with h = 0.00001', linesHtml(slopeLines), result6));
+
+      const rule1 = M.low >= -1e-12 ? 'yes' : `no, f(${num(M.argLow)}) = ${num(M.low)}`;
+      const rule2 = Math.abs(M.total - 1) < 1e-6 ? 'yes' : `no, the area is ${num(M.total)}`;
+      const totalLines = [...totalSteps(D), '', `rule 1 · f(x) ≥ 0 for every x   ${rule1}`, `rule 2 · total area = 1         ${rule2}`];
+      const ok7 = Math.abs(D.total - M.total) <= 1e-6;
+      parts.push(block('7 · Is it a valid pdf?', 'f(x) ≥ 0 for every x and ∫ f(x) dx = 1', linesHtml(totalLines),
+        (ok7 ? `<span class="ok">✓ Numeric integration gives a total of ${num(M.total)} too.</span>`
+          : `<span class="bad">✗ Numeric integration gives ${num(M.total)}.</span>`)
+          + `<br>Verdict: <strong class="${M.valid ? 'ok' : 'bad'}">${M.valid ? 'a valid pdf' : 'not a pdf'}</strong>`));
+
+      if (M.hist) {
+        const { start, h, counts, N } = M.hist;
+        const j = Math.floor((b - start) / h);
+        if (j >= 0 && j < counts.length) {
+          const lo = start + j * h;
+          const ex = F(lo + h) - F(lo);
+          const binLines = [
+            `bin [${num(lo)}, ${num(lo + h)}), the bin that holds b`,
+            ...chain('count', [`${counts[j]} of N = ${N}`]),
+            ...chain('fraction', [`${counts[j]} / ${N}`, num(counts[j] / N)]),
+            ...chain('fraction ÷ h', [`${num(counts[j] / N)} / ${h}`, num(counts[j] / N / h)]),
+            ...chain('exact', [`(F(${num(lo + h)}) − F(${num(lo)})) / ${h}`, `(${num(F(lo + h))} − ${num(F(lo))}) / ${h}`, num(ex / h)]),
+            ...chain('f at the centre', [`f(${num(lo + h / 2)})`, num(D.pdf(lo + h / 2))]),
+          ];
+          parts.push(block('8 · One histogram bar', 'bar height = fraction ÷ h ≈ average of f over the bin', linesHtml(binLines),
+            'The bar estimates the average height of f over its bin. More samples cut the noise. Narrow bins cut the averaging.'));
+        }
+      }
+
+      if (D.shape === 'pareto') {
+        let tail;
+        if (P.alpha > 1) {
+          const mean = (P.alpha * P.k) / (P.alpha - 1);
+          const lam = 1 / mean;
+          const xs = [...new Set([b, 10, 20, 50].filter((x) => x > P.k))];
+          const rows = [['x', 'Pareto (k/x)^α', 'Exponential e^(−λx)', 'ratio', { cls: 'head' }]].concat(xs.map((x) => {
+            const p = (P.k / x) ** P.alpha;
+            const e = Math.exp(-lam * x);
+            return [num(x), `(${num(P.k)}/${num(x)})^${num(P.alpha)} = ${num(p)}`, `e^(−${num(lam)} × ${num(x)}) = ${num(e)}`, num(p / e)];
+          }));
+          tail = linesHtml([
+            ...chain('mean', ['αk / (α − 1)', `${num(P.alpha)} × ${num(P.k)} / ${num(P.alpha - 1)}`, `${num(mean)}    a standard result`]),
+            ...chain('λ', ['1 / mean', num(lam)]),
+            '',
+          ]) + gridHtml(rows);
+          parts.push(block('9 · Heavy tail against light tail', 'P(X > x) for a Pareto and an Exponential with the same mean', tail,
+            'The ratio grows without limit as x grows. A power tail always beats an exponential tail far out.'));
+        } else {
+          parts.push(block('9 · Heavy tail against light tail', 'mean = αk / (α − 1) needs α > 1', '',
+            `Here α = ${num(P.alpha)}. The mean is infinite. So no Exponential has the same mean.`));
+        }
+      }
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    Object.entries(SHAPES).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.shape = k;
+      b.addEventListener('click', () => apply({ shape: k, view: state.view === 'hist' ? 'area' : state.view }));
+      $('shapeGrid').append(b);
+    });
+    Object.entries(CANDIDATES).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.cand = k;
+      b.addEventListener('click', () => apply({ shape: 'candidate', P: { which: k }, view: state.view === 'hist' ? 'area' : state.view }));
+      $('candGrid').append(b);
+    });
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.textContent = v.word;
+      b.dataset.view = v.key;
+      b.addEventListener('click', () => setView(v.key));
+      $('viewGrid').append(b);
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    document.querySelectorAll('[data-load]').forEach((b) => b.addEventListener('click', () => apply(LOADS[+b.dataset.load])));
+    document.querySelectorAll('[data-sample]').forEach((b) => b.addEventListener('click', () => {
+      addSamples(+b.dataset.sample);
+      update();
+    }));
+    $('resetSamples').addEventListener('click', () => {
+      state.samples = [];
+      state.sorted = null;
+      update();
+    });
+    $('hIn').addEventListener('input', (e) => {
+      state.hIdx = +e.target.value;
+      update();
+    });
+    $('divideBox').addEventListener('change', (e) => {
+      state.divide = e.target.checked;
+      update();
+    });
+    $('nIn').addEventListener('input', (e) => {
+      state.N = +e.target.value;
+      update();
+    });
+    $('aIn').addEventListener('input', (e) => {
+      stopShrink();
+      state.a = Math.min(+e.target.value, state.b);
+      update();
+    });
+    $('bIn').addEventListener('input', (e) => {
+      stopShrink();
+      state.b = Math.max(+e.target.value, state.a);
+      update();
+    });
+    $('shrinkBtn').addEventListener('click', shrink);
+    $('intervalReset').addEventListener('click', () => {
+      stopShrink();
+      [state.a, state.b] = SHAPES[state.shape].interval(params[state.shape]);
+      update();
+    });
+    $('compareBox').addEventListener('change', (e) => {
+      state.compare = e.target.checked;
+      if (state.compare) state.view = 'area';
+      renderControls();
+      update();
+    });
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-4]$/.test(e.key)) setView(VIEWS[+e.key - 1].key);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

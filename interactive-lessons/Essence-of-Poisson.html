@@ -1,0 +1,1432 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of the Poisson · Counting Random Events</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.blue { background: var(--left); }
+    .swatch.dot { background: var(--right); border-radius: 50%; }
+    .swatch.outline { background: transparent; border: 2px solid var(--right); border-bottom: 0; border-radius: 3px 3px 0 0; }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.tail {
+      background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 4px);
+      border: 1px solid var(--muted);
+    }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav .formula-chip { font-family: var(--mono); color: var(--ink); }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .view-grid { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .view-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .view-grid button b { font-size: 15px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .body a, .src a { color: var(--blue-1); }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.sel { color: var(--ink); box-shadow: inset 3px 0 0 var(--blue-1); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Distributions · 50008 Lecture 3 · Poisson</div>
+        <h1>Poisson: counting random events</h1>
+        <p class="lead">
+          Patients reach an emergency room at random times.
+          On average <strong>λ</strong> arrive each hour.
+          Count the arrivals in one hour. That count is <strong>X ∼ Poi(λ)</strong>.
+          Where does <strong>e<sup>−λ</sup>λ<sup>x</sup>/x!</strong> come from?
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <span>50008 Probability · L03 Poisson</span>
+        <span class="formula-chip">p(x) = e<sup>−λ</sup>λ<sup>x</sup> / x!</span>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · from random dots to the formula</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 4 pick a view.
+            The Arithmetic tab writes out every sum for the λ on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a view</div>
+          <div id="viewGrid" class="view-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Set the rate</div>
+          <div id="rateHost" style="display: grid; gap: 8px;"></div>
+          <div id="slotHost" style="display: grid; gap: 8px;">
+            <div id="slotSlider"></div>
+            <div id="slotLine" class="live-line"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Play the hours</div>
+          <div class="body">Each hour drops arrivals at random times. The page uses no Poisson formula for this.
+            It only counts the dots.</div>
+          <div class="preset-grid">
+            <button data-play="1">Play one hour</button>
+            <button data-play="100">Play ×100</button>
+            <button data-play="1000">Play ×1000</button>
+            <button id="resetSim">Reset</button>
+          </div>
+          <div id="playLine" class="live-line"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · λ = 3. Which count is most likely?</summary>
+            <div class="answer"><strong>2 and 3 tie at 0.2240.</strong> p(3) = p(2) × 3/3.
+              A ratio of 1 means a tie. This happens whenever λ is a whole number.</div>
+            <button data-predict="0">Set it up: Poi(3), ratio view</button>
+          </details>
+          <details class="predict">
+            <summary>2 · λ = 0.1. What is P(X = 0)?</summary>
+            <div class="answer"><strong>e<sup>−0.1</sup> ≈ 0.905.</strong> A quiet window has chance e<sup>−λ</sup>.
+              For small λ this is close to 1 − λ.</div>
+            <button data-predict="1">Set it up: Poi(0.1)</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Raise λ from 4 to 8. Does σ double?</summary>
+            <div class="answer"><strong>No. σ grows from 2 to 2.83.</strong> σ = √λ.
+              So twice the λ gives √2 times the σ. The spread grows slower than the mean.</div>
+            <button data-predict="2">Set it up: Poi(4), spread view. Then drag λ to 8.</button>
+          </details>
+          <details class="predict">
+            <summary>4 · Compare Binomial(1000, 0.003) with Poi(3). How large is the largest gap?</summary>
+            <div class="answer"><strong>About 0.00034.</strong> That is less than 0.2% of the tallest bar.
+              Many chances with a tiny chance each act like a Poisson.</div>
+            <button data-predict="3">Set it up: 1000 slots</button>
+          </details>
+          <details class="predict">
+            <summary>5 · 3 patients arrive per hour on average. What is the chance of no patient in 20 minutes?</summary>
+            <div class="answer"><strong>e<sup>−1</sup> ≈ 0.368.</strong> 20 minutes is 1/3 of an hour.
+              So λt = 3 × 1/3 = 1. A quiet window has chance e<sup>−λt</sup>.</div>
+            <button data-predict="4">Set it up: 20 minutes at 3 per hour</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="pair">
+            <button id="selPrev">← smaller x</button>
+            <button id="selNext">larger x →</button>
+          </div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The slide definition</div>
+          <div class="formula">p(x) = e^(−λ) λ^x / x!,   x = 0, 1, 2, …,   λ > 0
+
+μ = λ,   σ² = λ,   γ₁ = 1/√λ</div>
+          <div class="body">X counts random events in one unit of time or space.
+            The events occur at a constant rate. The slides state these facts. The sections below show why they hold.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">From slots to the formula</div>
+          <div class="formula">n slots, each full with chance p = λ/n:
+P(X = x) = C(n, x) (λ/n)^x (1 − λ/n)^(n − x)
+
+         = A · B · C · D   with
+
+A = n(n − 1)…(n − x + 1) / n^x     → 1
+B = λ^x / x!                       stays
+C = (1 − λ/n)^n                    → e^(−λ)
+D = (1 − λ/n)^(−x)                 → 1
+
+P(X = x) → e^(−λ) λ^x / x!     as n → ∞</div>
+          <div class="body">Hold x fixed and let n grow. A has x factors and each one tends to 1.
+            C is the limit (1 + a/n)<sup>n</sup> → e<sup>a</sup> with a = −λ.
+            D has a fixed power x. So it tends to 1 as well.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why <span class="nocase">e<sup>−λ</sup></span></div>
+          <div class="formula">P(X = 0) = P(every slot is empty) = (1 − λ/n)^n
+
+λ = 3:  n = 10     0.7^10     = 0.02825
+        n = 100    0.97^100   = 0.04755
+        n = 1000   0.997^1000 = 0.04956
+        limit      e^(−3)     = 0.04979</div>
+          <div class="body">A quiet hour needs every slot to stay empty. Finer slots make the product creep up to e<sup>−λ</sup>.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why the bars sum to 1</div>
+          <div class="formula">Σ λ^x / x! = 1 + λ + λ²/2! + λ³/3! + … = e^λ
+
+Σ p(x) = e^(−λ) · e^λ = 1</div>
+          <div class="body">The series is the Taylor series of e<sup>λ</sup>.
+            So e<sup>−λ</sup> is the constant that makes the bars sum to 1. It is also the chance of a quiet window.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The ratio rule</div>
+          <div class="formula">  p(x)        e^(−λ) λ^x / x!
+──────── = ──────────────────────── = λ / x
+p(x − 1)   e^(−λ) λ^(x−1) / (x − 1)!
+
+x < λ:  ratio > 1, so the bars climb
+x > λ:  ratio < 1, so the bars fall
+mode = ⌊λ⌋;  λ whole:  p(λ − 1) = p(λ)</div>
+          <div class="body">This rule is also the fast way to compute the pmf by hand. Start at e<sup>−λ</sup>.
+            Multiply by λ/1, then λ/2, then λ/3.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Mean: the cancel trick</div>
+          <div class="formula">E[X] = Σ_{x≥0} x · e^(−λ) λ^x / x!
+     = Σ_{x≥1} e^(−λ) λ^x / (x − 1)!
+     = λ · Σ_{x≥1} e^(−λ) λ^(x − 1) / (x − 1)!
+     = λ · Σ_{y≥0} p(y)
+     = λ
+
+line 2 uses x / x! = 1 / (x − 1)! for x ≥ 1</div>
+          <div class="body">Term by term, x · p(x) = λ · p(x − 1). The Arithmetic tab shows each pair with numbers.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Variance: one more cancel</div>
+          <div class="formula">E[X(X − 1)] = Σ x(x − 1) p(x) = λ² Σ p(x − 2) = λ²
+E[X²]       = E[X(X − 1)] + E[X] = λ² + λ
+σ²          = E[X²] − μ² = λ² + λ − λ² = λ</div>
+          <div class="body">The Binomial gives the same answer. np(1 − p) = λ(1 − λ/n) tends to λ as n grows.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Skewness: two more cancels</div>
+          <div class="formula">E[X(X − 1)(X − 2)] = λ³
+x³ = x(x − 1)(x − 2) + 3x(x − 1) + x, so
+E[X³]       = λ³ + 3λ² + λ
+E[(X − μ)³] = E[X³] − 3μE[X²] + 2μ³
+            = λ³ + 3λ² + λ − 3λ(λ² + λ) + 2λ³
+            = λ
+γ₁          = λ / λ^(3/2) = 1/√λ</div>
+          <div class="body">The Binomial skewness (1 − 2p)/√(np(1 − p)) with p = λ/n also tends to 1/√λ.
+            The <a href="Essence-of-Skewness.html">skewness page</a> shows the cube-by-cube sums.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">A longer or shorter window</div>
+          <div class="formula">rate λ per unit, window of length t:
+X ∼ Poi(λt),   p(x) = e^(−λt) (λt)^x / x!
+mean = variance = λt</div>
+          <div class="body">The input to the Poisson is always the mean count in the window.</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L03 Discrete Random Variables.
+            The pmf and the examples are on slides 36 and 37. μ, σ² and γ₁ are on slide 38.
+            The Poi(5) plots are on slides 5, 7 and 39. The λt rule is on slide 40.
+            The Binomial limit, the cancel trick and E[(X − μ)³] = λ are standard results. They are not on the slides.
+            Every number on this page comes from one maths block. A Node test checks it.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>A Poisson counts dots in a window.</strong> The dots land at random times.
+            They arrive at a constant average rate.</div>
+          <div class="essence"><strong>It is a Binomial with countless tiny slots.</strong> n slots with chance λ/n each give Binomial(n, λ/n).
+            Let n grow and the pmf becomes e<sup>−λ</sup>λ<sup>x</sup>/x!.</div>
+          <div class="essence"><strong>e<sup>−λ</sup> is the chance of a quiet window.</strong>
+            It is also the factor that makes the bars sum to 1.</div>
+          <div class="essence"><strong>Each bar is the last bar times λ/x.</strong> The bars climb until x reaches λ. Then they fall.</div>
+          <div class="essence"><strong>Mean and variance are both λ.</strong> So σ = √λ. The spread grows slower than the mean.</div>
+          <div class="essence"><strong><span>γ₁ = 1/√λ.</span></strong> The wall at 0 sits √λ standard deviations below μ.
+            A big λ moves the wall far away. So the skew fades.</div>
+          <div class="essence"><strong>A longer window means a bigger λ.</strong> Rate λ over time t gives Poi(λt).</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can say what one Poisson outcome is: a count of dots in a window.</label>
+            <label><input type="checkbox"> I can explain why the count is a Binomial with many tiny slots.</label>
+            <label><input type="checkbox"> I can explain why P(X = 0) = e<sup>−λ</sup>.</label>
+            <label><input type="checkbox"> I can build the pmf by hand with the ratio λ/x.</label>
+            <label><input type="checkbox"> I can say why the mean and the variance are both λ.</label>
+            <label><input type="checkbox"> I can say why γ₁ = 1/√λ shrinks as λ grows.</label>
+            <label><input type="checkbox"> I can change λ for a longer or shorter window.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Real arrivals rarely keep a constant rate.</strong> An emergency room is busier at some hours than others.
+            Then the counts vary more than a Poisson predicts.</div>
+          <div class="body"><strong>The slot story is a picture of the limit.</strong> A real slot can hold two arrivals.
+            The limit n → ∞ makes that chance vanish.</div>
+          <div class="body"><strong>λ need not be a whole number.</strong> Poi(2.5) has mean 2.5. No single hour has 2.5 arrivals.</div>
+          <div class="body"><strong>A simulation wobbles.</strong> 1000 hours pin the mean down to about ±√(λ/1000).
+            For λ = 3 that is about ±0.05.</div>
+          <div class="body"><strong>The tail column folds the far bars into one.</strong> Its height is their total.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">See also</div>
+          <div class="body"><a href="Essence-of-Skewness.html">Skewness: the cubed seesaw</a> works through γ₁ for five distributions.
+            <a href="Essence-of-Geometric.html">The Geometric page</a> covers the wait for a first success.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_poisson.js) =====================
+    // KIT START
+    const TAIL_EPS = 1e-15;
+
+    // Poisson pmf from x = 0 by the ratio rule p(x) = p(x − 1) · λ/x.
+    // It stops past λ once the terms drop below TAIL_EPS.
+    function poissonPmf(lambda) {
+      const ps = [];
+      let pr = Math.exp(-lambda);
+      for (let x = 0; x <= lambda || pr > TAIL_EPS; x += 1) {
+        ps.push(pr);
+        pr *= lambda / (x + 1);
+      }
+      return ps;
+    }
+
+    // Binomial(n, p) pmf on x = 0..n by its own ratio rule.
+    function binomialPmf(n, p) {
+      const ps = [];
+      const ratio = p / (1 - p);
+      let pr = Math.pow(1 - p, n);
+      for (let x = 0; x <= n; x += 1) {
+        ps.push(pr);
+        pr *= ((n - x) / (x + 1)) * ratio;
+      }
+      return ps;
+    }
+
+    // Moments of a pmf on x = 0, 1, 2, …, with the factorial moments
+    // E[X(X − 1)] and E[X(X − 1)(X − 2)] that the cancel trick uses.
+    function moments(ps) {
+      let mu = 0;
+      ps.forEach((p, x) => { mu += x * p; });
+      let variance = 0;
+      let m3 = 0;
+      let abs3 = 0;
+      let f2 = 0;
+      let f3 = 0;
+      ps.forEach((p, x) => {
+        const d = x - mu;
+        variance += d * d * p;
+        m3 += d * d * d * p;
+        abs3 += Math.abs(d * d * d) * p;
+        f2 += x * (x - 1) * p;
+        f3 += x * (x - 1) * (x - 2) * p;
+      });
+      // Left and right cubes that cancel leave rounding noise, not skew.
+      if (Math.abs(m3) < 1e-12 * abs3) m3 = 0;
+      const sd = Math.sqrt(variance);
+      const skew = sd > 1e-12 ? m3 / (sd * sd * sd) : NaN;
+      return { mu, variance, sd, m3, f2, f3, skew };
+    }
+
+    // μ, σ² and γ₁ from slide 38. E[(X − μ)³] = λ is a standard result.
+    const closedPoisson = (lambda) => ({ mu: lambda, variance: lambda, m3: lambda, skew: 1 / Math.sqrt(lambda) });
+    // Binomial skewness from slide 31.
+    const binomialSkew = (n, p) => (1 - 2 * p) / Math.sqrt(n * p * (1 - p));
+
+    // C(n, x)(λ/n)^x(1 − λ/n)^(n − x) as four factors A·B·C·D.
+    // Their limits as n → ∞ are 1, λ^x/x!, e^(−λ) and 1.
+    function limitFactors(n, lambda, x) {
+      const p = lambda / n;
+      let A = 1;
+      for (let k = 0; k < x; k += 1) A *= (n - k) / n;
+      let B = 1;
+      for (let k = 1; k <= x; k += 1) B *= lambda / k;
+      const C = Math.pow(1 - p, n);
+      const D = Math.pow(1 - p, -x);
+      return { p, A, B, C, D, product: A * B * C * D };
+    }
+
+    // Largest |Binomial(n, λ/n) − Poisson(λ)| over all x, and the x where it happens.
+    function largestGap(lambda, n) {
+      const pois = poissonPmf(lambda);
+      const bin = binomialPmf(n, lambda / n);
+      let gap = 0;
+      let at = 0;
+      for (let x = 0; x < Math.max(pois.length, bin.length); x += 1) {
+        const g = Math.abs((bin[x] || 0) - (pois[x] || 0));
+        if (g > gap) {
+          gap = g;
+          at = x;
+        }
+      }
+      return { gap, at };
+    }
+
+    // Terms λ^x / x! of the series for e^λ, with running totals.
+    function taylorTerms(lambda, count) {
+      const out = [];
+      let term = 1;
+      let sum = 0;
+      for (let x = 0; x < count; x += 1) {
+        sum += term;
+        out.push({ term, sum });
+        term *= lambda / (x + 1);
+      }
+      return out;
+    }
+
+    // The last x with its own column. Larger x fold into one tail column.
+    function lastColumn(ps, lambda, cap = 59) {
+      let hi = ps.length - 1;
+      while (hi > 0 && ps[hi] < 1e-4) hi -= 1;
+      return Math.min(cap, Math.max(hi, Math.ceil(lambda) + 3, 6));
+    }
+
+    // Arrival times in one window [0, 1) at rate λ.
+    // The gaps are exponential, so no Poisson formula is used.
+    function simulateWindow(lambda, rng) {
+      const times = [];
+      let t = -Math.log(1 - rng()) / lambda;
+      while (t < 1) {
+        times.push(t);
+        t += -Math.log(1 - rng()) / lambda;
+      }
+      return times;
+    }
+
+    // Arrivals per slot when [0, 1) is cut into n equal slots.
+    function slotFill(times, n) {
+      const per = new Map();
+      times.forEach((t) => {
+        const k = Math.floor(t * n);
+        per.set(k, (per.get(k) || 0) + 1);
+      });
+      let crowded = 0;
+      per.forEach((c) => { if (c > 1) crowded += 1; });
+      return { per, filled: per.size, crowded };
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmt = (v, d = 3) => {
+      if (!Number.isFinite(v)) return '—';
+      return minus((Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d));
+    };
+    const fmtS = (v, d = 3) => (Number.isFinite(v) && v >= 0.5 * 10 ** -d ? '+' : '') + fmt(v, d);
+    const fmtT = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      return minus(Math.abs(v) >= 1e-3 ? v.toFixed(4) : v.toExponential(1));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const fmtDur = (min) => (min >= 1 ? `${+min.toPrecision(3)} min` : `${+(min * 60).toPrecision(2)} s`);
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))));
+    };
+    function factorial(x) {
+      let f = 1;
+      for (let k = 2; k <= x; k += 1) f *= k;
+      return f;
+    }
+
+    // ===================== STATE =====================
+    const VIEWS = [
+      { key: 'count', word: 'Count', chart: 'p(x) and the share of hours with each count' },
+      { key: 'slots', word: 'Slots', chart: 'Poisson p(x) and the slot model Binomial(n, λ/n)' },
+      { key: 'ratio', word: 'Ratios', chart: 'p(x), labelled with p(x) / p(x − 1) = λ/x' },
+      { key: 'spread', word: 'Spread', chart: 'p(x) with μ ± σ and z = (x − μ)/σ' },
+    ];
+    const TWO_HOURS = { rate: 3, t: 2, tText: '2', label: 'Two hours at 3 per hour' };
+    const TWENTY_MIN = { rate: 3, t: 1 / 3, tText: '1/3', label: '20 minutes at 3 per hour' };
+    const TOUR = [
+      { title: 'What a Poisson counts', lambda: 3, view: 'count', play: 1,
+        note: 'Each orange dot is one patient. The dots land at random times in the hour. On average 3 arrive. X is the number of dots. Press Play one hour a few times. X changes from hour to hour.' },
+      { title: 'Play 1000 hours', lambda: 3, view: 'count', play: 1000,
+        note: 'Each hour adds one count to the orange markers. After 1000 hours the markers sit on the blue bars. The blue bars are e^(−3)·3^x/x!. The simulation never uses that formula. It only places dots at random times.' },
+      { title: 'Chop the hour into 10 slots', lambda: 3, view: 'slots', n: 10,
+        note: 'Cut the hour into 10 slots of 6 minutes. Assume each slot holds one arrival or none. Each slot fills with chance 3/10. So the count is Binomial(10, 0.3). Its peak is too tall. Its variance is 2.1 instead of 3.' },
+      { title: '100 slots', lambda: 3, view: 'slots', n: 100,
+        note: 'Now each slot lasts 36 seconds. Each one fills with chance 0.03. The orange outline almost covers the blue bars. The largest gap drops from 0.043 to 0.0034.' },
+      { title: '1000 slots', lambda: 3, view: 'slots', n: 1000,
+        note: 'Slots of 3.6 seconds fill with chance 0.003. The largest gap is now 0.00034. More slots always shrink the gap. In the limit the Binomial becomes the Poisson pmf. The Math tab shows the algebra.' },
+      { title: 'Where e^(−λ) comes from', lambda: 3, view: 'slots', n: 20, sel: 0,
+        note: 'A quiet hour needs every slot to stay empty. With 20 slots that chance is 0.85^20 = 0.0388. More slots push it up to e^(−3) = 0.0498. Drag the slot slider and watch the bar at x = 0.' },
+      { title: 'Each bar from the last', lambda: 3, view: 'ratio', sel: 3,
+        note: 'Divide one bar by the bar before it. The answer is λ/x. While x is below λ the ratio is above 1. So the bars climb. At x = 3 the ratio is 3/3 = 1. So the bars at 2 and 3 tie.' },
+      { title: 'Rare events', lambda: 0.5, view: 'ratio', sel: 0,
+        note: 'Now λ = 0.5. The first ratio is 0.5/1. So the bars fall from the start. Most hours are quiet: P(X = 0) = e^(−0.5) = 0.607. γ₁ = 1/√0.5 = 1.41 is large.' },
+      { title: 'The lecture\'s Poi(5)', lambda: 5, view: 'count', play: 1000,
+        note: 'This is the Poi(5) plot from slide 39. Bars 4 and 5 tie at 0.1755. The live lines show the average and the variance of 1000 hours. Both sit near 5.' },
+      { title: 'Mean equals variance', lambda: 5, view: 'spread',
+        note: 'For a Poisson μ = λ and σ² = λ. So σ = √5 = 2.24. The dashed lines mark μ ± σ. The slot model shows why: np = λ and np(1 − p) is almost np.' },
+      { title: 'Big λ, small skew', lambda: 25, view: 'spread',
+        note: 'Now μ = 25 and σ = 5. The wall at 0 sits 5σ below μ. The bars do not feel it. So the pmf looks almost symmetric. γ₁ = 1/√25 = 0.2.' },
+      { title: 'Change the window', lambda: 6, view: 'count', play: 1, win: TWO_HOURS,
+        note: 'Watch two hours instead of one. Arrivals still come at 3 per hour. Slide 40 says: use λt in place of λ. So X ∼ Poi(3 × 2) = Poi(6). The mean count doubles to 6.' },
+    ];
+    const PREDICT = [
+      { lambda: 3, view: 'ratio', sel: 3 },
+      { lambda: 0.1, view: 'ratio', sel: 0 },
+      { lambda: 4, view: 'spread' },
+      { lambda: 3, view: 'slots', n: 1000 },
+      { lambda: 1, view: 'count', sel: 0, play: 1, win: TWENTY_MIN },
+    ];
+
+    const state = { lambda: 3, view: 0, n: 10, sel: 3, tour: 0, hover: -1, win: null };
+    const sim = { counts: [], hours: 0, sum: 0, sumSq: 0, last: [], preview: true };
+    let model = null;
+    let shown = null;
+    let dirty = true;
+    const nMin = () => Math.floor(state.lambda) + 1;
+    const viewKey = () => VIEWS[state.view].key;
+
+    function resetSim() {
+      sim.counts = [];
+      sim.hours = 0;
+      sim.sum = 0;
+      sim.sumSq = 0;
+      sim.last = simulateWindow(state.lambda, Math.random);
+      sim.preview = true;
+    }
+    function play(k) {
+      for (let i = 0; i < k; i += 1) {
+        const times = simulateWindow(state.lambda, Math.random);
+        const c = times.length;
+        sim.counts[c] = (sim.counts[c] || 0) + 1;
+        sim.hours += 1;
+        sim.sum += c;
+        sim.sumSq += c * c;
+        sim.last = times;
+      }
+      sim.preview = false;
+    }
+
+    // ===================== MODEL =====================
+    function buildModel() {
+      const lambda = state.lambda;
+      const ps = poissonPmf(lambda);
+      const m = moments(ps);
+      const hi = lastColumn(ps, lambda);
+      const n = Math.max(state.n, nMin());
+      const fold = (arr) => {
+        const out = Array(hi + 2).fill(0);
+        arr.forEach((v, x) => { out[Math.min(x, hi + 1)] += v || 0; });
+        return out;
+      };
+      const pois = fold(ps);
+      const binom = fold(binomialPmf(n, lambda / n));
+      const share = fold(Array.from(sim.counts, (c) => (c || 0) / Math.max(1, sim.hours)));
+      const view = viewKey();
+      const cols = pois.map((p, j) => ({ x: j, tail: j > hi, p, b: binom[j], s: share[j] }));
+      let top = Math.max(...pois);
+      if (view === 'slots') top = Math.max(top, ...binom);
+      if (view === 'count' && sim.hours) top = Math.max(top, ...share);
+      return {
+        ps, m, hi, n, cols, view, fill: slotFill(sim.last, n), gap: largestGap(lambda, n),
+        topMax: top * (view === 'ratio' || view === 'spread' ? 1.32 : 1.18),
+        key: `${cols.length}|${view}`,
+      };
+    }
+
+    function modeText() {
+      const l = state.lambda;
+      if (l >= 1 && Math.abs(l - Math.round(l)) < 1e-9) return `x = ${Math.round(l) - 1} and x = ${Math.round(l)}, a tie`;
+      return `x = ⌊λ⌋ = ${Math.floor(l)}`;
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      blue: '#3d95ec', orange: '#dd7425', mean: '#a0e7a0', bg: '#07111f',
+      ink: '#ebf2ff', muted: '#8aa1c0', grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)',
+    };
+    const FONT = '11px Inter, ui-sans-serif, system-ui, sans-serif';
+    const BOLD = '600 12px Inter, ui-sans-serif, system-ui, sans-serif';
+    let hatchFill = null;
+    function hatch() {
+      if (!hatchFill) {
+        const c = document.createElement('canvas');
+        c.width = 6;
+        c.height = 6;
+        const k = c.getContext('2d');
+        k.strokeStyle = C.blue;
+        k.lineWidth = 1.6;
+        k.beginPath();
+        k.moveTo(0, 6);
+        k.lineTo(6, 0);
+        k.stroke();
+        hatchFill = ctx.createPattern(c, 'repeat');
+      }
+      return hatchFill;
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const x = 58;
+      const line = { y: 22, h: 38 };
+      const zH = viewKey() === 'spread' ? 34 : 0;
+      const plotY = line.y + line.h + 46;
+      const plot = { y: plotY, h: Math.max(110, H - plotY - 26 - zH) };
+      return { x, w: W - x - 16, line, plot, labelY: plot.y + plot.h + 18, zY: plot.y + plot.h + 38 };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || '12px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    // The first option that fits in maxW, else the last one.
+    function fit(options, maxW, font) {
+      ctx.font = font;
+      return options.find((s) => ctx.measureText(s).width <= maxW) || options[options.length - 1];
+    }
+    function hline(x0, x1, y, color, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function vline(x, y0, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A bar up from baseline y0 to y1 with a rounded data end.
+    function bar(cx, w, y0, y1, fill, alpha = 1) {
+      const h = y0 - y1;
+      if (h < 0.4) return;
+      const r = Math.min(4, w / 2, h);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.roundRect(cx - w / 2, y1, w, h, [r, r, 0, 0]);
+      ctx.fill();
+      ctx.restore();
+    }
+    function outlineBar(cx, w, y0, y1) {
+      const h = y0 - y1;
+      if (h < 0.4) return;
+      const r = Math.min(4, w / 2, h);
+      ctx.save();
+      ctx.strokeStyle = C.orange;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx - w / 2 + 1, y1, w - 2, h, [r, r, 0, 0]);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function dot(x, y, r, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = C.bg;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawTimeline(g) {
+      const { y, h } = g.line;
+      const view = model.view;
+      const k = sim.last.length;
+      const words = k === 1 ? '1 arrival' : `${k} arrivals`;
+      const span = state.win ? state.win.t * 60 : 60;
+      const unit = state.win ? 'window' : 'hour';
+      let options;
+      if (view === 'slots') {
+        const f = model.fill;
+        const full = `${f.filled} full slot${f.filled === 1 ? '' : 's'}`;
+        const crowd = f.crowded ? ` · ${f.crowded} with 2 or more` : '';
+        options = [`${model.n} slots of ${fmtDur(span / model.n)} · ${words} · ${full}${crowd}`, `${model.n} slots · ${words}${crowd}`];
+      } else if (sim.preview) {
+        options = [`A sample ${unit} · ${words} · not counted yet`, `A sample ${unit} · ${words}`];
+      } else {
+        const where = state.win ? state.win.label : 'The emergency room';
+        options = [`${where} · ${unit} ${sim.hours} · ${words}`, `${unit === 'hour' ? 'Hour' : 'Window'} ${sim.hours} · ${words}`];
+      }
+      text(fit(options, g.w, BOLD), g.x, y - 8, { color: C.ink, font: BOLD });
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 23, 40, 0.7)';
+      ctx.strokeStyle = C.axis;
+      ctx.beginPath();
+      ctx.roundRect(g.x, y, g.w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      if (view === 'slots') {
+        const sw = g.w / model.n;
+        if (model.n <= 120) for (let j = 1; j < model.n; j += 1) vline(g.x + j * sw, y + 4, y + h - 4, 'rgba(138, 161, 192, 0.32)');
+        model.fill.per.forEach((c, j) => {
+          ctx.fillStyle = c > 1 ? 'rgba(221, 116, 37, 0.8)' : 'rgba(221, 116, 37, 0.32)';
+          ctx.fillRect(g.x + j * sw, y + 2, Math.max(1.5, sw), h - 4);
+        });
+      }
+      sim.last.forEach((t) => dot(g.x + t * g.w, y + h / 2, 4.5, C.orange));
+      text('0 min', g.x, y + h + 13, { font: FONT });
+      text('time →', g.x + g.w / 2, y + h + 13, { font: FONT, align: 'center' });
+      text(`${+span.toFixed(1)} min`, g.x + g.w, y + h + 13, { font: FONT, align: 'right' });
+    }
+
+    function drawChart(g) {
+      const s = shown;
+      const view = model.view;
+      const n = s.cols.length;
+      const colW = g.w / n;
+      const barW = Math.max(2, Math.min(42, colW - 2));
+      const cx = (j) => g.x + (j + 0.5) * colW;
+      const pxOf = (v) => cx(0) + v * colW;
+      const inPlot = (px) => px >= g.x && px <= g.x + g.w;
+      const top = g.plot.y;
+      const base = top + g.plot.h;
+      const yOf = (v) => base - (v / s.topMax) * g.plot.h;
+
+      text(fit([VIEWS[state.view].chart, 'p(x)'], g.w, BOLD), g.x, top - 14, { color: C.ink, font: BOLD });
+      const band = (j, fill) => {
+        if (j < 0 || j >= n) return;
+        ctx.fillStyle = fill;
+        ctx.fillRect(g.x + j * colW, top, colW, g.plot.h);
+      };
+      band(state.sel, 'rgba(134, 212, 255, 0.09)');
+      if (state.hover !== state.sel) band(state.hover, 'rgba(134, 212, 255, 0.06)');
+
+      const tStep = niceStep(s.topMax, 3);
+      for (let t = tStep; t <= s.topMax * 0.999; t += tStep) {
+        const y = yOf(t);
+        hline(g.x, g.x + g.w, y, C.grid);
+        text(fmtTick(t, tStep), g.x - 8, y + 4, { align: 'right' });
+      }
+      s.cols.forEach((c, j) => {
+        if (c.tail) bar(cx(j), barW, base, yOf(c.p), hatch());
+        else bar(cx(j), barW, base, yOf(c.p), C.blue, j === state.sel || j === state.hover ? 1 : 0.88);
+      });
+      if (view === 'slots') s.cols.forEach((c, j) => outlineBar(cx(j), barW, base, yOf(c.b)));
+      if (view === 'count' && sim.hours) {
+        s.cols.forEach((c, j) => {
+          if (model.cols[j].s <= 0) return;
+          const y = yOf(c.s);
+          ctx.save();
+          ctx.strokeStyle = C.orange;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(cx(j) - barW / 2, y);
+          ctx.lineTo(cx(j) + barW / 2, y);
+          ctx.stroke();
+          ctx.restore();
+          dot(cx(j), y, 4, C.orange);
+        });
+      }
+      hline(g.x, g.x + g.w, base, C.axis);
+
+      const muX = pxOf(s.mu);
+      if (view === 'spread') {
+        [-1, 1].forEach((k) => {
+          const px = pxOf(s.mu + k * s.sd);
+          if (!inPlot(px)) return;
+          vline(px, top + 15, base, 'rgba(138, 161, 192, 0.7)', 1, [4, 4]);
+          text(k < 0 ? 'μ − σ' : 'μ + σ', px, top + 10, { align: 'center' });
+        });
+      }
+      vline(muX, top, base, C.mean, 2);
+      ctx.fillStyle = C.mean;
+      ctx.beginPath();
+      ctx.moveTo(muX, base + 1);
+      ctx.lineTo(muX - 6, base + 9);
+      ctx.lineTo(muX + 6, base + 9);
+      ctx.closePath();
+      ctx.fill();
+      const muText = `μ = λ = ${num(state.lambda)}`;
+      ctx.font = BOLD;
+      const muW = ctx.measureText(muText).width;
+      const muRight = muX + 6 + muW <= g.x + g.w;
+      text(muText, muRight ? muX + 6 : muX - 6, top + 24, { color: C.mean, font: BOLD, align: muRight ? 'left' : 'right' });
+
+      if (view === 'ratio') {
+        ctx.font = FONT;
+        const labelW = ctx.measureText('×0.017 ↓').width + 6;
+        const every = Math.max(1, Math.ceil(labelW / colW));
+        for (let x = 1; x <= model.hi; x += 1) {
+          if ((x - 1) % every) continue;
+          const r = state.lambda / x;
+          const tie = Math.abs(r - 1) < 1e-9;
+          const y = Math.max(top + 40, Math.min(yOf(s.cols[x - 1].p), yOf(s.cols[x].p)) - 8);
+          text(`×${String(+r.toPrecision(2))}${tie ? '' : r > 1 ? ' ↑' : ' ↓'}`, g.x + x * colW, y,
+            { align: 'center', color: r >= 1 ? C.ink : C.muted, font: FONT });
+        }
+      }
+
+      if (view === 'spread') {
+        // The wall at 0 and its distance from μ in units of σ.
+        const x0 = cx(0);
+        const by = top + 42;
+        if (muX - x0 > 6) {
+          hline(x0, muX, by, C.ink);
+          vline(x0, by - 5, by + 5, C.ink);
+          vline(muX, by - 5, by + 5, C.ink);
+        }
+        const wall = `0 sits √λ = ${num(Math.sqrt(state.lambda))} σ below μ`;
+        ctx.font = FONT;
+        const tw = ctx.measureText(wall).width;
+        if (muX - x0 > tw + 16) text(wall, (x0 + muX) / 2, by - 6, { align: 'center', color: C.ink, font: FONT });
+        else text(wall, Math.min(muX + 10, g.x + g.w - tw), by + 16, { color: C.ink, font: FONT });
+        // A z-score ruler under the x labels.
+        const zy = g.zY;
+        hline(g.x, g.x + g.w, zy, C.axis);
+        text('z', g.x - 8, zy + 4, { align: 'right', font: FONT });
+        let last = -Infinity;
+        for (let k = -40; k <= 40; k += 1) {
+          const px = pxOf(s.mu + k * s.sd);
+          if (!inPlot(px)) continue;
+          vline(px, zy - 4, zy + 4, C.axis);
+          if (px - last < 24) continue;
+          text(k === 0 ? '0' : `${k > 0 ? '+' : '−'}${Math.abs(k)}`, px, zy + 16, { align: 'center', font: FONT, color: k === 0 ? C.ink : C.muted });
+          last = px;
+        }
+      }
+
+      ctx.font = FONT;
+      const labelW = ctx.measureText(String(model.hi)).width + 8;
+      const every = Math.max(1, Math.ceil(labelW / colW));
+      s.cols.forEach((c, j) => {
+        if (c.tail) text(`>${model.hi}`, cx(j), g.labelY, { align: 'center', color: C.ink, font: FONT });
+        else if (j === state.sel) text(String(j), cx(j), g.labelY, { align: 'center', color: C.ink, font: `700 ${FONT}` });
+        else if (j % every === 0 && Math.abs(j - state.sel) >= every && j < n - every) {
+          text(String(j), cx(j), g.labelY, { align: 'center', font: FONT });
+        }
+      });
+    }
+
+    function drawTooltip(g) {
+      const j = state.hover;
+      if (j < 0 || j >= model.cols.length) return;
+      const c = model.cols[j];
+      const lam = state.lambda;
+      const lines = c.tail
+        ? [`tail: x > ${model.hi}`, `total Poisson p = ${fmtT(c.p)}`]
+        : [`x = ${c.x}`, `Poisson p(${c.x}) = ${fmtT(c.p)}`];
+      if (model.view === 'count') {
+        lines.push(sim.hours ? `share of hours = ${fmtT(c.s)} (${Math.round(c.s * sim.hours)} of ${sim.hours})` : 'no hours played yet');
+      } else if (model.view === 'slots') {
+        lines.push(`Binomial(${model.n}, ${num(lam / model.n)}) = ${fmtT(c.b)}`, `gap = ${fmtT(Math.abs(c.b - c.p))}`);
+      } else if (model.view === 'ratio' && !c.tail) {
+        lines.push(c.x ? `p(${c.x}) / p(${c.x - 1}) = λ/${c.x} = ${num(lam / c.x)}` : 'p(0) = e^(−λ), the start of the chain');
+      } else if (model.view === 'spread' && !c.tail) {
+        lines.push(`z = (x − μ)/σ = ${fmtS((c.x - lam) / Math.sqrt(lam), 2)}`);
+      }
+      if (!c.tail) lines.push('click: use this x in the Arithmetic tab');
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      const colW = g.w / model.cols.length;
+      let x = g.x + (j + 1) * colW + 8;
+      if (x + w > g.x + g.w) x = g.x + j * colW - 8 - w;
+      x = Math.max(4, x);
+      const y = g.plot.y + 30;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 10, y + 20 + i * 17, { color: i === lines.length - 1 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!shown || W < 50) return;
+      const g = geom();
+      drawTimeline(g);
+      drawChart(g);
+      drawTooltip(g);
+    }
+
+    // Ease the drawn values toward the model. A new column layout snaps.
+    function snapshot(mdl) {
+      return { key: mdl.key, cols: mdl.cols.map((c) => ({ ...c })), topMax: mdl.topMax, mu: mdl.m.mu, sd: mdl.m.sd };
+    }
+    function frame() {
+      if (model) {
+        if (!shown || shown.key !== model.key) {
+          shown = snapshot(model);
+          dirty = true;
+        } else {
+          let moving = false;
+          const ease = (a, b) => {
+            if (Math.abs(b - a) <= 1e-4 * (Math.abs(b) + 1e-9)) return b;
+            moving = true;
+            return a + (b - a) * 0.22;
+          };
+          shown.topMax = ease(shown.topMax, model.topMax);
+          shown.mu = ease(shown.mu, model.m.mu);
+          shown.sd = ease(shown.sd, model.m.sd);
+          shown.cols.forEach((c, j) => {
+            const t = model.cols[j];
+            c.p = ease(c.p, t.p);
+            c.b = ease(c.b, t.b);
+            c.s = ease(c.s, t.s);
+          });
+          if (moving) dirty = true;
+        }
+      }
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function colAt(e) {
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const g = geom();
+      if (y < g.plot.y - 20 || y > g.labelY + 6) return -1;
+      const j = Math.floor(((x - g.x) / g.w) * model.cols.length);
+      return j >= 0 && j < model.cols.length ? j : -1;
+    }
+    canvas.addEventListener('pointermove', (e) => {
+      const j = colAt(e);
+      if (j !== state.hover) {
+        state.hover = j;
+        dirty = true;
+      }
+    });
+    canvas.addEventListener('pointerleave', () => {
+      state.hover = -1;
+      dirty = true;
+    });
+    canvas.addEventListener('click', (e) => {
+      const j = colAt(e);
+      if (j < 0 || j > model.hi) return;
+      state.sel = j;
+      update();
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const show = (v) => { out.textContent = spec.format(v); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+
+    function renderSlotSlider() {
+      $('slotHost').hidden = viewKey() !== 'slots';
+      const host = $('slotSlider');
+      host.innerHTML = '';
+      const toN = (v) => clamp(Math.round(10 ** v), nMin(), 2000);
+      host.append(makeSlider({
+        label: 'n, the number of slots', min: Math.log10(nMin()), max: Math.log10(2000), step: 0.001,
+        format: (v) => String(toN(v)),
+      }, Math.log10(state.n), (v) => {
+        state.n = toN(v);
+        update();
+      }));
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', +b.dataset.view === state.view));
+      const host = $('rateHost');
+      host.innerHTML = '';
+      host.append(makeSlider({ label: 'λ, the mean count per hour', min: 0.1, max: 30, step: 0.1, format: (v) => v.toFixed(1) },
+        state.lambda, (v) => {
+          state.lambda = v;
+          state.win = null;
+          state.n = Math.max(state.n, nMin());
+          resetSim();
+          renderSlotSlider();
+          update();
+        }));
+      renderSlotSlider();
+    }
+
+    function apply(s) {
+      state.lambda = s.lambda;
+      state.view = VIEWS.findIndex((v) => v.key === s.view);
+      state.win = s.win || null;
+      if (s.n) state.n = s.n;
+      state.n = Math.max(state.n, nMin());
+      state.sel = s.sel ?? Math.floor(s.lambda);
+      resetSim();
+      if (s.play) play(s.play);
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      const t = TOUR[state.tour];
+      apply(t);
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(i) {
+      state.view = i;
+      renderControls();
+      update();
+    }
+
+    function simLine() {
+      if (!sim.hours) return 'No hours played yet. Press Play one hour.';
+      const mean = sim.sum / sim.hours;
+      const variance = sim.sumSq / sim.hours - mean * mean;
+      return `${sim.hours} ${sim.hours === 1 ? 'hour' : 'hours'} · average ${num(mean)} · variance ${num(variance)} · theory: both ${num(state.lambda)}`;
+    }
+
+    function renderReadouts() {
+      const lam = state.lambda;
+      const L = num(lam);
+      const sd = Math.sqrt(lam);
+      const p = lam / model.n;
+      const win = state.win;
+      const name = win ? `${win.label}: Poi(λt) = Poi(${win.rate} × ${win.tText}) = Poi(${L})` : `Poi(${L})`;
+      const big = {
+        count: simLine(),
+        slots: `Binomial(${model.n}, ${num(p)}) against Poi(${L}) · largest gap <strong>${num(model.gap.gap)}</strong> at x = ${model.gap.at}`,
+        ratio: `p(x) = p(x − 1) × λ/x · tallest bar: ${modeText()}`,
+        spread: `0 sits √λ = ${num(sd)} σ below μ · γ₁ = 1/√λ = <strong>${num(1 / sd)}</strong>`,
+      }[model.view];
+      const x = state.sel;
+      $('receipt').innerHTML = `
+        <div>${name} · μ = λ = ${L} · σ² = λ = ${L} · σ = √λ = ${num(sd)} · γ₁ = 1/√λ = ${num(1 / sd)}</div>
+        <div class="big">${big}</div>
+        <div>Selected x = ${x} · p(${x}) = e<sup>−${L}</sup> × ${L}<sup>${x}</sup> / ${x}! = <strong>${num(model.ps[x])}</strong> · click a bar to change x</div>`;
+
+      const k = sim.last.length;
+      const where = win ? 'window' : 'hour';
+      const caption = {
+        count: sim.hours
+          ? `<strong>Count events.</strong> ${sim.hours} ${sim.hours === 1 ? 'hour' : 'hours'} played. Each orange marker is the share of hours with that count. The markers wobble around the blue bars. More hours give less wobble.`
+          : `<strong>Count events.</strong> The strip shows one sample ${where} with ${k} ${k === 1 ? 'arrival' : 'arrivals'}. Press Play to count hours. Each orange marker then shows the share of hours with that count.`,
+        slots: `<strong>Chop the ${where} into ${model.n} slots.</strong> Each slot holds an arrival with chance λ/n = ${num(p)}. So the count is Binomial(${model.n}, ${num(p)}). The orange outline shows it. A slot with two arrivals still counts once. More slots make that rare.`,
+        ratio: `<strong>Shape by ratios.</strong> Each label is p(x) / p(x − 1) = λ/x. A label above 1 means the bar climbs. A label below 1 means it falls. Start at p(0) = e<sup>−λ</sup> = ${num(Math.exp(-lam))} and multiply along the labels.`,
+        spread: `<strong>Spread and skew.</strong> μ = λ = ${L} and σ = √λ = ${num(sd)}. The wall at 0 sits ${num(sd)} σ below μ. The right tail has no wall. So γ₁ = 1/√λ = ${num(1 / sd)} is positive.`,
+      }[model.view];
+      $('caption').innerHTML = caption;
+
+      const sw = (cls, label) => `<span class="legend"><span class="swatch ${cls}"></span>${label}</span>`;
+      const legend = [sw('blue', 'Poisson p(x)')];
+      if (model.view === 'count') legend.push(sw('dot', 'simulated: arrivals in the strip, shares in the chart'));
+      if (model.view === 'slots') legend.push(sw('outline', 'Binomial(n, λ/n)'), sw('dot', 'arrivals; a dark slot holds 2 or more'));
+      legend.push(sw('mean', 'μ = λ'));
+      if (model.view === 'spread') legend.push(sw('sigma', 'μ ± σ'));
+      legend.push(sw('tail', 'far tail, one bar'));
+      $('legend').innerHTML = `${legend.join('')}Click a bar to pick x.`;
+
+      $('playLine').textContent = simLine();
+      $('slotLine').textContent = `p = λ/n = ${L}/${model.n} = ${num(p)} per slot`;
+      renderArithmetic();
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of [label, working, value, class], padded into aligned columns.
+    function rowsHtml(rows) {
+      const wl = Math.max(...rows.map((r) => r[0].length));
+      const ww = Math.max(...rows.map((r) => r[1].length));
+      return rows.map(([label, work, value, cls]) => {
+        const line = `${label.padEnd(wl)}  ${work.padEnd(ww)}${value ? ` = ${value}` : ''}`;
+        return `<div class="${cls || ''}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+    const same = (u, v) => Math.abs(u - v) <= 1e-6 * Math.max(1, Math.abs(v));
+    const tick = (ok, yes) => (ok ? `<span class="ok">✓ ${yes}</span>` : '<span class="bad">✗ The two routes disagree.</span>');
+
+    function renderArithmetic() {
+      const { ps, m, hi, n } = model;
+      const lam = state.lambda;
+      const L = num(lam);
+      const x = state.sel;
+      const idx = [...Array(hi + 1).keys()];
+      const cls = (i) => (i === x ? 'sel' : '');
+      const rest = ps.length - hi - 1;
+      const tailRow = (f) => {
+        if (rest <= 0) return [];
+        let s = 0;
+        for (let i = hi + 1; i < ps.length; i += 1) s += f(i);
+        return [[`x > ${hi}`, `${rest} more terms, summed`, num(s), 'tail']];
+      };
+      const win = state.win;
+      $('arithHead').innerHTML = `<strong>Poi(${L}).</strong> `
+        + (win ? `${win.label} gives λt = ${win.rate} × ${win.tText} = ${L}. ` : '')
+        + `Eight blocks lead from the pmf to γ₁. The highlighted rows use x = ${x}. Click a bar or use the buttons to change x.`;
+
+      // 1. The pmf by the ratio chain, then the direct formula at x.
+      const direct = (Math.exp(-lam) * lam ** x) / factorial(x);
+      const b1 = block('1 · The pmf, bar by bar', 'p(0) = e^(−λ), then p(x) = p(x − 1) × λ/x',
+        rowsHtml(idx.map((i) => [`p(${i})`, i ? `${num(ps[i - 1])} × ${L}/${i}` : `e^(−${L})`, num(ps[i]), cls(i)])
+          .concat(tailRow((i) => ps[i]))),
+        `Direct formula at x = ${x}:<br>p(${x}) = e^(−${L}) × ${L}^${x} / ${x}! = ${num(Math.exp(-lam))} × ${num(lam ** x)} / ${num(factorial(x))}`
+          + ` = <strong>${num(direct)}</strong> ${tick(same(direct, ps[x]), 'same as the chain')}`);
+
+      // 2. The Taylor series for e^λ, which makes the bars sum to 1.
+      const terms = taylorTerms(lam, ps.length);
+      const eL = terms[terms.length - 1].sum;
+      const total = ps.reduce((s, v) => s + v, 0);
+      const b2 = block('2 · Why the bars sum to 1', 'e^λ = Σ λ^x / x! = 1 + λ + λ²/2! + …',
+        rowsHtml(idx.map((i) => [`x ≤ ${i}`, i ? `${num(terms[i - 1].sum)} + ${L}^${i}/${i}! = ${num(terms[i - 1].sum)} + ${num(terms[i].term)}` : `${L}^0/0! = 1`,
+          num(terms[i].sum), cls(i)]).concat(tailRow((i) => terms[i].term))),
+        `e^${L} = <strong>${num(eL)}</strong>. So Σ p(x) = e^(−${L}) × e^${L} = ${num(Math.exp(-lam))} × ${num(eL)} = <strong>${num(total)}</strong>`);
+
+      // 3. The slot model at x, split into the four factors of the limit.
+      const f = limitFactors(n, lam, x);
+      const q = num(1 - f.p);
+      const aText = x === 0 ? '1, no factors'
+        : x > n ? '0, since x > n'
+          : x <= 4 ? `${idx.slice(0, x).map((k) => n - k).join(' × ')} / ${n}^${x}`
+            : `${n} × ${n - 1} × … × ${n - x + 1} / ${n}^${x}`;
+      const rows3 = [
+        ['', `now, n = ${n}`, 'as n → ∞'],
+        ['A', `${aText} = ${num(f.A)}`, '1'],
+        ['B', `${L}^${x} / ${x}! = ${num(f.B)}`, num(f.B)],
+        ['C', `${q}^${n} = ${num(f.C)}`, `e^(−${L}) = ${num(Math.exp(-lam))}`],
+        ['D', `${q}^(−${x}) = ${num(f.D)}`, '1'],
+        ['ABCD', num(f.product), num(ps[x])],
+      ];
+      const w0 = Math.max(...rows3.map((r) => r[0].length));
+      const w1 = Math.max(...rows3.map((r) => r[1].length));
+      const b3 = block('3 · From <span class="nocase">n</span> slots to the Poisson', 'C(n, x) p^x (1 − p)^(n − x) = A · B · C · D,  p = λ/n',
+        linesHtml([`n = ${n} slots, p = λ/n = ${L}/${n} = ${num(f.p)}, x = ${x}`, '',
+          'A = n(n − 1)…(n − x + 1) / n^x', 'B = λ^x / x!', 'C = (1 − λ/n)^n', 'D = (1 − λ/n)^(−x)', '',
+          ...rows3.map((r) => `${r[0].padEnd(w0)}  ${r[1].padEnd(w1)}  ${r[2]}`)]),
+        `Binomial(${n}, ${num(f.p)}) gives <strong>${num(f.product)}</strong> at x = ${x}. The Poisson limit gives <strong>${num(ps[x])}</strong>.`
+          + ` The gap is ${num(Math.abs(f.product - ps[x]))}.`);
+
+      // 4. The mean, term by term, with x · p(x) = λ · p(x − 1).
+      const b4 = block('4 · The mean <span class="nocase">μ</span>', 'μ = Σ x · p(x), and each term x · p(x) = λ · p(x − 1)',
+        rowsHtml(idx.map((i) => [`x = ${i}`, i ? `${i} × ${num(ps[i])} = ${L} × ${num(ps[i - 1])}` : `0 × ${num(ps[0])}`, num(i * ps[i]), cls(i)])
+          .concat(tailRow((i) => i * ps[i]))),
+        `μ = sum of the last column = <strong>${num(m.mu)}</strong>.<br>The middle column sums λ × (every bar) = ${L} × 1 = ${L}.`);
+
+      // 5. The variance through E[X(X − 1)] = λ².
+      const L2 = num(lam * lam);
+      const sigma2 = m.f2 + m.mu - m.mu ** 2;
+      const b5 = block('5 · The variance <span class="nocase">σ²</span>', 'E[X(X − 1)] = Σ x(x − 1) p(x), and each term = λ² · p(x − 2)',
+        rowsHtml(idx.map((i) => [`x = ${i}`, i >= 2 ? `${i} × ${i - 1} × ${num(ps[i])} = ${L2} × ${num(ps[i - 2])}` : `${i} × ${i - 1} × ${num(ps[i])}`,
+          num(i * (i - 1) * ps[i]), cls(i)]).concat(tailRow((i) => i * (i - 1) * ps[i]))),
+        `E[X(X − 1)] = <strong>${num(m.f2)}</strong>, which is λ² = ${L2}.<br>`
+          + `σ² = E[X(X − 1)] + μ − μ² = ${num(m.f2)} + ${num(m.mu)} − ${num(m.mu ** 2)} = <strong>${num(sigma2)}</strong>`);
+
+      // 6. σ and σ³.
+      const sd3 = m.sd ** 3;
+      const b6 = block('6 · <span class="nocase">σ</span> and <span class="nocase">σ³</span>', 'σ = √σ² and σ³ = σ² × σ',
+        linesHtml([...chain('σ ', [`√${num(m.variance)}`, num(m.sd)]), ...chain('σ³', [`${num(m.variance)} × ${num(m.sd)}`, num(sd3)])]),
+        `σ³ = <strong>${num(sd3)}</strong>`);
+
+      // 7. The third central moment and γ₁.
+      const e2 = m.f2 + m.mu;
+      const e3 = m.f3 + 3 * m.f2 + m.mu;
+      const viaShortcut = e3 - 3 * m.mu * e2 + 2 * m.mu ** 3;
+      const P = (s) => s.padEnd(18);
+      const b7 = block('7 · The skewness <span class="nocase">γ₁</span>', 'γ₁ = E[(X − μ)³] / σ³',
+        linesHtml([
+          ...chain(P('E[X(X − 1)(X − 2)]'), ['Σ x(x − 1)(x − 2) p(x)', `${num(m.f3)}, which is λ³ = ${num(lam ** 3)}`]),
+          ...chain(P('E[X²]'), ['E[X(X − 1)] + E[X]', `${num(m.f2)} + ${num(m.mu)}`, num(e2)]),
+          ...chain(P('E[X³]'), ['E[X(X − 1)(X − 2)] + 3E[X(X − 1)] + E[X]', `${num(m.f3)} + 3 × ${num(m.f2)} + ${num(m.mu)}`, num(e3)]),
+          ...chain(P('E[(X − μ)³]'), ['E[X³] − 3μE[X²] + 2μ³', `${num(e3)} − 3 × ${num(m.mu)} × ${num(e2)} + 2 × ${num(m.mu ** 3)}`, numS(viaShortcut)]),
+          ...chain(P('γ₁'), ['E[(X − μ)³] / σ³', `${paren(m.m3)} / ${num(sd3)}`, numS(m.skew)]),
+        ]),
+        `The direct sum Σ (x − μ)³ p(x) also gives ${numS(m.m3)}. That is λ.<br>γ₁ = <strong>${numS(m.skew)}</strong>`);
+
+      // 8. The lecture formulas against the sums, and the slot model's skewness.
+      const cp = closedPoisson(lam);
+      const bsk = binomialSkew(n, f.p);
+      const Q = (s) => s.padEnd(13);
+      const ok = same(cp.mu, m.mu) && same(cp.variance, m.variance) && same(cp.m3, m.m3) && same(cp.skew, m.skew);
+      const b8 = block('8 · Check with the lecture formulas', `Poi(${L}): closed forms, numbers substituted`,
+        linesHtml([
+          ...chain(Q('μ'), ['λ', L]),
+          ...chain(Q('σ²'), ['λ', L]),
+          ...chain(Q('E[(X − μ)³]'), ['λ', numS(lam)]),
+          ...chain(Q('γ₁'), ['1 / √λ', `1 / √${L}`, `1 / ${num(Math.sqrt(lam))}`, numS(cp.skew)]),
+          '',
+          `The slot model Binomial(${n}, ${num(f.p)}):`,
+          ...chain(Q('γ₁'), ['(1 − 2p) / √(np(1 − p))', `${paren(1 - 2 * f.p)} / √(${n} × ${num(f.p)} × ${q})`,
+            `${paren(1 - 2 * f.p)} / ${num(Math.sqrt(n * f.p * (1 - f.p)))}`, numS(bsk)]),
+        ]),
+        `${tick(ok, 'μ, σ², E[(X − μ)³] and γ₁ all match the sums above.')}<br>`
+          + `The slot model gives γ₁ = ${numS(bsk)}. More slots move it toward 1/√λ = ${num(cp.skew)}.`);
+
+      $('arithBody').innerHTML = [b1, b2, b3, b4, b5, b6, b7, b8].join('');
+    }
+
+    function update() {
+      model = buildModel();
+      state.sel = clamp(state.sel, 0, model.hi);
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${i + 1}</b><span>${v.word}</span>`;
+      b.dataset.view = i;
+      b.addEventListener('click', () => setView(i));
+      $('viewGrid').append(b);
+    });
+    document.querySelectorAll('[data-play]').forEach((b) => b.addEventListener('click', () => {
+      play(+b.dataset.play);
+      if (viewKey() !== 'count') setView(0);
+      else update();
+    }));
+    $('resetSim').addEventListener('click', () => {
+      resetSim();
+      update();
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    $('selPrev').addEventListener('click', () => {
+      state.sel -= 1;
+      update();
+    });
+    $('selNext').addEventListener('click', () => {
+      state.sel += 1;
+      update();
+    });
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-4]$/.test(e.key)) setView(+e.key - 1);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

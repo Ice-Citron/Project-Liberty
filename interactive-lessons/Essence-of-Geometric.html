@@ -1,0 +1,1488 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of the Geometric · Waiting for the First Success</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    a { color: var(--blue-1); }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.theory { background: var(--left); }
+    .swatch.dim { background: var(--left); opacity: 0.3; }
+    .swatch.sim { width: 14px; height: 3px; border-radius: 2px; background: var(--right); }
+    .swatch.outline { background: transparent; border: 2px solid var(--right); border-bottom: 0; border-radius: 3px 3px 0 0; }
+    .swatch.pick { background: var(--left); box-shadow: 0 0 0 1.5px var(--ink); }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.link { width: 14px; height: 0; border-top: 1px dashed var(--muted); border-radius: 0; }
+    .swatch.wait {
+      background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 4px);
+      border: 1px solid var(--muted);
+    }
+    .swatch.tail {
+      background: repeating-linear-gradient(135deg, var(--left) 0 2px, transparent 2px 4px);
+      border: 1px solid var(--left);
+    }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav .formula-chip { font-family: var(--mono); color: var(--ink); }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lens-grid { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .lens-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .lens-grid button b { font-size: 15px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; margin: 2px 0; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.l { box-shadow: inset 3px 0 0 var(--left); }
+    .arith div.r { box-shadow: inset 3px 0 0 var(--right); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Distributions · 50008 Lecture 3 · Geometric(p)</div>
+        <h1>Geometric: waiting for the first success</h1>
+        <p class="lead">
+          Flip a coin until the first head. <strong>X</strong> counts the flips.
+          Why is p(x) = p(1 − p)<sup>x−1</sup>? Why is the mean <strong>1/p</strong>?
+          Play the game and watch each formula from the slide appear.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <span>50008 Probability · L03 Geometric</span>
+        <span id="chip" class="formula-chip"></span>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · one game, every formula</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 4 pick a picture.
+            The Arithmetic tab writes out every sum for the p on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Play the game</div>
+          <div class="body">Each game flips a coin with chance p until the first 1.
+            Finished games add orange marks to the pmf picture.</div>
+          <div class="preset-grid three">
+            <button id="flipOne">Flip one trial</button>
+            <button id="runOne">Run to success</button>
+            <button id="resetGames">Reset games</button>
+            <button id="play100">Play ×100</button>
+            <button id="play1000">Play ×1000</button>
+          </div>
+          <div id="gameLine" class="live-line"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a picture</div>
+          <div class="body">Four pictures of the same pmf. Each one explains one formula from the slide.</div>
+          <div id="viewGrid" class="lens-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Set <span class="nocase">p</span></div>
+          <div id="sliderHost" style="display: grid; gap: 8px;"></div>
+          <label class="checkbox"><input id="failBox" type="checkbox"> Count failures instead: Y = X − 1</label>
+          <div class="src">The failures switch moves the pmf and No memory pictures.
+            The other two pictures always count trials.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · You roll a fair die until a six shows. How many rolls does it take on average?</summary>
+            <div class="answer"><strong>6 rolls.</strong> Each roll succeeds with p = 1/6. So μ = 1/p = 6.
+              One six per six rolls in the long run means six rolls per six.</div>
+            <button data-predict="0">Set it up: Geometric(1/6)</button>
+          </details>
+          <details class="predict">
+            <summary>2 · No six in the first 10 rolls. How many more rolls on average?</summary>
+            <div class="answer"><strong>Still 6.</strong> The die has no memory.
+              After any number of failures the wait ahead is Geometric(1/6) again. A six is never due.</div>
+            <button data-predict="1">Set it up: No memory after 10 failures</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Is x = 1 always the most likely value, for every p?</summary>
+            <div class="answer"><strong>Yes.</strong> Each bar is (1 − p) times the bar before.
+              So the bars only shrink. Even at p = 0.05 the first bar is the tallest.</div>
+            <button data-predict="2">Set it up: Geometric(0.05)</button>
+          </details>
+          <details class="predict">
+            <summary>4 · p rises from 0.1 to 0.9. Does γ₁ go up or down?</summary>
+            <div class="answer"><strong>Up, from 2.003 to 3.479.</strong> Long waits get rare.
+              But σ shrinks too. So each long wait sits more standard deviations above μ.</div>
+            <button data-predict="3">Set it up: Geometric(0.9)</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Count failures instead of trials. Which of μ, σ² and γ₁ change?</summary>
+            <div class="answer"><strong>Only μ.</strong> It drops by exactly 1.
+              Y = X − 1 moves every bar left by 1. A shift does not change spread or shape.</div>
+            <button data-predict="4">Set it up: Y = X − 1 at p = 0.25</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Decode the definition</div>
+          <div class="formula">X = min{ i | i ≥ 1, Xᵢ = 1 }
+  = the index of the first trial that gives a 1
+
+trial i:   1   2   3   4   5   …
+Xᵢ:        0   0   0   1   ?
+                       ↑ first 1, so X = 4</div>
+          <div class="body">The set holds every index that shows a 1. min picks the smallest.
+            Trials after the first 1 do not change X.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The pmf: one path per value</div>
+          <div class="formula">{X = x} = {X₁ = 0, …, Xₓ₋₁ = 0, Xₓ = 1}
+
+P(X = x) = (1 − p)(1 − p)…(1 − p) · p
+           └─── x − 1 factors ──┘
+         = p(1 − p)^(x−1)       by independence
+
+p(x + 1) / p(x) = 1 − p        a constant ratio</div>
+          <div class="body">A constant ratio between neighbours makes a geometric sequence.
+            That is where the name comes from.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why the bars sum to 1</div>
+          <div class="formula">Σₓ p(1 − p)^(x−1) = p (1 + q + q² + …)     q = 1 − p
+                  = p · 1 / (1 − q)
+                  = p / p = 1
+
+P(X > x) = P(X₁ = … = Xₓ = 0) = (1 − p)^x</div>
+          <div class="body">Trial x stops a share p of the games still running.
+            The rest carry over. No probability leaks away.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The mean, three ways</div>
+          <div class="formula">first step:
+  E[X] = p · 1 + (1 − p) · (1 + E[X])
+  p E[X] = 1   →   E[X] = 1/p
+
+tail sum:
+  X = Σₖ 1{X ≥ k}    counts each trial played
+  E[X] = Σₖ P(X ≥ k) = Σₖ q^(k−1)
+       = 1/(1 − q) = 1/p
+
+direct:
+  Σₓ x q^(x−1) = d/dq Σₓ qˣ = d/dq 1/(1 − q)
+               = 1/(1 − q)²
+  E[X] = p · 1/p² = 1/p</div>
+          <div class="body"><strong>First step.</strong> Spend one trial. With chance 1 − p it fails.
+            Then the game starts over with a fresh copy of X.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The variance</div>
+          <div class="formula">E[X²] = p · 1² + (1 − p) · E[(1 + X)²]
+      = p + (1 − p)(1 + 2E[X] + E[X²])
+p E[X²] = 1 + 2(1 − p)/p   →   E[X²] = (2 − p)/p²
+
+σ² = E[X²] − μ² = (2 − p)/p² − 1/p² = (1 − p)/p²
+σ / μ = √(1 − p)       so σ ≈ μ when p is small</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The skewness</div>
+          <div class="formula">E[X³] = p + (1 − p) E[(1 + X)³]
+   →  E[X³] = (p² − 6p + 6)/p³
+
+E[(X − μ)³] = E[X³] − 3μ E[X²] + 2μ³
+            = (p² − 6p + 6 − 3(2 − p) + 2)/p³
+            = (1 − p)(2 − p)/p³
+σ³          = (1 − p)^(3/2) / p³
+γ₁          = (2 − p) / √(1 − p)
+
+dγ₁/dp = p / (2(1 − p)^(3/2)) > 0   so γ₁ rises
+γ₁ → 2 as p → 0                     so γ₁ > 2</div>
+          <div class="body">The slide only says γ₁ is positive. The two lines at the bottom say more.
+            <a href="Essence-of-Skewness.html">Essence of Skewness</a> draws every cube.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">No memory</div>
+          <div class="formula">P(X > m + n | X > m) = P(X > m + n) / P(X > m)
+                     = (1 − p)^(m+n) / (1 − p)^m
+                     = (1 − p)^n = P(X > n)
+
+E[X | X > m] = m + 1/p</div>
+          <div class="body">This property is why first-step analysis works. A failed trial leaves a fresh game.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Trials versus failures</div>
+          <div class="formula">Y = X − 1         supp(Y) = {0, 1, 2, …}
+p_Y(y) = p(1 − p)^y
+E[Y]   = 1/p − 1 = (1 − p)/p
+Var(Y) = Var(X) = (1 − p)/p²
+γ₁(Y)  = γ₁(X) = (2 − p)/√(1 − p)</div>
+          <div class="body">These are the "minor corrections" that the slide's remark mentions. Only the mean moves.</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L03 Discrete Random Variables.
+            Pages 33 to 35 of the PDF give the definition and the pmf. They also give μ, σ² and γ₁.
+            Page 35 shows the Geometric(¼) plot. Page 20 defines skewness.
+            The tail sum and first-step analysis are standard results. So are E[X³] and the no-memory property.
+            They are not on these slides. A Node test checks every number on this page against direct sums.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>X is a waiting time.</strong> It counts trials up to and including the first success.
+            So X starts at 1.</div>
+          <div class="essence"><strong>One path per bar.</strong> X = x needs x − 1 failures and then one success.
+            Independence lets you multiply: (1 − p)^(x−1) p.</div>
+          <div class="essence"><strong>Each bar is (1 − p) times the last.</strong> That constant ratio makes a geometric sequence.
+            Its sum is p / (1 − (1 − p)) = 1.</div>
+          <div class="essence"><strong>μ = 1/p is a rate turned over.</strong> A success rate of p per trial means 1/p trials per success.
+            First-step analysis proves it in one line.</div>
+          <div class="essence"><strong>The spread matches the wait.</strong> σ/μ = √(1 − p).
+            For rare successes σ is almost as large as μ.</div>
+          <div class="essence"><strong>Always right-skewed and never below 2.</strong> A wall at x = 1 blocks the left side.
+            The right tail never ends.</div>
+          <div class="essence"><strong>The coin has no memory.</strong> After m failures the wait ahead is Geometric(p) again.
+            A success is never due.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can read min{i | i ≥ 1, Xᵢ = 1} as the index of the first success.</label>
+            <label><input type="checkbox"> I can write p(x) by multiplying along the only path to X = x.</label>
+            <label><input type="checkbox"> I can explain why the bars sum to 1.</label>
+            <label><input type="checkbox"> I can get μ = 1/p from E = 1 + (1 − p)E.</label>
+            <label><input type="checkbox"> I can explain why a success is not due after 10 failures.</label>
+            <label><input type="checkbox"> I know which of μ, σ² and γ₁ change when I count failures.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Two conventions exist.</strong> This page and the lecture count trials.
+            Some books count failures. A mean of 1/p means trials. A mean of (1 − p)/p means failures.</div>
+          <div class="body"><strong>The slides stop at γ₁.</strong> The tail sum and first-step analysis are standard results.
+            So is the no-memory property. They are not on these slides.</div>
+          <div class="body"><strong>p must be above 0.</strong> At p = 0 the wait never ends.
+            At p = 1 every game ends at trial 1. Then σ = 0 and γ₁ is undefined.
+            So the slider runs from 0.05 to 0.95.</div>
+          <div class="body"><strong>Simulated averages wobble.</strong> With n games the typical error is about σ/√n.
+            At p = 0.25 and n = 1000 that is about 0.11.</div>
+          <div class="body"><strong>The chart folds the far tail into one hatched bar.</strong>
+            The Arithmetic tab still sums every term.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Related pages</div>
+          <div class="body"><a href="Essence-of-Skewness.html">Essence of Skewness</a> builds γ₁ cube by cube.
+            It includes the Geometric.</div>
+          <div class="body"><a href="Essence-of-Poisson.html">Essence of the Poisson</a> counts rare events in a window.
+            It comes from the same lecture.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_geometric.js) =====================
+    // KIT START
+    const TAIL_EPS = 1e-13;
+
+    // Geometric(p), lecture convention: X counts trials up to and including the first success.
+    // The support stops once the mass left, (1 − p)^x, is below TAIL_EPS.
+    function pmf(p) {
+      const xs = [];
+      const ps = [];
+      for (let x = 1; Math.pow(1 - p, x - 1) > TAIL_EPS; x += 1) {
+        xs.push(x);
+        ps.push(p * Math.pow(1 - p, x - 1));
+      }
+      return { xs, ps };
+    }
+
+    // P(X > x): the first x trials all fail.
+    const survival = (p, x) => Math.pow(1 - p, x);
+
+    // Two-pass moments: the mean first, then sums of centred powers.
+    function moments(xs, ps) {
+      let mu = 0;
+      xs.forEach((x, i) => { mu += x * ps[i]; });
+      let variance = 0;
+      let m3 = 0;
+      let e2 = 0;
+      let e3 = 0;
+      xs.forEach((x, i) => {
+        const d = x - mu;
+        variance += d * d * ps[i];
+        m3 += d * d * d * ps[i];
+        e2 += x * x * ps[i];
+        e3 += x * x * x * ps[i];
+      });
+      const sd = Math.sqrt(variance);
+      return { mu, variance, sd, m3, e2, e3, skew: m3 / (sd * sd * sd) };
+    }
+
+    // The slides give μ, σ² and γ₁. E[X²], E[X³] and E[(X − μ)³] are standard results.
+    function closedMoments(p) {
+      const q = 1 - p;
+      return {
+        mu: 1 / p, e2: (2 - p) / p ** 2, e3: (p * p - 6 * p + 6) / p ** 3,
+        variance: q / p ** 2, m3: (q * (2 - p)) / p ** 3, skew: (2 - p) / Math.sqrt(q),
+      };
+    }
+
+    // First-step analysis: with chance p the game ends at 1, otherwise X = 1 + X′.
+    // E[X^k] = p + (1 − p)E[(1 + X)^k], solved for E[X^k].
+    function firstStep(p) {
+      const q = 1 - p;
+      const mu = 1 / (1 - q);
+      const e2 = (p + q * (1 + 2 * mu)) / (1 - q);
+      const e3 = (p + q * (1 + 3 * mu + 3 * e2)) / (1 - q);
+      return { mu, e2, e3 };
+    }
+
+    // P(X = m + n | X > m), from the pmf itself.
+    const conditional = (p, m, n) => (p * Math.pow(1 - p, m + n - 1)) / survival(p, m);
+
+    const trial = (p, rng) => (rng() < p ? 1 : 0);
+    function playGame(p, rng) {
+      let x = 1;
+      while (!trial(p, rng)) x += 1;
+      return x;
+    }
+
+    // Last x worth its own column: after it less than 0.2 % of the mass is left.
+    // At least `min` columns and at most `cap`. The chart folds the rest into one tail column.
+    function windowHi(p, min = 8, cap = 60) {
+      let hi = 1;
+      while (survival(p, hi) >= 0.002 && hi < cap) hi += 1;
+      return Math.min(cap, Math.max(min, hi));
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmt = (v, d = 3) => {
+      if (!Number.isFinite(v)) return '—';
+      return minus((Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d));
+    };
+    const fmtS = (v, d = 3) => (Number.isFinite(v) && v >= 0.5 * 10 ** -d ? '+' : '') + fmt(v, d);
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+    const sup = (n) => String(n).split('').map((c) => SUP[+c]).join('');
+    const pName = (p) => (Math.abs(p - 1 / 6) < 1e-9 ? '1/6' : num(p));
+
+    // ===================== STATE =====================
+    const VIEWS = [
+      { key: 'pmf', word: 'pmf' },
+      { key: 'wait', word: 'Still waiting' },
+      { key: 'rows', word: 'Mean by rows' },
+      { key: 'memory', word: 'No memory' },
+    ];
+    const TOUR = [
+      { title: 'Decode the definition', p: 0.5, strip: [0, 0, 0, 1],
+        note: 'Flip a fair coin until the first head. Write 1 for a head and 0 for a tail. The set {i | i ≥ 1, Xᵢ = 1} lists every index that shows a 1. min picks the first one. The strip reads 0 0 0 1. So X = 4.' },
+      { title: 'One path per bar', p: 0.5, strip: [0, 0, 1],
+        note: 'X = 3 needs exactly one path: 0 0 1. No other run of trials gives X = 3. The trials are independent. So multiply: 0.5 × 0.5 × 0.5 = 0.125.' },
+      { title: 'The lecture\'s Geometric(¼)', p: 0.25,
+        note: 'This is the plot on the slide. Each bar is 0.75 times the bar before. A constant ratio makes a geometric sequence. That gives the distribution its name. The tallest bar is always x = 1.' },
+      { title: 'The bars sum to 1', p: 0.25, view: 1,
+        note: 'Trial 1 stops a share 0.25 of all games. The other 0.75 carry over to trial 2. Trial 2 stops 0.25 of that 0.75. Each blue cap is the same share of what is left. Nothing leaks away. So the caps sum to 1.' },
+      { title: 'Still waiting after 10 trials', p: 0.25, view: 1,
+        note: 'You still wait after trial 10 only if trials 1 to 10 all fail. That has probability 0.75¹⁰ ≈ 0.056. In general P(X > x) = (1 − p)^x.' },
+      { title: 'Play 1000 games', p: 0.25, play: 1000,
+        note: 'The page just played 1000 games. The orange marks show the share of games that ended at each x. They land close to the blue bars. The average game length lands close to 1/p = 4.' },
+      { title: 'The mean by rows', p: 0.25, view: 2, pick: 4,
+        note: 'A game of 4 trials is still running at trials 1 to 4. So it counts once in each of bars 1 to 4. Bar k holds P(X ≥ k) = 0.75^(k−1). The bars add up to 1 + 0.75 + 0.5625 + … = 4.' },
+      { title: 'The mean by first step', p: 0.25, view: 3, mem: 1,
+        note: 'Spend one trial. With chance 0.25 you are done. With chance 0.75 you fail and the game starts again. So E = 1 + 0.75E. Solve it: 0.25E = 1 and E = 4.' },
+      { title: 'A rare success', p: 0.05,
+        note: 'Now p = 0.05. The mean wait is μ = 20 trials. σ ≈ 19.5 is almost as large. A wait past 40 trials has probability 0.95⁴⁰ ≈ 0.13.' },
+      { title: 'No memory after 10 failures', p: 0.25, view: 3, mem: 10,
+        note: 'Trials 1 to 10 all failed. Only the bright bars remain possible. Move them left by 10 and scale them up by 1/0.75¹⁰ ≈ 17.8. The orange outline lands exactly on the original pmf. The wait ahead is Geometric(¼) again. A success is never due.' },
+      { title: 'Skew near the floor', p: 0.1,
+        note: 'At p = 0.1 the skewness is γ₁ ≈ 2.003. A Geometric never drops below 2. As p shrinks toward 0 the value sinks toward 2.' },
+      { title: 'Skew rises with p', p: 0.9,
+        note: 'At p = 0.9 most games end at trial 1. Long waits are rare. But σ is only 0.35. So a wait of 3 trials sits 5.4σ above μ. Cubed, that distance wins: γ₁ ≈ 3.48.' },
+      { title: 'Trials or failures?', p: 0.25, failures: true,
+        note: 'Now count the failures before the first success: Y = X − 1. Every bar slides left by 1. μ drops from 4 to 3. σ² stays 12. γ₁ stays 2.02. A shift moves a shape but does not change it.' },
+    ];
+    const PREDICT = [
+      { p: 1 / 6 },
+      { p: 1 / 6, view: 3, mem: 10 },
+      { p: 0.05 },
+      { p: 0.9 },
+      { p: 0.25, failures: true },
+    ];
+
+    const state = {
+      p: 0.5, view: 0, failures: false, mem: 10, pick: 4, tour: 0, hover: -1,
+      strip: [], games: 0, trials: 0, counts: [],
+    };
+    let model = null;
+    let shown = null;
+    let dirty = true;
+
+    // ===================== GAMES =====================
+    function resetGames() {
+      state.strip = [];
+      state.games = 0;
+      state.trials = 0;
+      state.counts = [];
+    }
+    function record(x) {
+      state.games += 1;
+      state.trials += x;
+      state.counts[x] = (state.counts[x] || 0) + 1;
+    }
+    function flipOne() {
+      if (state.strip.at(-1) === 1) state.strip = [];
+      state.strip.push(trial(state.p, Math.random));
+      if (state.strip.at(-1) === 1) record(state.strip.length);
+      update();
+    }
+    function runToSuccess() {
+      if (state.strip.at(-1) === 1) state.strip = [];
+      while (state.strip.at(-1) !== 1) state.strip.push(trial(state.p, Math.random));
+      record(state.strip.length);
+      update();
+    }
+    function playMany(n) {
+      let x = 1;
+      for (let k = 0; k < n; k += 1) {
+        x = playGame(state.p, Math.random);
+        record(x);
+      }
+      state.strip = [...Array(x - 1).fill(0), 1];
+    }
+
+    // ===================== MODEL =====================
+    function buildModel() {
+      const p = state.p;
+      const q = 1 - p;
+      const full = pmf(p);
+      const key = VIEWS[state.view].key;
+      const shift = state.failures ? -1 : 0;
+      // Only the pmf and No memory pictures switch to Y. The others index trials.
+      const labelShift = key === 'pmf' || key === 'memory' ? shift : 0;
+      const m = moments(full.xs.map((x) => x + labelShift), full.ps);
+      const mX = moments(full.xs, full.ps);
+      const hi = windowHi(p, key === 'memory' ? Math.min(60, Math.max(8, state.mem + 4)) : 8);
+      const left = survival(p, state.mem);
+      const cols = [];
+      for (let X = 1; X <= hi; X += 1) {
+        cols.push({
+          X, x: X + labelShift, p: p * q ** (X - 1), ge: survival(p, X - 1), gt: survival(p, X),
+          sim: state.games ? (state.counts[X] || 0) / state.games : 0,
+          cond: (p * q ** (state.mem + X - 1)) / left,
+        });
+      }
+      const rest = survival(p, hi);
+      if (rest >= 1e-6) {
+        let simTail = 0;
+        state.counts.forEach((c, X) => { if (X > hi) simTail += c; });
+        cols.push({
+          tail: true, X: hi + 1, x: hi + 1 + labelShift, p: rest, ge: rest, gt: 0, rows: rest / p,
+          sim: state.games ? simTail / state.games : 0, cond: rest,
+        });
+      }
+      const topMax = {
+        pmf: Math.max(p, ...cols.map((c) => c.sim)) * 1.15,
+        wait: 1.08,
+        rows: 1.08,
+        memory: p * 1.15,
+      }[key];
+      return {
+        p, q, full, m, mX, cm: closedMoments(p), hi, cols, key, labelShift, topMax,
+        name: `Geometric(${pName(p)})`, snapKey: `${key}|${cols.length}|${labelShift}`,
+      };
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mean: '#a0e7a0', ink: '#ebf2ff', muted: '#8aa1c0',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)', bg: '#07111f',
+    };
+    const FONT = 'Inter, ui-sans-serif, system-ui, sans-serif';
+    const BOLD = `600 12px ${FONT}`;
+    const hatches = {};
+    function hatch(color) {
+      if (!hatches[color]) {
+        const c = document.createElement('canvas');
+        c.width = 6;
+        c.height = 6;
+        const k = c.getContext('2d');
+        k.strokeStyle = color;
+        k.lineWidth = 1.6;
+        k.beginPath();
+        k.moveTo(0, 6);
+        k.lineTo(6, 0);
+        k.stroke();
+        hatches[color] = ctx.createPattern(c, 'repeat');
+      }
+      return hatches[color];
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const strip = { y: 0, h: 64 };
+      const titleH = 26;
+      const labelsH = 46;
+      const top = strip.h + titleH;
+      return { x: 62, w: W - 62 - 16, strip, chart: { y: top, h: Math.max(110, H - top - labelsH) } };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || `12px ${FONT}`;
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function hline(x0, x1, y, color, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function vline(x, y0, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A bar from y0 to y1 with a rounded data end at y1.
+    function bar(cx, w, y0, y1, fill, alpha = 1) {
+      const h = y1 - y0;
+      if (Math.abs(h) < 0.4) return;
+      const r = Math.min(4, w / 2, Math.abs(h));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      if (h < 0) ctx.roundRect(cx - w / 2, y1, w, -h, [r, r, 0, 0]);
+      else ctx.roundRect(cx - w / 2, y0, w, h, [0, 0, r, r]);
+      ctx.fill();
+      ctx.restore();
+    }
+    // An outline bar with a surface ring, so it reads on top of a filled bar.
+    function outlineBar(cx, w, y0, y1, color) {
+      const h = y0 - y1;
+      if (h < 0.6) return;
+      const r = Math.min(4, w / 2, h);
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(cx - w / 2, y1, w, h, [r, r, 0, 0]);
+      ctx.strokeStyle = C.bg;
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.restore();
+    }
+    function simMark(x, w, y) {
+      const half = Math.max(5, w * 0.42);
+      ctx.save();
+      ctx.lineCap = 'round';
+      [[C.bg, 7], [C.right, 3]].forEach(([color, width]) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.beginPath();
+        ctx.moveTo(x - half, y);
+        ctx.lineTo(x + half, y);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+    // A boxed note in the top right corner of the chart.
+    function cornerNote(g, lines) {
+      ctx.font = `12px ${FONT}`;
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
+      const x = Math.max(g.x, g.x + g.w - w);
+      const y = g.chart.y + 34;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.88)';
+      ctx.strokeStyle = 'rgba(132, 160, 202, 0.3)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, lines.length * 17 + 9, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 8, y + 18 + i * 17, { color: i === 0 ? C.ink : C.muted }));
+    }
+
+    function drawStrip(g) {
+      const s = state.strip;
+      const n = s.length;
+      const done = n > 0 && s[n - 1] === 1;
+      const status = !n ? 'Press Flip one trial or Run to success.'
+        : done ? `First 1 at trial ${n}, so X = ${n}${state.failures ? ` and Y = ${n - 1}` : ''}`
+          : `${n} trial${n > 1 ? 's' : ''} and no 1 yet · still waiting`;
+      const title = 'The game · X = min{ i | i ≥ 1, Xᵢ = 1 }';
+      ctx.font = BOLD;
+      const tw = ctx.measureText(title).width;
+      ctx.font = `12px ${FONT}`;
+      const sw = ctx.measureText(status).width;
+      ctx.font = BOLD;
+      const shortW = ctx.measureText('The game').width;
+      if (tw + sw + 24 < g.w) text(title, g.x, 13, { color: C.ink, font: BOLD });
+      else if (shortW + sw + 24 < g.w) text('The game', g.x, 13, { color: C.ink, font: BOLD });
+      text(status, g.x + g.w, 13, { align: 'right', color: done ? C.ink : C.muted });
+      const size = 24;
+      const gap = 4;
+      const y = 22;
+      const fit = Math.max(3, Math.floor((g.w + gap) / (size + gap)));
+      let items = s.map((v, i) => ({ v, i: i + 1 }));
+      if (n > fit) items = [...items.slice(0, fit - 2), { skip: true }, items[n - 1]];
+      if (n) {
+        text('Xᵢ', g.x - 8, y + 16, { align: 'right' });
+        text('i', g.x - 8, y + size + 13, { align: 'right', font: `10px ${FONT}` });
+      }
+      items.forEach((t, k) => {
+        const x = g.x + k * (size + gap);
+        if (t.skip) {
+          text('…', x + size / 2, y + 16, { align: 'center', color: C.ink });
+          return;
+        }
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(x, y, size, size, 5);
+        ctx.fillStyle = t.v ? 'rgba(19, 52, 92, 0.96)' : 'rgba(8, 23, 40, 0.84)';
+        ctx.strokeStyle = t.v ? '#86d4ff' : 'rgba(132, 160, 202, 0.45)';
+        ctx.lineWidth = t.v ? 1.6 : 1;
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        text(String(t.v), x + size / 2, y + 16.5, { align: 'center', color: t.v ? C.ink : C.muted, font: t.v ? `700 13px ${FONT}` : `12px ${FONT}` });
+        text(String(t.i), x + size / 2, y + size + 13, { align: 'center', font: `10px ${FONT}` });
+      });
+    }
+
+    // A long and a short title; the short one is for narrow screens.
+    function chartTitle() {
+      const tail = state.failures ? 'y ≥ m' : 'x > m';
+      return {
+        pmf: state.failures ? ['p(y), the pmf of Y = X − 1, the failures', 'p(y), the pmf of Y'] : ['p(x), the pmf of X, the trials', 'p(x), the pmf'],
+        wait: ['Trial x stops a share p of the games still running', 'Each trial stops a share p'],
+        rows: ['Bar k = P(X ≥ k), the chance a game is still running at trial k', 'Bar k = P(X ≥ k)'],
+        memory: [`After m failures: the tail ${tail}, moved left by m and rescaled`, `The tail ${tail}, moved left by m`],
+      }[model.key];
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!shown || W < 50) return;
+      const g = geom();
+      drawStrip(g);
+      const s = shown;
+      const { cols } = s;
+      const n = cols.length;
+      const colW = g.w / n;
+      const barW = Math.max(2, Math.min(46, colW - 2));
+      const cx = (j) => g.x + (j + 0.5) * colW;
+      const base = g.chart.y + g.chart.h;
+      const yOf = (v) => base - (v / s.topMax) * g.chart.h;
+      const key = model.key;
+
+      if (state.hover >= 0 && state.hover < n) {
+        ctx.fillStyle = 'rgba(134, 212, 255, 0.07)';
+        ctx.fillRect(g.x + state.hover * colW, g.chart.y, colW, g.chart.h);
+      }
+      const [longTitle, shortTitle] = chartTitle();
+      ctx.font = BOLD;
+      text(ctx.measureText(longTitle).width <= g.w ? longTitle : shortTitle, g.x, g.chart.y - 10, { color: C.ink, font: BOLD });
+      const tStep = niceStep(s.topMax, 4);
+      for (let t = tStep; t <= s.topMax * 0.999; t += tStep) {
+        hline(g.x, g.x + g.w, yOf(t), C.grid);
+        text(fmtTick(t, tStep), g.x - 8, yOf(t) + 4, { align: 'right' });
+      }
+
+      if (key === 'pmf') {
+        cols.forEach((c, j) => {
+          if (c.tail) bar(cx(j), barW, base, Math.min(yOf(c.p), base - 3), hatch(C.left));
+          else bar(cx(j), barW, base, yOf(c.p), C.left, state.hover === j ? 1 : 0.88);
+        });
+        if (state.games) cols.forEach((c, j) => { if (c.sim > 0) simMark(cx(j), barW, yOf(c.sim)); });
+      } else if (key === 'wait') {
+        cols.forEach((c, j) => {
+          if (c.tail) {
+            bar(cx(j), barW, base, Math.min(yOf(c.p), base - 3), hatch(C.left));
+            return;
+          }
+          const yGt = yOf(c.gt);
+          if (base - yGt > 0.5) {
+            ctx.save();
+            ctx.fillStyle = hatch(C.muted);
+            ctx.fillRect(cx(j) - barW / 2, yGt, barW, base - yGt);
+            ctx.strokeStyle = 'rgba(138, 161, 192, 0.6)';
+            ctx.strokeRect(cx(j) - barW / 2 + 0.5, yGt + 0.5, barW - 1, base - yGt - 1);
+            ctx.restore();
+          }
+          bar(cx(j), barW, yGt - 2, yOf(c.ge), C.left, state.hover === j ? 1 : 0.9);
+          if (j < n - 1 && !cols[j + 1].tail) hline(cx(j) + barW / 2, cx(j + 1) - barW / 2, yGt, C.muted, [3, 3]);
+        });
+        const q = model.q;
+        cornerNote(g, [1, 2, 3].map((x) => `trial ${x}: ${num(model.p * q ** (x - 1))} stops · ${num(q ** x)} waits on`));
+      } else if (key === 'rows') {
+        const q = model.q;
+        const hov = cols[state.hover];
+        const pick = hov && !hov.tail ? hov.X : state.pick;
+        const px = (v) => (v / s.topMax) * g.chart.h;
+        cols.forEach((c, j) => {
+          if (c.tail) {
+            bar(cx(j), barW, base, Math.min(yOf(c.rows), base - 3), hatch(C.left));
+            return;
+          }
+          bar(cx(j), barW, base, yOf(c.ge), C.left, 0.55);
+          // Bar k stacks p(k), p(k + 1), … from the bottom. Mark the seams while they are visible.
+          const k = c.X;
+          for (let x = k; px(model.p * q ** (x - 1)) >= 3 && x < k + 60; x += 1) {
+            const seam = base - px(q ** (k - 1) - q ** x);
+            if (x === pick) {
+              const lo = base - px(q ** (k - 1) - q ** (x - 1));
+              ctx.save();
+              ctx.fillStyle = C.left;
+              ctx.fillRect(cx(j) - barW / 2, seam, barW, lo - seam);
+              ctx.strokeStyle = C.ink;
+              ctx.lineWidth = 1.5;
+              ctx.strokeRect(cx(j) - barW / 2 + 0.75, seam + 0.75, barW - 1.5, lo - seam - 1.5);
+              ctx.restore();
+            }
+            hline(cx(j) - barW / 2, cx(j) + barW / 2, seam, C.bg);
+          }
+        });
+        const pp = model.p * q ** (pick - 1);
+        cornerNote(g, [
+          `Σ bars = 1 + ${num(q)} + ${num(q * q)} + … = ${num(1 / model.p)} = μ`,
+          `p(${pick}) sits in bars 1 to ${pick}: ${pick} × ${num(pp)} = ${num(pick * pp)}`,
+        ]);
+      } else {
+        const mm = state.mem;
+        cols.forEach((c, j) => {
+          const alpha = c.X <= mm ? 0.22 : 0.9;
+          if (c.tail) bar(cx(j), barW, base, Math.min(yOf(c.p), base - 3), hatch(C.left), alpha);
+          else bar(cx(j), barW, base, yOf(c.p), C.left, alpha);
+        });
+        cols.forEach((c, j) => { if (!c.tail) outlineBar(cx(j), barW, base, yOf(c.cond), C.right); });
+        // The divider labels sit in the empty second label row, clear of the bars.
+        if (mm >= 1 && mm < n) {
+          const bx = g.x + mm * colW;
+          vline(bx, g.chart.y + 4, base + 32, C.ink, 1, [4, 4]);
+          ctx.font = `11px ${FONT}`;
+          const long = `still possible after ${mm} failure${mm > 1 ? 's' : ''} →`;
+          const right = bx + 6 + ctx.measureText(long).width <= g.x + g.w ? long : 'still possible →';
+          text(right, bx + 6, base + 37, { color: C.ink, font: `11px ${FONT}` });
+          if (bx - 6 - ctx.measureText('← ruled out').width >= 4) {
+            text('← ruled out', bx - 6, base + 37, { align: 'right', font: `11px ${FONT}` });
+          }
+        }
+        cornerNote(g, [
+          `tail after ${mm} failures, moved left ${mm}`,
+          `scaled × 1/${num(model.q)}${sup(mm)} = ×${num(1 / survival(model.p, mm))}`,
+        ]);
+      }
+      hline(g.x, g.x + g.w, base, C.axis);
+
+      // x labels, and the constant ratio under them in the pmf picture.
+      const axis = { pmf: state.failures ? 'y' : 'x', wait: 'trial', rows: 'k', memory: state.failures ? 'y' : 'x' }[key];
+      text(axis, g.x - 8, base + 18, { align: 'right', font: `11px ${FONT}` });
+      ctx.font = `11px ${FONT}`;
+      const last = cols[n - 1].tail ? n - 2 : n - 1;
+      const labelW = ctx.measureText(String(cols[last].x)).width + 10;
+      const every = Math.max(1, Math.ceil(labelW / colW));
+      cols.forEach((c, j) => {
+        if (c.tail) text(`>${cols[j - 1].x}`, cx(j), base + 18, { align: 'center', color: C.ink, font: `11px ${FONT}` });
+        else if (j % every === 0 && !(every > 1 && j === n - 2 && cols[n - 1].tail)) {
+          text(String(c.x), cx(j), base + 18, { align: 'center', font: `11px ${FONT}` });
+        }
+      });
+      if (key === 'pmf') {
+        const r = `×${num(model.q)}`;
+        ctx.font = `10px ${FONT}`;
+        const step = Math.max(1, Math.ceil((ctx.measureText(r).width + 8) / colW));
+        text('ratio', g.x - 8, base + 37, { align: 'right', font: `10px ${FONT}` });
+        for (let j = 0; j + 1 <= last; j += step) text(r, g.x + (j + 1) * colW, base + 37, { align: 'center', font: `10px ${FONT}` });
+      }
+
+      // μ and μ ± σ for the pictures of the pmf itself.
+      if (key === 'pmf' || key === 'memory') {
+        const pxOf = (v) => cx(0) + (v - cols[0].x) * colW;
+        const inPlot = (x) => x >= g.x && x <= g.x + g.w;
+        [-1, 1].forEach((k) => {
+          const x = pxOf(s.mu + k * s.sd);
+          if (!inPlot(x)) return;
+          vline(x, g.chart.y + 14, base, 'rgba(138, 161, 192, 0.7)', 1, [4, 4]);
+          text(k < 0 ? 'μ − σ' : 'μ + σ', x, g.chart.y + 10, { align: 'center' });
+        });
+        const muX = pxOf(s.mu);
+        if (inPlot(muX)) {
+          vline(muX, g.chart.y + 14, base, C.mean, 2);
+          const label = `μ = ${fmt(s.mu, 2)}`;
+          ctx.font = BOLD;
+          const lw = ctx.measureText(label).width;
+          const lx = muX + 6 + lw <= g.x + g.w ? muX + 6 : muX - 6 - lw;
+          ctx.fillStyle = 'rgba(7, 17, 31, 0.85)';
+          ctx.fillRect(lx - 3, g.chart.y + 14, lw + 6, 17);
+          text(label, lx, g.chart.y + 26, { color: C.mean, font: BOLD });
+        }
+      }
+      drawTooltip(g, colW, cx);
+    }
+
+    function tooltipLines(c) {
+      const { p, q } = model;
+      const both = state.failures && model.labelShift ? `X = ${c.X} trials · Y = ${c.X - 1} failures` : `x = ${c.X}`;
+      if (c.tail) {
+        const rows = model.key === 'rows' ? [`bars k > ${c.X - 1} sum to ${num(c.rows)}`] : [];
+        return [`${model.key === 'rows' ? 'k' : 'x'} > ${c.X - 1}, folded into one bar`, `mass left = ${num(q)}${sup(c.X - 1)} = ${num(c.p)}`, ...rows];
+      }
+      if (model.key === 'pmf') {
+        const share = state.games ? [`your games: ${state.counts[c.X] || 0} of ${state.games} = ${num(c.sim)}`] : [];
+        return [both, `p = ${num(p)} × ${num(q)}${sup(c.X - 1)}`, `  = ${num(c.p)}`, ...share];
+      }
+      if (model.key === 'wait') {
+        return [`trial ${c.X}`, `running before it: ${num(q)}${sup(c.X - 1)} = ${num(c.ge)}`,
+          `stops here: × ${num(p)} = ${num(c.p)}`, `still waiting after: ${num(c.gt)}`];
+      }
+      if (model.key === 'rows') {
+        let run = 0;
+        for (let k = 1; k <= c.X; k += 1) run += q ** (k - 1);
+        return [`bar k = ${c.X}`, `P(X ≥ ${c.X}) = ${num(q)}${sup(c.X - 1)} = ${num(c.ge)}`,
+          `bars 1 to ${c.X} sum to ${num(run)}`, `all bars sum to μ = ${num(1 / p)}`];
+      }
+      const mm = state.mem;
+      return [both, `bar: p(${c.X}) = ${num(c.p)}`, `outline: p(${mm + c.X}) / P(X > ${mm})`,
+        `  = ${num(p * q ** (mm + c.X - 1))} / ${num(survival(p, mm))} = ${num(c.cond)}`];
+    }
+
+    function drawTooltip(g, colW, cx) {
+      const j = state.hover;
+      if (j < 0 || j >= model.cols.length) return;
+      const lines = tooltipLines(model.cols[j]);
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let x = cx(j) + colW / 2 + 8;
+      if (x + w > g.x + g.w) x = cx(j) - colW / 2 - 8 - w;
+      x = Math.max(4, x);
+      const y = g.chart.y + 40;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.95)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 10, y + 20 + i * 17, { color: i === 0 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    // Ease the drawn heights toward the model. A new column layout snaps.
+    const EASED = ['p', 'ge', 'gt', 'sim', 'cond', 'rows'];
+    function snapshot(mdl) {
+      return { key: mdl.snapKey, cols: mdl.cols.map((c) => ({ ...c })), topMax: mdl.topMax, mu: mdl.m.mu, sd: mdl.m.sd };
+    }
+    function frame() {
+      if (model) {
+        if (!shown || shown.key !== model.snapKey) {
+          shown = snapshot(model);
+          dirty = true;
+        } else {
+          let moving = false;
+          const ease = (a, b) => {
+            if (!Number.isFinite(a) || !Number.isFinite(b)) return b;
+            if (Math.abs(b - a) <= 1e-4 * (Math.abs(b) + 1e-9)) return b;
+            moving = true;
+            return a + (b - a) * 0.22;
+          };
+          shown.topMax = ease(shown.topMax, model.topMax);
+          shown.mu = ease(shown.mu, model.m.mu);
+          shown.sd = ease(shown.sd, model.m.sd);
+          shown.cols.forEach((c, j) => {
+            const t = model.cols[j];
+            EASED.forEach((k) => { if (k in t) c[k] = ease(c[k], t[k]); });
+            c.X = t.X;
+            c.x = t.x;
+          });
+          if (moving) dirty = true;
+        }
+      }
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function colAt(e) {
+      const r = canvas.getBoundingClientRect();
+      const x = e.clientX - r.left;
+      const y = e.clientY - r.top;
+      const g = geom();
+      if (y < g.chart.y || y > g.chart.y + g.chart.h + 46) return -1;
+      const n = model.cols.length;
+      const j = Math.floor(((x - g.x) / g.w) * n);
+      return j >= 0 && j < n ? j : -1;
+    }
+    canvas.addEventListener('pointermove', (e) => {
+      const j = colAt(e);
+      if (j !== state.hover) {
+        state.hover = j;
+        dirty = true;
+      }
+    });
+    canvas.addEventListener('pointerleave', () => {
+      state.hover = -1;
+      dirty = true;
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      const j = colAt(e);
+      if (model.key !== 'rows' || j < 0 || model.cols[j].tail) return;
+      state.pick = model.cols[j].X;
+      renderControls();
+      update();
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = v.toFixed(decimals); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', +b.dataset.view === state.view));
+      const host = $('sliderHost');
+      host.innerHTML = '';
+      host.append(makeSlider({ label: 'p, the success chance per trial', min: 0.05, max: 0.95, step: 0.01 }, state.p, (v) => {
+        state.p = v;
+        resetGames();
+        update();
+      }));
+      if (VIEWS[state.view].key === 'memory') {
+        host.append(makeSlider({ label: 'm, failures so far', min: 0, max: 20, step: 1 }, state.mem, (v) => {
+          state.mem = v;
+          update();
+        }));
+      }
+      if (VIEWS[state.view].key === 'rows') {
+        host.append(makeSlider({ label: 'x, the game length to follow', min: 1, max: 15, step: 1 }, state.pick, (v) => {
+          state.pick = v;
+          update();
+        }));
+      }
+      $('failBox').checked = state.failures;
+    }
+
+    function setView(i) {
+      state.view = i;
+      state.hover = -1;
+      renderControls();
+      update();
+    }
+    function apply(s) {
+      state.p = s.p;
+      state.view = s.view ?? 0;
+      state.failures = !!s.failures;
+      if (s.mem !== undefined) state.mem = s.mem;
+      state.pick = s.pick ?? 4;
+      resetGames();
+      if (s.strip) state.strip = s.strip.slice();
+      if (s.play) playMany(s.play);
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      const t = TOUR[state.tour];
+      apply(t);
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+
+    function caption() {
+      const { p, q, m } = model;
+      if (model.key === 'pmf') {
+        if (state.failures) {
+          return `<strong>Shifted by one.</strong> Y = X − 1 counts the failures. Every bar moves left by 1.
+            μ drops by 1 to ${num(m.mu)}. σ² and γ₁ stay the same.`;
+        }
+        return `<strong>One path per bar.</strong> X = 3 happens only as 0 0 1.
+          Multiply along the path: p(3) = ${num(q)} × ${num(q)} × ${num(p)} = ${num(p * q * q)}.
+          Each bar is ${num(q)} times the bar before.`;
+      }
+      if (model.key === 'wait') {
+        return `<strong>Each trial takes the same share.</strong> The blue cap is the share p = ${num(p)} that stops at trial x.
+          The hatched part carries on to trial x + 1. Nothing leaks away. So the caps sum to 1.`;
+      }
+      if (model.key === 'rows') {
+        const k = state.pick;
+        return `<strong>Count each game once per trial it lasts.</strong> A game of ${k} trial${k > 1 ? 's' : ''} is still running at trials 1 to ${k}.
+          So bar k holds P(X ≥ k). The bars add up to μ = ${num(1 / p)}. Click a bar to follow another game length.`;
+      }
+      const mm = state.mem;
+      if (!mm) return '<strong>The coin forgets.</strong> Raise m to rule out the first m trials. Then watch the tail.';
+      return `<strong>The coin forgets.</strong> After ${mm} failure${mm > 1 ? 's' : ''} only the bright bars remain possible.
+        Move them left by ${mm}. Scale them up by ×${num(1 / survival(p, mm))}. They land exactly on the original pmf.
+        ${model.labelShift ? `The expected count of further failures is still (1 − p)/p = ${num(q / p)}.`
+          : `The expected extra wait is still 1/p = ${num(1 / p)}.`}`;
+    }
+
+    function legend() {
+      const L = (cls, label) => `<span class="legend"><span class="swatch ${cls}"></span>${label}</span>`;
+      const tail = L('tail', 'far tail, folded into one bar');
+      const mu = L('mean', 'μ') + L('sigma', 'μ ± σ');
+      return {
+        pmf: L('theory', 'p(x), from the formula') + L('sim', 'your games: share that ended here') + mu + tail,
+        wait: L('theory', 'p(x): stops at trial x') + L('wait', 'P(X > x): still waiting after trial x') + L('link', 'carried to the next trial') + tail,
+        rows: L('theory', 'P(X ≥ k): still running at trial k') + L('pick', 'p(x) for the followed game, once per bar') + tail,
+        memory: L('dim', `ruled out: ${model.labelShift ? 'y < m' : 'x ≤ m'}`) + L('theory', `still possible: ${model.labelShift ? 'y ≥ m' : 'x > m'}`)
+          + L('outline', 'that tail, moved left and rescaled') + mu,
+      }[model.key] + 'Hover a bar for its numbers.';
+    }
+
+    function renderReadouts() {
+      const { p, q, m } = model;
+      const v = model.labelShift ? 'Y' : 'X';
+      const conv = model.labelShift ? 'Y = X − 1 counts failures' : 'X counts trials';
+      const mm = state.mem;
+      const big = {
+        pmf: model.labelShift
+          ? `p(y) = p(1 − p)^y = ${num(p)} × ${num(q)}^y · each bar = ${num(q)} × the bar before`
+          : `p(x) = p(1 − p)^(x−1) = ${num(p)} × ${num(q)}^(x−1) · each bar = ${num(q)} × the bar before`,
+        wait: `P(X > x) = (1 − p)^x · P(X > 10) = ${num(q)}¹⁰ = <strong>${num(q ** 10)}</strong>`,
+        rows: `μ = Σ P(X ≥ k) = 1 + ${num(q)} + ${num(q * q)} + … = 1 / ${num(p)} = <strong>${num(1 / p)}</strong>`,
+        memory: `P(X > ${mm} + n | X > ${mm}) = ${num(q)}ⁿ = P(X > n) · the wait ahead is ${model.name} again`,
+      }[model.key];
+      const avg = state.trials / state.games;
+      const games = state.games
+        ? `Your games: ${state.games} · average ${v} = ${num(avg + model.labelShift)} · theory μ = ${num(m.mu)}`
+        : 'Your games: none yet. Press Play ×1000 to test μ = 1/p.';
+      $('receipt').innerHTML = `
+        <div>${model.name} · ${conv} · μ = ${fmt(m.mu)} · σ² = ${fmt(m.variance)} · σ = ${fmt(m.sd)} · γ₁ = ${fmtS(m.skew)}</div>
+        <div class="big">${big}</div>
+        <div>${games}</div>`;
+      $('caption').innerHTML = caption();
+      $('legend').innerHTML = legend();
+      $('chip').textContent = model.labelShift ? 'p(y) = p(1 − p)^y' : 'p(x) = p(1 − p)^(x−1)';
+      $('gameLine').textContent = state.games
+        ? `games ${state.games} · trials ${state.trials} · average ${num(avg)} · 1/p = ${num(1 / p)}`
+        : `no games yet · 1/p = ${num(1 / p)}`;
+      renderArithmetic();
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of [label, working, value, class], padded into aligned columns.
+    function rowsHtml(rows) {
+      const wl = Math.max(...rows.map((r) => r[0].length));
+      const ww = Math.max(...rows.map((r) => r[1].length));
+      return rows.map(([label, work, value, cls]) => {
+        const line = `${label.padEnd(wl)}  ${work.padEnd(ww)}${value ? ` = ${value}` : ''}`;
+        return `<div class="${cls || ''}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+    const same = (u, v) => Math.abs(u - v) <= 1e-6 * Math.max(1, Math.abs(v));
+    const tick = (ok, what) => (ok ? `<span class="ok">✓ ${what}</span>` : `<span class="bad">✗ ${what}: the routes disagree</span>`);
+
+    function renderArithmetic() {
+      const { p, q, mX: m, cm, full, name } = model;
+      const hi = windowHi(p);
+      const P = (x) => p * q ** (x - 1);
+      const xs = [];
+      for (let x = 1; x <= hi; x += 1) xs.push(x);
+      const rest = survival(p, hi);
+      const beyond = full.xs.filter((x) => x > hi).length;
+      const tailOf = (f) => full.xs.reduce((s, x, i) => (x > hi ? s + f(x, full.ps[i]) : s), 0);
+      const shownSum = xs.reduce((s, x) => s + P(x), 0);
+      const fs = firstStep(p);
+      const sd = Math.sqrt(cm.variance);
+      const sd3 = sd ** 3;
+      const k10 = Math.min(10, hi);
+      let cdf = 0;
+      for (let x = 1; x <= k10; x += 1) cdf += P(x);
+      let rowsSum = rest / p;
+      xs.forEach((k) => { rowsSum += q ** (k - 1); });
+      const d = (x) => (Math.abs(x - m.mu) < 1e-9 * Math.max(1, m.mu) ? 0 : x - m.mu);
+      const side = (x) => (d(x) < 0 ? 'l' : d(x) > 0 ? 'r' : '');
+      let neg = 0;
+      let pos = 0;
+      full.xs.forEach((x, i) => {
+        const c = d(x) ** 3 * full.ps[i];
+        if (c < 0) neg += c;
+        else pos += c;
+      });
+      const mm = state.mem;
+      const y = moments(full.xs.map((x) => x - 1), full.ps);
+
+      $('arithHead').innerHTML = `<strong>${esc(name)}, so q = 1 − p = ${num(q)}.</strong>
+        Blocks 1 to 8 work with X, the trials. Block 9 switches to Y = X − 1, the failures.
+        Rows past x = ${hi} fold into one tail row.`;
+      const parts = [
+        block('1 · The pmf, one path per bar', 'p(x) = p × (1 − p)^(x−1)',
+          rowsHtml(xs.map((x) => [`x = ${x}`, `${num(p)} × ${num(q)}${sup(x - 1)}`, num(P(x))])
+            .concat([[`x > ${hi}`, `all the rest: ${num(q)}${sup(hi)}`, num(rest), 'tail']])),
+          `Each row is ${num(q)} times the row above.<br>`
+            + `Σ p(x) = p × (1 + q + q² + …) = p / (1 − q) = ${num(p)} / ${num(p)} = <strong>1</strong><br>`
+            + tick(same(shownSum + rest, 1), 'the rows above sum to 1')),
+        block('2 · Still waiting after trial x', 'P(X > x) = (1 − p)^x, since trials 1 to x all fail',
+          rowsHtml(xs.map((x) => [`x = ${x}`, `${num(q)}${sup(x)}`, num(q ** x)])),
+          `Check at x = ${k10}: 1 − [p(1) + … + p(${k10})] = 1 − ${num(cdf)} = ${num(1 - cdf)}<br>`
+            + `Trial x stops a share p of the games still running: p(x) = p × P(X > x − 1).<br>`
+            + tick(same(1 - cdf, q ** k10), 'same as (1 − p)^x')),
+        block('3 · <span class="nocase">μ</span> by columns', 'μ = Σ x · p(x)',
+          rowsHtml(xs.map((x) => [`x = ${x}`, `${x} × ${num(P(x))}`, num(x * P(x))])
+            .concat(beyond ? [[`x > ${hi}`, `${beyond} more terms, summed`, num(tailOf((x, pr) => x * pr)), 'tail']] : [])),
+          `μ = sum of the last column = <strong>${num(m.mu)}</strong>`),
+        block('4 · <span class="nocase">μ</span> by rows', 'μ = Σ P(X ≥ k): a game of x trials counts once at each k = 1 to x',
+          rowsHtml(xs.map((k) => [`k = ${k}`, `P(X ≥ ${k}) = ${num(q)}${sup(k - 1)}`, num(q ** (k - 1))])
+            .concat([[`k > ${hi}`, `the rest: ${num(q)}${sup(hi)} / p`, num(rest / p), 'tail']])),
+          `Σ = 1 / (1 − q) = 1 / ${num(p)} = <strong>${num(rowsSum)}</strong><br>`
+            + tick(same(rowsSum, m.mu), 'rows and columns give the same μ')),
+        block('5 · <span class="nocase">μ</span> by first step and by playing', 'E = 1 + (1 − p) × E',
+          linesHtml([
+            'E = 1 + (1 − p) × E',
+            `  = 1 + ${num(q)} × E`,
+            `E − ${num(q)} × E = 1`,
+            `${num(p)} × E = 1`,
+            `E = 1 / ${num(p)} = ${num(fs.mu)}`,
+            '',
+            `Long run: ${num(p)} successes per trial`,
+            `       → 1 / ${num(p)} = ${num(1 / p)} trials per success`,
+            state.games ? `Your games: ${state.trials} trials / ${state.games} games = ${num(state.trials / state.games)}`
+              : 'Your games: none yet. Play some on the Explore tab.',
+          ]),
+          `E[X] = <strong>${num(fs.mu)}</strong> `
+            + tick(same(fs.mu, m.mu) && same(cm.mu, m.mu), 'first step, columns and 1/p agree')),
+        block('6 · <span class="nocase">E[X²], σ², σ</span> and <span class="nocase">σ³</span>', 'E[X²] = p × 1² + (1 − p) × E[(1 + X)²]',
+          linesHtml([
+            'E[X²] = p + (1 − p) × (1 + 2μ + E[X²])',
+            `      = ${num(p)} + ${num(q)} × (1 + ${num(2 * fs.mu)} + E[X²])`,
+            `${num(p)} × E[X²] = ${num(p)} + ${num(q)} × ${num(1 + 2 * fs.mu)} = ${num(p + q * (1 + 2 * fs.mu))}`,
+            `E[X²] = ${num(p + q * (1 + 2 * fs.mu))} / ${num(p)} = ${num(fs.e2)}`,
+            `check (2 − p) / p² = ${num(2 - p)} / ${num(p * p)} = ${num(cm.e2)}`,
+            '',
+            `σ² = E[X²] − μ² = ${num(fs.e2)} − ${num(fs.mu ** 2)} = ${num(fs.e2 - fs.mu ** 2)}`,
+            `check (1 − p) / p² = ${num(q)} / ${num(p * p)} = ${num(cm.variance)}`,
+            `σ  = √${num(cm.variance)} = ${num(sd)}`,
+            `σ³ = ${num(cm.variance)} × ${num(sd)} = ${num(sd3)}`,
+            `σ / μ = ${num(sd)} / ${num(cm.mu)} = ${num(sd / cm.mu)} = √(1 − p)`,
+          ]),
+          `σ² = <strong>${num(cm.variance)}</strong> `
+            + tick(same(fs.e2, m.e2) && same(cm.variance, m.variance), 'E[X²] and σ² match the sums over the pmf')),
+        block('7 · <span class="nocase">E[(X − μ)³]</span> and <span class="nocase">γ₁</span>', 'E[(X − μ)³] = Σ (x − μ)³ · p(x)',
+          rowsHtml(xs.map((x) => [`x = ${x}`, `(${numS(d(x))})³ × ${num(P(x))} = ${paren(d(x) ** 3)} × ${num(P(x))}`,
+            numS(d(x) ** 3 * P(x)), side(x)])
+            .concat(beyond ? [[`x > ${hi}`, `${beyond} more terms, summed`, numS(tailOf((x, pr) => d(x) ** 3 * pr)), 'tail r']] : [])),
+          `Left of μ sums to ${num(neg)}. Right of μ sums to ${num(pos)}.<br>`
+            + `E[(X − μ)³] = ${num(neg)} + ${num(pos)} = ${numS(m.m3)}<br>`
+            + `check (1 − p)(2 − p) / p³ = ${num(q)} × ${num(2 - p)} / ${num(p ** 3)} = ${num(cm.m3)}<br>`
+            + `γ₁ = E[(X − μ)³] / σ³ = ${num(m.m3)} / ${num(sd3)} = <strong>${numS(m.skew)}</strong><br>`
+            + `check (2 − p) / √(1 − p) = ${num(2 - p)} / ${num(Math.sqrt(q))} = ${numS(cm.skew)}<br>`
+            + `γ₁ − 2 = ${num(cm.skew - 2)}. So γ₁ sits above the floor of 2.<br>`
+            + tick(same(cm.m3, m.m3) && same(cm.skew, m.skew), 'E[(X − μ)³] and γ₁ match the lecture formula')),
+        block(`8 · No memory after <span class="nocase">m = ${mm}</span> failures`, 'P(X > m + n | X > m) = P(X > m + n) / P(X > m)',
+          rowsHtml([1, 2, 3, 4].flatMap((k) => [
+            [`P(X > ${mm + k} | X > ${mm})`, `${num(q)}${sup(mm + k)} / ${num(q)}${sup(mm)}`, num(survival(p, mm + k) / survival(p, mm))],
+            [`P(X > ${k})`, `${num(q)}${sup(k)}`, num(survival(p, k)), 'tail'],
+          ])),
+          `P(X = ${mm + 1} | X > ${mm}) = p(${mm + 1}) / ${num(q)}${sup(mm)} = ${num(conditional(p, mm, 1))} = p(1)<br>`
+            + `E[X | X > ${mm}] = ${mm} + 1/p = <strong>${num(mm + 1 / p)}</strong><br>`
+            + tick([1, 2, 3, 4].every((k) => same(survival(p, mm + k) / survival(p, mm), survival(p, k)))
+              && same(conditional(p, mm, 1), p), `the wait ahead is ${name} again`)),
+        block('9 · Counting failures: <span class="nocase">Y = X − 1</span>', 'p_Y(y) = p(1 − p)^y,  y = 0, 1, 2, …',
+          linesHtml([
+            `p_Y(0) = ${num(p)}   p_Y(1) = ${num(p * q)}   p_Y(2) = ${num(p * q * q)}`,
+            `E[Y]   = E[X] − 1 = ${num(cm.mu)} − 1 = ${num(cm.mu - 1)}`,
+            `check (1 − p) / p = ${num(q)} / ${num(p)} = ${num(q / p)}`,
+            `Var(Y) = Var(X) = ${num(cm.variance)}    sum over p_Y: ${num(y.variance)}`,
+            `γ₁(Y)  = γ₁(X)  = ${numS(cm.skew)}    sum over p_Y: ${numS(y.skew)}`,
+          ]),
+          tick(same(y.mu, q / p) && same(y.variance, cm.variance) && same(y.skew, cm.skew), 'only μ moves, by exactly 1')),
+      ];
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${i + 1}</b><span>${v.word}</span>`;
+      b.dataset.view = i;
+      b.addEventListener('click', () => setView(i));
+      $('viewGrid').append(b);
+    });
+    $('flipOne').addEventListener('click', flipOne);
+    $('runOne').addEventListener('click', runToSuccess);
+    $('resetGames').addEventListener('click', () => {
+      resetGames();
+      update();
+    });
+    [['play100', 100], ['play1000', 1000]].forEach(([id, n]) => $(id).addEventListener('click', () => {
+      playMany(n);
+      if (state.view !== 0) setView(0);
+      else update();
+    }));
+    $('failBox').addEventListener('change', (e) => {
+      state.failures = e.target.checked;
+      update();
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-4]$/.test(e.key)) setView(+e.key - 1);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

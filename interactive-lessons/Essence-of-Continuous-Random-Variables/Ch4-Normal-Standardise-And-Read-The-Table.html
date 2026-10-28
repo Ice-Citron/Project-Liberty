@@ -1,0 +1,1974 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of Continuous RVs · Ch 4 · The Normal</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: pan-y; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.blue { width: 14px; height: 0; border-top: 2px solid var(--left); border-radius: 0; }
+    .swatch.orange { width: 14px; height: 0; border-top: 2px solid var(--right); border-radius: 0; }
+    .swatch.area-blue { background: rgba(61, 149, 236, 0.45); }
+    .swatch.area-orange { background: rgba(221, 116, 37, 0.5); }
+    .swatch.hist { border: 2px solid var(--right); background: transparent; }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.grey { width: 14px; height: 0; border-top: 1px solid var(--muted); border-radius: 0; }
+    .swatch.handle { background: var(--ink); width: 2px; height: 12px; border-radius: 1px; }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .formula-chip { font-family: var(--mono); color: var(--ink); }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .preset-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .lens-grid { display: grid; gap: 6px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .lens-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .lens-grid button b { font-size: 15px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    input[type="text"] {
+      min-width: 0; border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; font-family: var(--mono); font-size: 13px;
+    }
+    input[type="text"]:focus { outline: none; border-color: rgba(134, 212, 255, 0.92); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .body a, .src a { color: var(--blue-1); }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.eq { color: var(--ink); }
+    .arith div.note { font-style: italic; white-space: normal; }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table.phi { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    table.phi th, table.phi td { text-align: right; padding: 3px 6px; white-space: nowrap; }
+    table.phi th { color: var(--blue-1); font-weight: 700; border-bottom: 1px solid var(--line); }
+    table.phi td.zc { color: var(--ink); }
+    table.phi td.gap, table.phi th.gap { border-left: 1px solid var(--line); }
+    table.phi td.hit { background: rgba(61, 149, 236, 0.35); color: var(--ink); font-weight: 700; }
+    table.phi tr.quant td.q { border-top: 1px solid var(--line); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .question {
+      padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line);
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13.5px; line-height: 1.5;
+    }
+    .answer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .steps { display: grid; gap: 4px; font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .steps div { padding: 4px 8px; border-left: 2px solid var(--blue-2); background: rgba(8, 23, 40, 0.6); border-radius: 4px; }
+    .steps div span { color: var(--muted); margin-right: 6px; }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 4</div>
+        <h1>The Normal: standardise, then read the table</h1>
+        <p class="lead">
+          Every Normal is the same bell. <strong>μ</strong> moves it and <strong>σ</strong> stretches it.
+          No formula gives the area under it. So we change the ruler to <strong>z = (x − μ)/σ</strong>.
+          Then one table of <strong>Φ</strong> answers every question.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="index.html">← Index</a>
+        <span>Chapter 4 of 5</span>
+        <a href="Ch5-Moment-Generating-Function.html">Ch 5 →</a>
+      </nav>
+      <div class="nav">
+        <span>50008 Probability · L04 Normal</span>
+        <span class="formula-chip">F_X(x) = Φ((x − μ)/σ)</span>
+      </div>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · one bell, many questions</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 5 pick a view.
+            The Arithmetic tab writes out every step for the picture on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">View</div>
+          <div id="viewGrid" class="lens-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Dials</div>
+          <div id="dialHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section id="gameSection" class="section" hidden>
+          <div class="section-title">Table game</div>
+          <div id="gameQ" class="question"></div>
+          <div id="qTypeGrid" class="preset-grid three"></div>
+          <div class="answer-row">
+            <input id="answerBox" type="text" inputmode="decimal" autocomplete="off">
+            <button id="checkBtn">Check</button>
+          </div>
+          <div id="gameVerdict" class="body"></div>
+          <div id="gameSteps" class="steps"></div>
+          <div class="pair">
+            <button id="revealBtn">Show the next step</button>
+            <button id="newQBtn">New question</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The table of <span class="nocase">Φ</span></div>
+          <div class="pair">
+            <button data-table="slide">Slide · 3 dp</button>
+            <button data-table="sheet">Course sheet · 4 dp</button>
+          </div>
+          <div class="table-wrap"><table id="phiTable" class="phi"></table></div>
+          <div class="src">Highlighted cells are the rows that the picture on screen uses.
+            The course sheet is Statistical_Tables.pdf in the 50008 folder. It has the same rows with one more digit.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · The slide plots N(0, 4). What is σ?</summary>
+            <div class="answer"><strong>σ = 2, not 4.</strong> The lecture writes N(μ, σ²).
+              So the 4 is the variance. The bell is twice as wide as N(0, 1). Its peak is half as tall.</div>
+            <button data-predict="0">Set it up: N(0, 4) over N(0, 1)</button>
+          </details>
+          <details class="predict">
+            <summary>2 · Heights X ∼ N(170, 10²). Which is bigger: P(X ≤ 185) or P(Z ≤ 1.5)?</summary>
+            <div class="answer"><strong>They are equal.</strong> 185 cm sits 1.5σ above μ.
+              Standardising only relabels the ruler. The area does not move.</div>
+            <button data-predict="1">Set it up: N(170, 10²) with x = 185</button>
+          </details>
+          <details class="predict">
+            <summary>3 · The table has no negative z. How do you find Φ(−1.2)?</summary>
+            <div class="answer"><strong>Use the mirror.</strong> The tail below −1.2 equals the tail above 1.2.
+              So Φ(−1.2) = 1 − Φ(1.2) ≈ 1 − 0.885 = 0.115.</div>
+            <button data-predict="2">Set it up: the mirror tails at z = 1.2</button>
+          </details>
+          <details class="predict">
+            <summary>4 · What share of any Normal lies within μ ± 2.58σ?</summary>
+            <div class="answer"><strong>About 99%.</strong> Φ(2.58) ≈ 0.995. So each tail holds about 0.5%.
+              The middle holds 1 − 2 × 0.005 = 0.99.</div>
+            <button data-predict="3">Set it up: k = 2.58</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Y = eˣ with X ∼ N(0, 0.6²). Which is bigger: the median of Y or its mean?</summary>
+            <div class="answer"><strong>The mean.</strong> The median is e⁰ = 1.
+              The mean is e^(0.18) ≈ 1.197. The long right tail pulls the mean up.</div>
+            <button data-predict="4">Set it up: the lognormal view</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The working uses full precision.
+            So a last digit can differ by 1. In the table game this tab shows the full answer.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The pdf, piece by piece</div>
+          <div class="formula">f(x) = 1/(σ√(2π)) · e^(−(x − μ)²/(2σ²))
+
+e^(−(x − μ)²/(2σ²))   the bell: 1 at x = μ
+1/(σ√(2π))            makes the area 1</div>
+          <div class="body">The exponent is the squared distance from μ in units of σ.
+            So every Normal has the same shape. Only the ruler changes.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why <span class="nocase">√(2π)</span>, a standard result</div>
+          <div class="formula">I  = ∫ e^(−z²/2) dz
+I² = ∫∫ e^(−(x² + y²)/2) dx dy
+   = ∫₀^2π ∫₀^∞ e^(−r²/2) r dr dθ    (polar)
+   = 2π · [−e^(−r²/2)]₀^∞ = 2π
+So I = √(2π). Then φ(z) = e^(−z²/2)/√(2π)
+has area 1.</div>
+          <div class="body">One bell is hard to integrate. Two bells side by side make a round hill.
+            Polar coordinates integrate the hill in one line.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Mean <span class="nocase">μ</span>, variance <span class="nocase">σ²</span></div>
+          <div class="formula">E(X) = μ    the bell is a mirror image about μ
+
+Put x = μ + σz:
+Var(X) = σ² ∫ z² φ(z) dz
+By parts, with φ′(z) = −z φ(z):
+∫ z² φ(z) dz = [−z φ(z)] + ∫ φ(z) dz
+             = 0 + 1 = 1</div>
+          <div class="body">The slide says "it can be shown". These two lines show it.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Stretch and shift</div>
+          <div class="formula">Y = aX + b with a > 0:
+F_Y(y) = P(aX + b ≤ y)
+       = P(X ≤ (y − b)/a)
+       = Φ(((y − b)/a − μ)/σ)
+       = Φ((y − (aμ + b))/(aσ))
+So Y ∼ N(aμ + b, a²σ²).
+For a &lt; 0 use 1 − Φ. Then σ_Y = |a|σ.
+
+a = 1/σ and b = −μ/σ give
+Z = (X − μ)/σ ∼ N(0, 1).</div>
+          <div class="body">This is the Linear Transformations slide. Standardising is one special choice of a and b.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Reading the table</div>
+          <div class="formula">F_X(x) = Φ((x − μ)/σ)          Standardising slide
+Φ(−z) = 1 − Φ(z)               Using Table of Φ slide
+P(Z > z) = 1 − Φ(z)
+P(a &lt; X ≤ b) = Φ(z_b) − Φ(z_a)
+P(|Z| ≤ k) = Φ(k) − Φ(−k) = 2Φ(k) − 1
+
+Between rows z₀ &lt; z &lt; z₁ (Statistical Tables slide):
+Φ(z) ≈ Φ(z₀) + (z − z₀)/(z₁ − z₀) · (Φ(z₁) − Φ(z₀))</div>
+          <div class="body">The straight line under-reads Φ where Φ curves down. For z ≥ 0 that is always.
+            Between rows 0.1 apart the error stays below 0.0004.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Quantiles</div>
+          <div class="formula">P(X ≤ x_p) = p  ⇔  x_p = μ + σ z_p
+where z_p = Φ⁻¹(p)
+
+Φ⁻¹(0.975) ≈ 1.96    95% inside μ ± 1.96σ
+Φ⁻¹(0.995) ≈ 2.576   99% inside μ ± 2.58σ</div>
+          <div class="body">Read the table backwards. Find p in a Φ column. Take its z. Then undo the standardising.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Lognormal</div>
+          <div class="formula">Y = e^X, X ∼ N(μ, σ²), y > 0:
+F_Y(y) = P(e^X ≤ y) = P(X ≤ ln y)
+       = Φ((ln y − μ)/σ)
+f_Y(y) = d/dy F_Y(y)
+       = φ((ln y − μ)/σ) · 1/(σy)
+
+median = e^μ           ln keeps the order
+mean   = e^(μ + σ²/2)  standard result, Ch 5</div>
+          <div class="body">The 1/(σy) factor is the chain rule. It matches the pdf on the Lognormal slide.</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale · 50008 Probability and Statistics · L04 Continuous Random Variables.
+            Slides: The normal distribution N(μ, σ²) · N(0, 1) · Statistical Tables · Linear Transformations of Normal Random Variables ·
+            Standardising Normal Random Variables · Table of Φ · Using Table of Φ · Important Quantiles of N(0, 1) · Lognormal Distribution.
+            These are standard results: the √(2π) proof, the variance integral and 68–95–99.7. The lognormal mean is a standard result too.
+            Every number on this page comes from one maths block. A Node test checks it against Python's erfc and both tables.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>One shape, two dials.</strong> μ slides the bell. σ stretches it.
+            The peak 1/(σ√(2π)) drops as σ grows. So the area stays 1.</div>
+          <div class="essence"><strong>The second number is the variance.</strong> N(0, 4) has σ = 2.</div>
+          <div class="essence"><strong>Every Normal is N(0, 1) on a new ruler.</strong> z = (x − μ)/σ counts σ-steps from μ.
+            So F_X(x) = Φ(z).</div>
+          <div class="essence"><strong>The table only holds z ≥ 0.</strong> The mirror gives the rest: Φ(−z) = 1 − Φ(z).</div>
+          <div class="essence"><strong>Between two rows, draw a straight line.</strong> Linear interpolation is close enough for exams.</div>
+          <div class="essence"><strong>Landmarks.</strong> 95% lies within ±1.96σ. 99% lies within ±2.58σ.</div>
+          <div class="essence"><strong>Lognormal: eˣ stretches the right side.</strong> The median e^μ stays put. The mean moves right.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can say what σ is for N(0, 4).</label>
+            <label><input type="checkbox"> I can standardise any x and say what z means in words.</label>
+            <label><input type="checkbox"> I can find Φ(−z) from a table with only z ≥ 0.</label>
+            <label><input type="checkbox"> I can interpolate between two table rows.</label>
+            <label><input type="checkbox"> I can find P(a &lt; X ≤ b) as Φ(z_b) − Φ(z_a).</label>
+            <label><input type="checkbox"> I can turn a probability back into x = μ + σz.</label>
+            <label><input type="checkbox"> I know why Y = aX + b stays Normal.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>The slide prints Φ(3.0) as .998.</strong> The exact value is 0.99865.
+            To 3 dp that rounds to .999. The course sheet gives .9987.</div>
+          <div class="body"><strong>The slide uses 2.58 and 2.576 for the same quantile.</strong>
+            Φ(2.576) = 0.99500 and Φ(2.58) = 0.99506. Both round to 99.5%.</div>
+          <div class="body"><strong>Interpolation is an approximation.</strong> Φ curves between rows.
+            This page shows the size of that error in the Arithmetic tab.</div>
+          <div class="body"><strong>68–95–99.7 is a standard rule.</strong> It is not on the slides.
+            The slides give 1.96 and 2.58 instead.</div>
+          <div class="body"><strong>Some books write N(μ, σ).</strong> This lecture writes N(μ, σ²). Check the notation first.</div>
+          <div class="body"><strong>P(X &lt; x) equals P(X ≤ x) here.</strong> A continuous X puts zero probability on a single point.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Where next</div>
+          <div class="body">Chapter 2 covers quantiles for any distribution.
+            <a href="Ch5-Moment-Generating-Function.html">Chapter 5</a> derives the lognormal mean from the Normal mgf.
+            The Normal has γ₁ = 0. <a href="../Essence-of-Skewness.html">Essence of Skewness</a> shows why a mirror image gives zero.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_ch4.js) =====================
+    // KIT START
+    const SQRT2PI = Math.sqrt(2 * Math.PI);
+    const phi = (z) => Math.exp(-0.5 * z * z) / SQRT2PI;
+
+    // Φ(z). Near 0: Φ(z) − 1/2 = φ(z) Σ z^(2n+1) / (1·3···(2n+1)); every term has one sign.
+    // Far out: the tail φ(a) / (a + 1/(a + 2/(a + …))), evaluated from the inside out.
+    function Phi(z) {
+      if (Number.isNaN(z)) return NaN;
+      const a = Math.abs(z);
+      if (a < 5) {
+        let term = z;
+        let sum = z;
+        for (let n = 1; n < 300; n += 1) {
+          term *= (z * z) / (2 * n + 1);
+          sum += term;
+          if (Math.abs(term) <= 1e-17 * Math.abs(sum)) break;
+        }
+        return 0.5 + phi(z) * sum;
+      }
+      if (a > 40) return z > 0 ? 1 : 0;
+      let t = a;
+      for (let k = 80; k >= 1; k -= 1) t = a + k / t;
+      const tail = phi(a) / t;
+      return z > 0 ? 1 - tail : tail;
+    }
+
+    // Φ⁻¹(p): Acklam's rational start, then two Newton steps on Φ.
+    function PhiInv(p) {
+      if (p <= 0) return -Infinity;
+      if (p >= 1) return Infinity;
+      const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+      const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+      const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+      const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+      const tail = (q) => (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+        / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1);
+      let z;
+      if (p < 0.02425) z = tail(Math.sqrt(-2 * Math.log(p)));
+      else if (p > 1 - 0.02425) z = -tail(Math.sqrt(-2 * Math.log(1 - p)));
+      else {
+        const q = p - 0.5;
+        const r = q * q;
+        z = ((((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q)
+          / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+      }
+      for (let k = 0; k < 2; k += 1) z -= (Phi(z) - p) / phi(z);
+      return z;
+    }
+
+    const normPdf = (x, mu, sigma) => phi((x - mu) / sigma) / sigma;
+    const normCdf = (x, mu, sigma) => Phi((x - mu) / sigma);
+
+    function simpson(f, a, b, n = 2000) {
+      const m = n % 2 ? n + 1 : n;
+      const h = (b - a) / m;
+      let s = f(a) + f(b);
+      for (let i = 1; i < m; i += 1) s += (i % 2 ? 4 : 2) * f(a + i * h);
+      return (s * h) / 3;
+    }
+
+    // Table of Φ as printed: the L04 slide (3 dp) and Statistical_Tables.pdf (4 dp).
+    // grid: rows for reading Φ(z). quant: the extra rows for common quantiles.
+    const TABLE_TEXT = {
+      slide: {
+        label: 'slide table',
+        grid: [['0', '.500'], ['.1', '.540'], ['.2', '.579'], ['.3', '.618'], ['.4', '.655'], ['.5', '.691'],
+          ['.6', '.726'], ['.7', '.758'], ['.8', '.788'], ['0.9', '.816'], ['1.0', '.841'], ['1.1', '.864'],
+          ['1.2', '.885'], ['1.3', '.903'], ['1.4', '.919'], ['1.5', '.933'], ['1.6', '.945'], ['1.7', '.955'],
+          ['1.8', '.964'], ['1.9', '.971'], ['2.0', '.977'], ['2.1', '.982'], ['2.2', '.986'], ['2.3', '.989'],
+          ['2.4', '.992'], ['2.5', '.994'], ['2.6', '.995'], ['2.8', '.997'], ['3.0', '.998'], ['3.5', '.9998']],
+        quant: [['1.282', '.900'], ['1.645', '.950'], ['1.96', '.975'], ['2.326', '.990'], ['2.576', '.995'], ['3.09', '.999']],
+      },
+      sheet: {
+        label: 'course sheet',
+        grid: [['0.0', '.5000'], ['0.1', '.5398'], ['0.2', '.5793'], ['0.3', '.6179'], ['0.4', '.6554'], ['0.5', '.6915'],
+          ['0.6', '.7257'], ['0.7', '.7580'], ['0.8', '.7881'], ['0.9', '.8159'], ['1.0', '.8413'], ['1.1', '.8643'],
+          ['1.2', '.8849'], ['1.3', '.9032'], ['1.4', '.9192'], ['1.5', '.9332'], ['1.6', '.9452'], ['1.7', '.9554'],
+          ['1.8', '.9641'], ['1.9', '.9713'], ['2.0', '.9772'], ['2.1', '.9821'], ['2.2', '.9861'], ['2.3', '.9893'],
+          ['2.4', '.9918'], ['2.5', '.9938'], ['2.6', '.9953'], ['2.8', '.9974'], ['3.0', '.9987'], ['3.5', '.9998']],
+        quant: [['1.282', '.9000'], ['1.645', '.9500'], ['1.960', '.9750'], ['2.326', '.9900'], ['2.576', '.9950'], ['3.090', '.9990']],
+      },
+    };
+    const decimals = (s) => (s.includes('.') ? s.length - s.indexOf('.') - 1 : 0);
+    const tableCache = {};
+    function tableRows(key) {
+      if (!tableCache[key]) {
+        // Rounding allows half a unit in the last place. A misprint can exceed that, so take the larger.
+        const row = ([zs, vs]) => {
+          const z = +zs;
+          const v = +vs;
+          return { zs, vs, z, v, err: Math.max(0.5 * 10 ** -decimals(vs), Math.abs(v - Phi(z))), zHalf: 0.5 * 10 ** -decimals(zs) };
+        };
+        tableCache[key] = { label: TABLE_TEXT[key].label, grid: TABLE_TEXT[key].grid.map(row), quant: TABLE_TEXT[key].quant.map(row) };
+      }
+      return tableCache[key];
+    }
+
+    // Φ(z) for z ≥ 0 from the table. bound is a guaranteed limit on |table value − Φ(z)|.
+    function lookupPos(z, key) {
+      const T = tableRows(key);
+      const hit = [...T.grid, ...T.quant].find((r) => Math.abs(r.z - z) < 1e-9);
+      if (hit) return { route: 'direct', z, rows: [hit], value: hit.v, bound: hit.err };
+      const last = T.grid[T.grid.length - 1];
+      if (z > last.z) return { route: 'beyond', z, rows: [last], value: 1, bound: 1 - Phi(last.z) };
+      let i = 0;
+      while (T.grid[i + 1].z < z) i += 1;
+      const r0 = T.grid[i];
+      const r1 = T.grid[i + 1];
+      const t = (z - r0.z) / (r1.z - r0.z);
+      // Linear interpolation error ≤ (z − z₀)(z₁ − z)/2 · max|Φ″|, and |Φ″(u)| = u φ(u) peaks at u = 1.
+      const curve = r0.z <= 1 && r1.z >= 1 ? phi(1) : Math.max(r0.z * phi(r0.z), r1.z * phi(r1.z));
+      const bound = Math.max(r0.err, r1.err) + ((z - r0.z) * (r1.z - z) / 2) * curve;
+      return { route: 'interp', z, rows: [r0, r1], t, value: r0.v + t * (r1.v - r0.v), bound };
+    }
+
+    // Any z: a negative z goes through the mirror Φ(z) = 1 − Φ(−z).
+    function tablePhi(z, key) {
+      const look = lookupPos(Math.abs(z), key);
+      return { z, neg: z < 0, look, value: z < 0 ? 1 - look.value : look.value, bound: look.bound };
+    }
+
+    // Regions for X ∼ N(μ, σ²): lt is X ≤ a, gt is X > a, between is a < X ≤ b.
+    function exactProb(r, mu, sigma) {
+      const za = (r.a - mu) / sigma;
+      if (r.type === 'lt') return Phi(za);
+      if (r.type === 'gt') return 1 - Phi(za);
+      return Phi((r.b - mu) / sigma) - Phi(za);
+    }
+    function tableProb(r, mu, sigma, key) {
+      const A = tablePhi((r.a - mu) / sigma, key);
+      if (r.type === 'lt') return { A, value: A.value, bound: A.bound };
+      if (r.type === 'gt') return { A, value: 1 - A.value, bound: A.bound };
+      const B = tablePhi((r.b - mu) / sigma, key);
+      return { A, B, value: B.value - A.value, bound: A.bound + B.bound };
+    }
+
+    // z with Φ(z) = p from the quantile rows. p < 1/2 uses the mirror.
+    function tableQuantile(p, key) {
+      const pp = p < 0.5 ? 1 - p : p;
+      const row = tableRows(key).quant.find((r) => Math.abs(r.v - pp) < 1e-9);
+      if (!row) return null;
+      return { p, pp, neg: p < 0.5, row, z: p < 0.5 ? -row.z : row.z, bound: row.zHalf };
+    }
+
+    // Exam-style questions with friendly μ and σ.
+    const CONTEXTS = [
+      { what: 'Adult height', unit: 'cm', mu: 170, sigma: 10, step: 1 },
+      { what: 'Exam mark', unit: 'marks', mu: 60, sigma: 12, step: 1 },
+      { what: 'Battery life', unit: 'hours', mu: 500, sigma: 40, step: 5 },
+      { what: 'Coffee volume', unit: 'ml', mu: 250, sigma: 4, step: 0.5 },
+      { what: 'Commute time', unit: 'min', mu: 30, sigma: 5, step: 0.5 },
+      { what: 'Web response time', unit: 'ms', mu: 200, sigma: 25, step: 1 },
+      { what: 'A standard Normal', unit: '', mu: 0, sigma: 1, step: 0.01 },
+    ];
+    const QTYPES = ['lt', 'gt', 'between', 'quantile', 'central'];
+    const QUANT_P = [0.9, 0.95, 0.975, 0.99, 0.995, 0.999];
+    const CENTRAL_Q = [0.8, 0.9, 0.95, 0.98, 0.99, 0.998];
+    function makeQuestion(rng, type, ctx) {
+      const c = ctx || CONTEXTS[Math.floor(rng() * CONTEXTS.length)];
+      const kind = type === 'any' ? QTYPES[Math.floor(rng() * QTYPES.length)] : type;
+      const at = (z) => +(Math.round((c.mu + z * c.sigma) / c.step) * c.step).toFixed(2);
+      const q = { ctx: c, mu: c.mu, sigma: c.sigma, type: kind };
+      if (kind === 'lt' || kind === 'gt') {
+        let a = c.mu;
+        while (a === c.mu) a = at(-2.8 + 5.6 * rng());
+        q.region = { type: kind, a };
+      } else if (kind === 'between') {
+        const za = -2.5 + 3 * rng();
+        const zb = za + 0.4 + (2.4 - za) * rng();
+        q.region = { type: 'between', a: at(za), b: Math.max(at(zb), at(za) + c.step) };
+      } else if (kind === 'quantile') {
+        const p = QUANT_P[Math.floor(rng() * QUANT_P.length)];
+        q.side = rng() < 0.5 ? 'below' : 'above';
+        q.p = rng() < 0.5 ? p : +(1 - p).toFixed(3);
+      } else {
+        q.q = CENTRAL_Q[Math.floor(rng() * CENTRAL_Q.length)];
+      }
+      return q;
+    }
+
+    // The table answer, the exact answer and a guaranteed bound on their gap.
+    function answerOf(q, key) {
+      if (q.region) {
+        const tab = tableProb(q.region, q.mu, q.sigma, key);
+        return { kind: 'prob', exact: exactProb(q.region, q.mu, q.sigma), table: tab.value, bound: tab.bound, tab };
+      }
+      const cdfP = q.type === 'central' ? +((1 + q.q) / 2).toFixed(4) : q.side === 'below' ? q.p : +(1 - q.p).toFixed(3);
+      const tq = tableQuantile(cdfP, key);
+      const zx = PhiInv(cdfP);
+      if (q.type === 'central') {
+        return { kind: 'c', cdfP, tq, exact: q.sigma * zx, table: q.sigma * tq.z, bound: q.sigma * tq.bound };
+      }
+      return { kind: 'x', cdfP, tq, exact: q.mu + q.sigma * zx, table: q.mu + q.sigma * tq.z, bound: q.sigma * tq.bound };
+    }
+    function checkAnswer(q, value, key) {
+      const ans = answerOf(q, key);
+      const tol = ans.kind === 'prob' ? ans.bound + 0.002 : ans.bound + 0.01 * q.sigma;
+      return Number.isFinite(value) && Math.abs(value - ans.exact) <= tol;
+    }
+
+    // Standard Normal draws by Box–Muller. The page maps each z to x = μ + σz.
+    function sampleZ(n, rng) {
+      const out = [];
+      while (out.length < n) {
+        const r = Math.sqrt(-2 * Math.log(1 - rng()));
+        const t = 2 * Math.PI * rng();
+        out.push(r * Math.cos(t), r * Math.sin(t));
+      }
+      return out.slice(0, n);
+    }
+    // Density histogram: count / (n · width) for each bin of [lo, hi].
+    function histogram(xs, lo, hi, bins) {
+      const w = (hi - lo) / bins;
+      const h = new Array(bins).fill(0);
+      xs.forEach((x) => {
+        const i = Math.floor((x - lo) / w);
+        if (i >= 0 && i < bins) h[i] += 1;
+      });
+      return h.map((c) => c / (xs.length * w));
+    }
+
+    // Y = aX + b: P(Y ≤ y) read straight from X.
+    function cdfYviaX(y, a, b, mu, sigma) {
+      const zx = ((y - b) / a - mu) / sigma;
+      return a > 0 ? Phi(zx) : 1 - Phi(zx);
+    }
+
+    const lognormPdf = (y, mu, sigma) => (y > 0 ? phi((Math.log(y) - mu) / sigma) / (sigma * y) : 0);
+    function lognormStats(mu, sigma) {
+      const s2 = sigma * sigma;
+      return {
+        median: Math.exp(mu), mean: Math.exp(mu + s2 / 2), mode: Math.exp(mu - s2),
+        variance: (Math.exp(s2) - 1) * Math.exp(2 * mu + s2),
+      };
+    }
+    // ∫ f_Y and ∫ y f_Y over (e^(μ − 12σ), e^(μ + 12σ)), in 48 pieces that each span σ/2 in ln y.
+    // One even grid would miss the narrow peak near 0.
+    function lognormCheck(mu, sigma) {
+      let area = 0;
+      let mean = 0;
+      for (let k = -24; k < 24; k += 1) {
+        const a = Math.exp(mu + (k * sigma) / 2);
+        const b = Math.exp(mu + ((k + 1) * sigma) / 2);
+        area += simpson((y) => lognormPdf(y, mu, sigma), a, b, 200);
+        mean += simpson((y) => y * lognormPdf(y, mu, sigma), a, b, 200);
+      }
+      return { area, mean };
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmtX = (v) => minus(String(+v.toFixed(3)));
+    const fmtP = (v) => minus(v.toFixed(4));
+    const sigmaSq = (s) => `${fmtX(s)}²`;
+    const normName = (mu, sigma) => `N(${fmtX(mu)}, ${sigmaSq(sigma)})`;
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step) + 1e-9))));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => {
+      const note = typeof l === 'object';
+      return `<div class="${note ? 'note' : 'eq'}">${esc((note ? l.note : l) || ' ')}</div>`;
+    }).join('');
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+
+    // ===================== STATE =====================
+    const VIEWS = [
+      { key: 'bell', word: 'Bell' },
+      { key: 'table', word: 'Table game' },
+      { key: 'symmetry', word: 'Mirror' },
+      { key: 'landmarks', word: 'Landmarks' },
+      { key: 'lognormal', word: 'Lognormal' },
+    ];
+    const QTYPE_UI = [
+      { key: 'lt', label: 'P(X < x)' }, { key: 'gt', label: 'P(X > x)' }, { key: 'between', label: 'P(a < X < b)' },
+      { key: 'quantile', label: 'Find x' }, { key: 'central', label: 'Find c' }, { key: 'any', label: 'Any' },
+    ];
+    const IQ = { what: 'An IQ-style score', unit: 'points', mu: 100, sigma: 15, step: 1 };
+    const TOUR = [
+      { title: 'The standard Normal bell', view: 'bell', region: { type: 'lt', a: 0 },
+        note: 'This is N(0, 1). The bell is a mirror image about μ = 0. Its peak is 1/√(2π) ≈ 0.399. The total area is 1. So exactly half of it lies left of 0.' },
+      { title: 'Slide μ: N(2, 1)', view: 'bell', mu: 2, compare: true, region: { type: 'lt', a: 2 },
+        note: 'The slide plots N(2, 1) beside N(0, 1). The orange curve is N(0, 1). μ moves the bell sideways. The shape stays exactly the same.' },
+      { title: 'N(0, 4) has σ = 2', view: 'bell', sigma: 2, compare: true, region: { type: 'lt', a: 2 },
+        note: 'The second number is the variance σ². So N(0, 4) has σ = 2. The bell is twice as wide. Its peak drops by half to 0.199. The area stays 1.' },
+      { title: 'Area is probability', view: 'bell', region: { type: 'lt', a: 1 },
+        note: 'The shaded area is P(X ≤ 1) = Φ(1) ≈ 0.841. The bottom chart shows the same number as a height. No formula gives this area. So the slides store Φ in a table.' },
+      { title: 'Standardise: a new ruler', view: 'bell', base: { mu: 170, sigma: 10 }, region: { type: 'lt', a: 185 },
+        note: 'Heights X ∼ N(170, 10²) in cm. Find 185 on the x ruler. The z ruler under it reads (185 − 170)/10 = 1.5. So P(X ≤ 185) = Φ(1.5) ≈ 0.933.' },
+      { title: 'Negative z: use the mirror', view: 'symmetry', z: 1.2,
+        note: 'The table only lists z ≥ 0. The bell is a mirror image. So the orange tail below −1.2 equals the blue tail above 1.2. Φ(−1.2) = 1 − Φ(1.2) ≈ 0.115.' },
+      { title: 'A right tail', view: 'bell', region: { type: 'gt', a: 1.5 },
+        note: 'P(Z > 1.5) = 1 − Φ(1.5). The table gives Φ(1.5) ≈ 0.933. So the right tail is about 0.067. The bottom chart shows it as the gap up to 1.' },
+      { title: 'Between two values', view: 'table', question: { ctx: IQ, type: 'between', region: { type: 'between', a: 85, b: 120 } },
+        note: 'Scores X ∼ N(100, 15²). Find P(85 < X < 120). The upper z is 1.333. It falls between two rows. So you draw a straight line between them.' },
+      { title: '95% inside ±1.96', view: 'landmarks', k: 1.96,
+        note: 'Φ(1.96) ≈ 0.975. So each tail holds 2.5%. The middle holds 95%. This is true for every Normal on the interval μ ± 1.96σ.' },
+      { title: '68–95–99.7', view: 'landmarks', k: 1,
+        note: 'About 68% lies within one σ of μ. About 95% lies within two. About 99.7% lies within three. This rule is a standard result. Try k = 2 and k = 3.' },
+      { title: 'Y = aX + b stays Normal', view: 'bell', base: { mu: 10, sigma: 2 }, tf: { a: 3, b: -5 }, region: { type: 'lt', a: 12 },
+        note: 'X ∼ N(10, 2²) is blue. Y = 3X − 5 is orange. Y is Normal again: N(25, 6²). The mean becomes aμ + b. The variance becomes a²σ².' },
+      { title: 'Lognormal: push the bell through eˣ', view: 'lognormal', base: { mu: 0, sigma: 0.5 }, sigma: 0.6,
+        note: 'Y = eˣ with X ∼ N(0, 0.6²). Each grey line maps a decile of X to Y. Each slice keeps 10% of the area. eˣ stretches the right side. So a long right tail appears.' },
+    ];
+    const PREDICT = [
+      { view: 'bell', sigma: 2, compare: true, region: { type: 'lt', a: 2 } },
+      { view: 'bell', base: { mu: 170, sigma: 10 }, region: { type: 'lt', a: 185 } },
+      { view: 'symmetry', z: 1.2 },
+      { view: 'landmarks', k: 2.58 },
+      { view: 'lognormal', base: { mu: 0, sigma: 0.5 }, sigma: 0.6 },
+    ];
+    const LANDMARKS = [1, 1.96, 2, 2.58, 3];
+
+    const state = {
+      view: 'bell', base: { mu: 0, sigma: 1 }, mu: 0, sigma: 1,
+      region: { type: 'lt', a: 1 }, compare: false, tf: { on: false, a: 2, b: 0 }, z: 1.2, k: 1.96,
+      table: 'slide', question: null, qType: 'any', reveal: 0, verdict: null,
+      samples: [], tour: 0, hover: null, drag: null,
+    };
+    let model = null;
+    let dirty = true;
+
+    // ===================== MODEL =====================
+    function regionText(r) {
+      if (r.type === 'lt') return `P(X ≤ ${fmtX(r.a)})`;
+      if (r.type === 'gt') return `P(X > ${fmtX(r.a)})`;
+      return `P(${fmtX(r.a)} < X ≤ ${fmtX(r.b)})`;
+    }
+    function phiExpr(r, mu, sigma) {
+      const za = num((r.a - mu) / sigma);
+      if (r.type === 'lt') return `Φ(${za})`;
+      if (r.type === 'gt') return `1 − Φ(${za})`;
+      return `Φ(${num((r.b - mu) / sigma)}) − Φ(${za})`;
+    }
+
+    function buildModel() {
+      if (state.view === 'lognormal') {
+        const { mu, sigma } = state;
+        return { log: true, mu, sigma, st: lognormStats(mu, sigma), yhi: Math.exp(mu + sigma * PhiInv(0.985)) };
+      }
+      const q = state.view === 'table' ? state.question : null;
+      const mu = q ? q.mu : state.mu;
+      const sigma = q ? q.sigma : state.sigma;
+      let region;
+      let ans = null;
+      if (state.view === 'bell') region = { ...state.region };
+      else if (state.view === 'symmetry') region = { type: 'lt', a: mu - state.z * sigma };
+      else if (state.view === 'landmarks') region = { type: 'between', a: mu - state.k * sigma, b: mu + state.k * sigma };
+      else {
+        ans = answerOf(q, state.table);
+        if (q.region) region = q.region;
+        else if (q.type === 'central') region = { type: 'between', a: mu - ans.exact, b: mu + ans.exact };
+        else region = { type: q.side === 'below' ? 'lt' : 'gt', a: ans.exact };
+      }
+      const curves = [{ mu, sigma, color: 'left', label: `X ∼ ${normName(mu, sigma)}` }];
+      if (state.view === 'bell' && state.compare) curves.push({ mu: 0, sigma: 1, color: 'right', label: 'N(0, 1)' });
+      const tf = state.view === 'bell' && state.tf.on && state.tf.a !== 0 ? state.tf : null;
+      if (tf) {
+        curves.push({ mu: tf.a * mu + tf.b, sigma: Math.abs(tf.a) * sigma, color: 'right', label: `Y = ${affine(tf.a, tf.b)}` });
+      }
+      let lo = Math.min(...curves.map((c) => c.mu - 4 * c.sigma));
+      let hi = Math.max(...curves.map((c) => c.mu + 4 * c.sigma));
+      if (state.view === 'bell') {
+        lo = Math.min(lo, region.a, region.b ?? region.a);
+        hi = Math.max(hi, region.a, region.b ?? region.a);
+      }
+      const ymax = Math.max(...curves.map((c) => 1 / (c.sigma * SQRT2PI))) * 1.14;
+      const exact = exactProb(region, mu, sigma);
+      const tab = tableProb(region, mu, sigma, state.table);
+      return { mu, sigma, q, ans, region, curves, tf, lo, hi, ymax, exact, tab };
+    }
+    function affine(a, b) {
+      const as = a === 1 ? '' : a === -1 ? '−' : fmtX(a);
+      return `${as}X${b ? ` ${b < 0 ? '−' : '+'} ${fmtX(Math.abs(b))}` : ''}`;
+    }
+    // In the table game the answer stays hidden until it is checked or fully revealed.
+    function spoilerFree() {
+      return state.view !== 'table' || state.verdict === true || state.reveal >= gameSteps(state.question).length;
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mean: '#a0e7a0', ink: '#ebf2ff', muted: '#8aa1c0',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)', bg: '#07111f', pill: '#0d2038',
+    };
+    const FONT = '12px Inter, ui-sans-serif, system-ui, sans-serif';
+    const BOLD = '600 12px Inter, ui-sans-serif, system-ui, sans-serif';
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const x = 58;
+      const w = W - x - 18;
+      if (state.view === 'lognormal') {
+        const gap = 104;
+        const avail = Math.max(160, H - 18 - gap - 24);
+        const top = { y: 18, h: avail * 0.55 };
+        const bot = { y: top.y + top.h + gap, h: avail * 0.45 };
+        return { x, w, top, bot };
+      }
+      const rulerH = 62;
+      const avail = Math.max(170, H - 18 - rulerH - 24 - 8);
+      const top = { y: 18, h: avail * 0.64 };
+      const ruler = { y: top.y + top.h, h: rulerH };
+      const bot = { y: ruler.y + rulerH + 24, h: avail * 0.36 };
+      return { x, w, top, ruler, bot };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || FONT;
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function hline(x0, x1, y, color, dash, width = 1) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function vline(x, y0, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function curvePath(f, lo, hi, X, Y, n = 360) {
+      ctx.beginPath();
+      for (let i = 0; i <= n; i += 1) {
+        const v = lo + ((hi - lo) * i) / n;
+        if (i) ctx.lineTo(X(v), Y(f(v)));
+        else ctx.moveTo(X(v), Y(f(v)));
+      }
+    }
+    function strokeCurve(f, lo, hi, X, Y, color, width = 2) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineJoin = 'round';
+      curvePath(f, lo, hi, X, Y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function fillUnder(f, lo, hi, X, Y, y0, color, alpha) {
+      if (!(hi > lo)) return;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = color;
+      curvePath(f, lo, hi, X, Y, 160);
+      ctx.lineTo(X(hi), y0);
+      ctx.lineTo(X(lo), y0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // A label in a dark pill, drawn over anything beneath it.
+    function pill(str, cx, cy, o = {}) {
+      ctx.save();
+      ctx.font = o.font || BOLD;
+      const w = ctx.measureText(str).width + 12;
+      const g = o.bounds;
+      const x = g ? clamp(cx - w / 2, g.x - 40, g.x + g.w - w + 12) : cx - w / 2;
+      ctx.fillStyle = C.pill;
+      ctx.strokeStyle = o.border || 'rgba(134, 212, 255, 0.7)';
+      ctx.beginPath();
+      ctx.roundRect(x, cy - 9, w, 18, 6);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = o.color || C.ink;
+      ctx.textBaseline = 'middle';
+      ctx.fillText(str, x + 6, cy + 0.5);
+      ctx.restore();
+      return { x, w };
+    }
+
+    function regionSpan(r, lo, hi) {
+      if (r.type === 'lt') return [lo, clamp(r.a, lo, hi)];
+      if (r.type === 'gt') return [clamp(r.a, lo, hi), hi];
+      return [clamp(r.a, lo, hi), clamp(r.b, lo, hi)];
+    }
+    function handlesOf(m) {
+      const r = m.region;
+      if (state.view === 'symmetry') return [r.a, 2 * m.mu - r.a];
+      return r.type === 'between' ? [r.a, r.b] : [r.a];
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!model || W < 50) return;
+      if (model.log) {
+        drawLog();
+        return;
+      }
+      const g = geom();
+      const m = model;
+      const X = (v) => g.x + ((v - m.lo) / (m.hi - m.lo)) * g.w;
+      const base = g.top.y + g.top.h;
+      const Yp = (v) => base - (v / m.ymax) * g.top.h;
+      const main = (x) => normPdf(x, m.mu, m.sigma);
+      const show = spoilerFree();
+
+      // ---- top chart: the pdf ----
+      const areaWord = state.view === 'symmetry' ? 'two equal tails' : `shaded area = ${regionText(m.region)} = ${show ? fmtP(m.exact) : '?'}`;
+      ctx.font = BOLD;
+      const title = `f(x), the pdf of X ∼ ${normName(m.mu, m.sigma)}`;
+      const room = g.w - ctx.measureText(areaWord).width - 30;
+      const shown = [title, 'f(x), the pdf'].find((t) => ctx.measureText(t).width < room);
+      if (shown) text(shown, g.x, g.top.y - 4, { color: C.ink, font: BOLD });
+      text(areaWord, g.x + g.w, g.top.y - 4, { color: C.ink, font: BOLD, align: 'right' });
+      const st = niceStep(m.ymax, 3);
+      for (let t = st; Yp(t) >= g.top.y + 10; t += st) {
+        hline(g.x, g.x + g.w, Yp(t), C.grid);
+        text(fmtTick(t, st), g.x - 8, Yp(t) + 4, { align: 'right' });
+      }
+
+      if (state.view === 'symmetry') {
+        fillUnder(main, m.lo, Math.max(m.lo, m.region.a), X, Yp, base, C.right, 0.5);
+        fillUnder(main, Math.min(m.hi, 2 * m.mu - m.region.a), m.hi, X, Yp, base, C.left, 0.45);
+      } else {
+        const [s0, s1] = regionSpan(m.region, m.lo, m.hi);
+        fillUnder(main, s0, s1, X, Yp, base, C.left, 0.38);
+      }
+
+      if (state.samples.length && state.view !== 'table') {
+        const bins = 48;
+        const hs = histogram(state.samples.map((z) => m.mu + m.sigma * z), m.lo, m.hi, bins);
+        const bw = g.w / bins;
+        ctx.save();
+        ctx.strokeStyle = C.right;
+        ctx.lineWidth = 1.5;
+        hs.forEach((h, i) => {
+          if (!h) return;
+          const y = Math.max(g.top.y, Yp(h));
+          ctx.strokeRect(g.x + i * bw + 1, y, Math.max(1, bw - 2), base - y);
+        });
+        ctx.restore();
+      }
+
+      m.curves.slice(1).forEach((c) => strokeCurve((x) => normPdf(x, c.mu, c.sigma), m.lo, m.hi, X, Yp, C.right));
+      strokeCurve(main, m.lo, m.hi, X, Yp, C.left);
+      m.curves.slice(1).forEach((c) => {
+        const px = clamp(X(c.mu), g.x + 40, g.x + g.w - 40);
+        text(c.label, px, Yp(1 / (c.sigma * SQRT2PI)) - 8, { align: 'center', color: C.ink, font: BOLD });
+      });
+
+      // μ and μ ± σ.
+      [-1, 1].forEach((k) => {
+        const px = X(m.mu + k * m.sigma);
+        vline(px, Yp(main(m.mu + k * m.sigma)), base, 'rgba(138, 161, 192, 0.75)', 1, [4, 4]);
+        text(k < 0 ? 'μ − σ' : 'μ + σ', px, Yp(main(m.mu + k * m.sigma)) - 6, { align: 'center' });
+      });
+      const peakY = Yp(main(m.mu));
+      vline(X(m.mu), peakY, base, C.mean, 2);
+      text(`μ = ${fmtX(m.mu)}`, X(m.mu) + 6, peakY - 6, { color: C.mean, font: BOLD });
+      text(`peak ${num(1 / (m.sigma * SQRT2PI))}`, X(m.mu) - 6, peakY - 6, { align: 'right', font: '11px Inter, sans-serif' });
+      hline(g.x, g.x + g.w, base, C.axis);
+
+      // ---- rulers: x on the axis, z under it ----
+      const hs = handlesOf(m);
+      const xRow = base + 15;
+      const zLine = base + 32;
+      const zRow = zLine + 15;
+      text('x', g.x - 34, xRow, { align: 'right', color: C.ink, font: BOLD });
+      text('z', g.x - 34, zRow, { align: 'right', color: C.ink, font: BOLD });
+      const near = (px, gap) => hs.some((h) => Math.abs(X(h) - px) < gap);
+      const xs = niceStep(m.hi - m.lo, Math.max(4, Math.floor(g.w / 70)));
+      for (let t = Math.ceil(m.lo / xs) * xs; t <= m.hi + 1e-9; t += xs) {
+        vline(X(t), base, base + 4, C.axis);
+        if (!near(X(t), 30)) text(fmtTick(t, xs), X(t), xRow, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+      hline(g.x, g.x + g.w, zLine, C.axis);
+      const k0 = Math.ceil((m.lo - m.mu) / m.sigma);
+      const k1 = Math.floor((m.hi - m.mu) / m.sigma);
+      for (let k = k0; k <= k1; k += 1) {
+        const px = X(m.mu + k * m.sigma);
+        vline(px, base + 4, zLine, 'rgba(134, 212, 255, 0.16)', 1, [2, 3]);
+        vline(px, zLine, zLine + 4, C.axis);
+        if (!near(px, 42)) text(minus(String(k)), px, zRow, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+
+      // ---- bottom chart: the cdf ----
+      const b = g.bot;
+      const bb = b.y + b.h;
+      const Yc = (v) => bb - v * b.h;
+      const F = (x) => normCdf(x, m.mu, m.sigma);
+      text('F(x) = P(X ≤ x) = Φ((x − μ)/σ), the cdf', g.x, b.y - 8, { color: C.ink, font: BOLD });
+      [0.5, 1].forEach((t) => {
+        hline(g.x, g.x + g.w, Yc(t), C.grid);
+        text(String(t), g.x - 8, Yc(t) + 4, { align: 'right' });
+      });
+      text('0', g.x - 8, bb + 4, { align: 'right' });
+      hline(g.x, g.x + g.w, bb, C.axis);
+      strokeCurve(F, m.lo, m.hi, X, Yc, C.left);
+
+      // Handles run through all three panels.
+      hs.forEach((h, i) => {
+        const px = X(h);
+        if (px < g.x - 1 || px > g.x + g.w + 1) return;
+        vline(px, g.top.y + 4, bb, 'rgba(235, 242, 255, 0.75)', 1.5);
+        ctx.save();
+        ctx.fillStyle = C.ink;
+        ctx.strokeStyle = C.bg;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, base, 5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        const hidden = !show && !m.q?.region;
+        const z = (h - m.mu) / m.sigma;
+        pill(hidden ? 'x = ?' : fmtX(h), px, xRow - 4, { bounds: g });
+        pill(hidden ? 'z = ?' : `z = ${minus(z.toFixed(2))}`, px, zRow - 4, { bounds: g });
+        // A point on the cdf at this handle, with its height.
+        const fy = Yc(F(h));
+        ctx.save();
+        ctx.fillStyle = C.left;
+        ctx.strokeStyle = C.bg;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, fy, 4.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        hline(g.x, px, fy, 'rgba(235, 242, 255, 0.35)', [3, 3]);
+        if (show) {
+          const lbl = `F = ${fmtP(F(h))}`;
+          ctx.font = '11px Inter, sans-serif';
+          const lw = ctx.measureText(lbl).width;
+          const right = px + 8 + lw < g.x + g.w;
+          const ly = i === 1 && hs.length === 2 ? fy + 14 : fy - 7;
+          text(lbl, right ? px + 8 : px - 8, ly, { align: right ? 'left' : 'right', color: C.ink, font: '11px Inter, sans-serif' });
+        }
+      });
+
+      // The probability as a vertical bracket on the cdf.
+      if (state.view !== 'symmetry') {
+        const r = m.region;
+        let y0;
+        let y1;
+        if (r.type === 'lt') [y0, y1] = [0, F(r.a)];
+        else if (r.type === 'gt') [y0, y1] = [F(r.a), 1];
+        else [y0, y1] = [F(r.a), F(r.b)];
+        const bx = g.x + g.w - 6;
+        ctx.save();
+        ctx.strokeStyle = C.left;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(bx, Yc(y0));
+        ctx.lineTo(bx, Yc(y1));
+        ctx.stroke();
+        ctx.restore();
+        hline(bx - 6, bx + 4, Yc(y0), C.left, null, 2);
+        hline(bx - 6, bx + 4, Yc(y1), C.left, null, 2);
+        text(show ? `${fmtP(y1 - y0)}` : '?', bx - 10, Yc((y0 + y1) / 2) + 4, { align: 'right', color: C.ink, font: BOLD });
+      } else {
+        const t = F(m.region.a);
+        text(`left tail Φ(−z) = ${fmtP(t)}`, g.x + 6, Yc(0.86), { color: C.ink, font: '11px Inter, sans-serif' });
+        text(`right tail 1 − Φ(z) = ${fmtP(1 - F(2 * m.mu - m.region.a))}`, g.x + g.w - 6, Yc(0.14), { align: 'right', color: C.ink, font: '11px Inter, sans-serif' });
+      }
+
+      drawHover(g, X, Yp, base, bb);
+    }
+
+    function drawHover(g, X, Yp, base, bb) {
+      const h = state.hover;
+      if (!h || state.drag || h.x < g.x || h.x > g.x + g.w || h.y < g.top.y || h.y > bb) return;
+      const m = model;
+      const x = m.lo + ((h.x - g.x) / g.w) * (m.hi - m.lo);
+      vline(h.x, g.top.y, bb, 'rgba(134, 212, 255, 0.35)', 1);
+      const lines = [`x = ${num(x)}`, `z = ${num((x - m.mu) / m.sigma)}`,
+        `f(x) = ${num(normPdf(x, m.mu, m.sigma))}`, `F(x) = ${spoilerFree() ? fmtP(normCdf(x, m.mu, m.sigma)) : '?'}`];
+      m.curves.slice(1).forEach((c) => lines.push(`${c.label.split(' ')[0] === 'Y' ? 'Y' : 'N(0, 1)'}: f = ${num(normPdf(x, c.mu, c.sigma))}`));
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const hh = lines.length * 17 + 12;
+      let bx = h.x + 12;
+      if (bx + w > g.x + g.w) bx = h.x - 12 - w;
+      const by = g.top.y + 8;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, w, hh, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, bx + 10, by + 20 + i * 17, { color: i === 3 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    // Lognormal: Y = eˣ on top, X ∼ N(μ, σ²) below, deciles joined by grey lines.
+    function drawLog() {
+      const g = geom();
+      const m = model;
+      const { mu, sigma, st, yhi } = m;
+      const xlo = mu - 3.5 * sigma;
+      const xhi = mu + 3.5 * sigma;
+      const Xt = (y) => g.x + (y / yhi) * g.w;
+      const Xb = (x) => g.x + ((x - xlo) / (xhi - xlo)) * g.w;
+      const tBase = g.top.y + g.top.h;
+      const bBase = g.bot.y + g.bot.h;
+      const fy = (y) => lognormPdf(y, mu, sigma);
+      const fx = (x) => normPdf(x, mu, sigma);
+      const tMax = fy(st.mode) * 1.14;
+      const bMax = (1 / (sigma * SQRT2PI)) * 1.14;
+      const Yt = (v) => tBase - (Math.min(v, tMax) / tMax) * g.top.h;
+      const Yb = (v) => bBase - (v / bMax) * g.bot.h;
+      const ps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+      const xq = ps.map((p) => mu + sigma * PhiInv(p));
+
+      text('f_Y(y), the pdf of Y = eˣ, a lognormal', g.x, g.top.y - 4, { color: C.ink, font: BOLD });
+      text('f_X(x), the pdf of X ∼ ' + normName(mu, sigma), g.x, g.bot.y - 8, { color: C.ink, font: BOLD });
+      const s1 = niceStep(tMax, 3);
+      for (let t = s1; Yt(t) >= g.top.y + 10; t += s1) {
+        hline(g.x, g.x + g.w, Yt(t), C.grid);
+        text(fmtTick(t, s1), g.x - 8, Yt(t) + 4, { align: 'right' });
+      }
+      const s2 = niceStep(bMax, 2);
+      for (let t = s2; Yb(t) >= g.bot.y + 10; t += s2) {
+        hline(g.x, g.x + g.w, Yb(t), C.grid);
+        text(fmtTick(t, s2), g.x - 8, Yb(t) + 4, { align: 'right' });
+      }
+
+      // Equal-probability slices, alternately light and dark.
+      const edgesX = [xlo, ...xq, xhi];
+      for (let i = 0; i < edgesX.length - 1; i += 1) {
+        const alpha = i % 2 ? 0.26 : 0.1;
+        fillUnder(fx, edgesX[i], edgesX[i + 1], Xb, Yb, bBase, C.right, alpha);
+        const y0 = i ? Math.exp(edgesX[i]) : 1e-9;
+        const y1 = Math.min(yhi, i === edgesX.length - 2 ? yhi : Math.exp(edgesX[i + 1]));
+        if (y0 < yhi) fillUnder(fy, y0, y1, Xt, Yt, tBase, C.left, alpha + 0.04);
+      }
+
+      // Decile connectors from X up to Y = e^x.
+      xq.forEach((x, i) => {
+        const y = Math.exp(x);
+        const pxB = Xb(x);
+        const inside = y <= yhi;
+        const pxT = inside ? Xt(y) : g.x + g.w;
+        vline(pxB, Yb(fx(x)), bBase, 'rgba(138, 161, 192, 0.55)', 1);
+        if (inside) vline(pxT, Yt(fy(y)), tBase, 'rgba(138, 161, 192, 0.55)', 1);
+        ctx.save();
+        ctx.strokeStyle = 'rgba(160, 185, 220, 0.8)';
+        ctx.lineWidth = 1.2;
+        if (!inside) ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(pxB, g.bot.y - 22);
+        ctx.lineTo(pxT, tBase + 22);
+        ctx.stroke();
+        ctx.restore();
+        if (i === 4) text('median', (pxB + pxT) / 2 + 6, (g.bot.y - 22 + tBase + 22) / 2, { color: C.ink, font: '11px Inter, sans-serif' });
+      });
+
+      strokeCurve(fy, 1e-6 * yhi, yhi, Xt, Yt, C.left);
+      strokeCurve(fx, xlo, xhi, Xb, Yb, C.right);
+      hline(g.x, g.x + g.w, tBase, C.axis);
+      hline(g.x, g.x + g.w, bBase, C.axis);
+
+      const ty = niceStep(yhi, Math.max(4, Math.floor(g.w / 70)));
+      for (let t = 0; t <= yhi + 1e-9; t += ty) text(fmtTick(t, ty), Xt(t), tBase + 15, { align: 'center', font: '11px Inter, sans-serif' });
+      const tx = niceStep(xhi - xlo, Math.max(4, Math.floor(g.w / 70)));
+      for (let t = Math.ceil(xlo / tx) * tx; t <= xhi + 1e-9; t += tx) text(fmtTick(t, tx), Xb(t), bBase + 15, { align: 'center', font: '11px Inter, sans-serif' });
+      text('y', g.x - 34, tBase + 15, { align: 'right', color: C.ink, font: BOLD });
+      text('x', g.x - 34, bBase + 15, { align: 'right', color: C.ink, font: BOLD });
+
+      // Median and mean on the Y chart. μ on the X chart.
+      vline(Xb(mu), Yb(fx(mu)), bBase, C.mean, 2);
+      text(`μ = ${fmtX(mu)}`, Xb(mu) + 6, Yb(fx(mu)) + 14, { color: C.mean, font: BOLD });
+      if (st.median <= yhi) {
+        vline(Xt(st.median), g.top.y + 20, tBase, C.ink, 1.5, [5, 4]);
+        text(`median e^μ = ${num(st.median)}`, Xt(st.median) - 6, g.top.y + 14, { align: 'right', color: C.ink, font: '11px Inter, sans-serif' });
+      }
+      if (st.mean <= yhi) {
+        vline(Xt(st.mean), g.top.y + 20, tBase, C.mean, 2);
+        text(`mean = ${num(st.mean)}`, Xt(st.mean) + 6, g.top.y + 30, { color: C.mean, font: BOLD });
+      }
+
+      const h = state.hover;
+      if (!h || h.x < g.x || h.x > g.x + g.w) return;
+      let lines = null;
+      if (h.y >= g.top.y && h.y <= tBase) {
+        const y = ((h.x - g.x) / g.w) * yhi;
+        lines = [`y = ${num(y)}`, `x = ln y = ${num(Math.log(y))}`, `f_Y(y) = ${num(fy(y))}`, `P(Y ≤ y) = ${fmtP(Phi((Math.log(y) - mu) / sigma))}`];
+        vline(h.x, g.top.y, tBase, 'rgba(134, 212, 255, 0.35)');
+      } else if (h.y >= g.bot.y && h.y <= bBase) {
+        const x = xlo + ((h.x - g.x) / g.w) * (xhi - xlo);
+        lines = [`x = ${num(x)}`, `y = eˣ = ${num(Math.exp(x))}`, `f_X(x) = ${num(fx(x))}`, `P(X ≤ x) = ${fmtP(Phi((x - mu) / sigma))}`];
+        vline(h.x, g.bot.y, bBase, 'rgba(134, 212, 255, 0.35)');
+      }
+      if (!lines) return;
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      let bx = h.x + 12;
+      if (bx + w > g.x + g.w) bx = h.x - 12 - w;
+      const by = clamp(h.y - 40, 4, canvas.clientHeight - 84);
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, w, lines.length * 17 + 12, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, bx + 10, by + 20 + i * 17, { color: i === 3 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    function frame() {
+      if (dirty) {
+        dirty = false;
+        draw();
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    const draggable = () => state.view === 'bell' || state.view === 'symmetry';
+    function xAt(px) {
+      const g = geom();
+      return model.lo + ((px - g.x) / g.w) * (model.hi - model.lo);
+    }
+    function dragTo(px) {
+      const x = clamp(xAt(px), model.lo, model.hi);
+      if (state.view === 'symmetry') {
+        state.z = Math.round(clamp(Math.abs(x - model.mu) / model.sigma, 0, 3.5) * 100) / 100;
+      } else {
+        const step = 10 ** (Math.floor(Math.log10(model.sigma)) - 2);
+        const v = +(Math.round(x / step) * step).toFixed(6);
+        const r = state.region;
+        if (state.drag === 'b') r.b = Math.max(v, r.a + step);
+        else r.a = r.type === 'between' ? Math.min(v, r.b - step) : v;
+      }
+      update();
+      renderControls();
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!draggable() || !model || model.log) return;
+      const { x, y } = local(e);
+      const g = geom();
+      if (y < g.top.y || y > g.bot.y + g.bot.h || x < g.x - 8 || x > g.x + g.w + 8) return;
+      const X = (v) => g.x + ((v - model.lo) / (model.hi - model.lo)) * g.w;
+      const r = state.region;
+      state.drag = 'a';
+      if (state.view === 'bell' && r.type === 'between') state.drag = Math.abs(x - X(r.b)) < Math.abs(x - X(r.a)) ? 'b' : 'a';
+      canvas.setPointerCapture(e.pointerId);
+      dragTo(x);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const p = local(e);
+      if (state.drag) dragTo(p.x);
+      state.hover = p;
+      dirty = true;
+    });
+    const stopDrag = () => {
+      state.drag = null;
+      dirty = true;
+    };
+    canvas.addEventListener('pointerup', stopDrag);
+    canvas.addEventListener('pointercancel', stopDrag);
+    canvas.addEventListener('pointerleave', () => {
+      state.hover = null;
+      dirty = true;
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimalsOf = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = minus(v.toFixed(decimalsOf)); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        const v = +(+input.value).toFixed(6);
+        show(v);
+        onInput(v);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+    // Slider ends sit on multiples of the step, so the base values stay reachable.
+    function range(lo, hi, step) {
+      return { min: +(Math.floor(lo / step) * step).toFixed(6), max: +(Math.ceil(hi / step) * step).toFixed(6), step };
+    }
+    function buttonRow(cls, items, isActive, onClick) {
+      const grid = document.createElement('div');
+      grid.className = cls;
+      items.forEach((it) => {
+        const b = document.createElement('button');
+        b.textContent = it.label;
+        b.classList.toggle('active', isActive(it));
+        b.addEventListener('click', () => onClick(it));
+        grid.append(b);
+      });
+      return grid;
+    }
+    function checkbox(label, checked, onChange) {
+      const l = document.createElement('label');
+      l.className = 'checkbox';
+      const i = document.createElement('input');
+      i.type = 'checkbox';
+      i.checked = checked;
+      i.addEventListener('change', () => onChange(i.checked));
+      l.append(i, document.createTextNode(label));
+      return l;
+    }
+    function note(html) {
+      const d = document.createElement('div');
+      d.className = 'body';
+      d.innerHTML = html;
+      return d;
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
+      document.querySelectorAll('[data-table]').forEach((b) => b.classList.toggle('active', b.dataset.table === state.table));
+      const host = $('dialHost');
+      host.innerHTML = '';
+      const u = state.base.sigma;
+      const muSlider = () => makeSlider({ label: 'μ, the centre', ...range(state.base.mu - 5 * u, state.base.mu + 5 * u, niceStep(u, 10)) },
+        state.mu, (v) => { state.mu = v; update(); });
+      const sdSlider = () => makeSlider({ label: 'σ, the spread', ...range(0.2 * u, 3 * u, niceStep(u, 20)) },
+        state.sigma, (v) => { state.sigma = v; update(); });
+      const sampleRow = () => {
+        const d = document.createElement('div');
+        d.className = 'pair';
+        const s = document.createElement('button');
+        s.textContent = 'Sample ×1000';
+        s.addEventListener('click', () => { state.samples = state.samples.concat(sampleZ(1000, Math.random)); update(); });
+        const c = document.createElement('button');
+        c.textContent = 'Clear samples';
+        c.addEventListener('click', () => { state.samples = []; update(); });
+        d.append(s, c);
+        return d;
+      };
+      if (state.view === 'bell') {
+        host.append(muSlider(), sdSlider());
+        host.append(buttonRow('preset-grid three', [
+          { key: 'lt', label: 'P(X ≤ a)' }, { key: 'gt', label: 'P(X > a)' }, { key: 'between', label: 'P(a < X ≤ b)' },
+        ], (it) => it.key === state.region.type, (it) => {
+          const r = state.region;
+          r.type = it.key;
+          if (it.key === 'between' && !(r.b > r.a)) r.b = +(r.a + state.sigma).toFixed(6);
+          renderControls();
+          update();
+        }));
+        host.append(note('Drag on the chart to move the handle. Drag near a handle to pick it.'));
+        host.append(checkbox('Overlay N(0, 1) in orange', state.compare, (on) => {
+          state.compare = on;
+          if (on) state.tf.on = false;
+          renderControls();
+          update();
+        }));
+        host.append(checkbox('Show Y = aX + b in orange', state.tf.on, (on) => {
+          state.tf.on = on;
+          if (on) state.compare = false;
+          renderControls();
+          update();
+        }));
+        if (state.tf.on) {
+          host.append(makeSlider({ label: 'a, the stretch', min: -3, max: 3, step: 0.1 }, state.tf.a, (v) => { state.tf.a = v; update(); }));
+          host.append(makeSlider({ label: 'b, the shift', ...range(-10 * u, 10 * u, niceStep(u, 2)) }, state.tf.b, (v) => { state.tf.b = v; update(); }));
+        }
+        host.append(sampleRow());
+      } else if (state.view === 'table') {
+        host.append(note('The question fixes μ and σ. Answer it in the Table game below.'));
+      } else if (state.view === 'symmetry') {
+        host.append(muSlider(), sdSlider());
+        host.append(makeSlider({ label: 'z, the distance in σ-steps', min: 0, max: 3.5, step: 0.01 }, state.z, (v) => { state.z = v; update(); }));
+        host.append(note('Drag on the chart to move both tails together.'));
+        host.append(sampleRow());
+      } else if (state.view === 'landmarks') {
+        host.append(muSlider(), sdSlider());
+        host.append(note('k, the half-width in σ-steps:'));
+        host.append(buttonRow('preset-grid five', LANDMARKS.map((k) => ({ k, label: `±${k}` })), (it) => it.k === state.k, (it) => {
+          state.k = it.k;
+          renderControls();
+          update();
+        }));
+        host.append(sampleRow());
+      } else {
+        host.append(muSlider(), sdSlider());
+        host.append(note('μ and σ belong to X. Y = eˣ follows them.'));
+      }
+      $('gameSection').hidden = state.view !== 'table';
+      canvas.style.cursor = draggable() ? 'ew-resize' : 'default';
+    }
+
+    function apply(s) {
+      state.view = s.view || 'bell';
+      state.base = s.base || { mu: 0, sigma: 1 };
+      state.mu = s.mu ?? state.base.mu;
+      state.sigma = s.sigma ?? state.base.sigma;
+      if (s.region) state.region = { ...s.region };
+      state.compare = !!s.compare;
+      state.tf = { on: !!s.tf, a: s.tf ? s.tf.a : 2, b: s.tf ? s.tf.b : 0 };
+      if (s.z != null) state.z = s.z;
+      if (s.k != null) state.k = s.k;
+      if (s.question) setQuestion({ ...s.question, mu: s.question.ctx.mu, sigma: s.question.ctx.sigma });
+      if (state.view === 'table' && !state.question) newQuestion();
+      state.samples = [];
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      apply(TOUR[state.tour]);
+      const t = TOUR[state.tour];
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(v) {
+      if (v === state.view) return;
+      const fromLog = state.view === 'lognormal';
+      state.view = v;
+      if (v === 'lognormal') {
+        state.base = { mu: 0, sigma: 0.5 };
+        state.mu = 0;
+        state.sigma = 0.6;
+      } else if (fromLog) {
+        state.base = { mu: 0, sigma: 1 };
+        state.mu = 0;
+        state.sigma = 1;
+      }
+      if (v === 'table' && !state.question) newQuestion();
+      state.samples = [];
+      renderControls();
+      update();
+    }
+
+    // ===================== TABLE GAME =====================
+    function setQuestion(q) {
+      state.question = q;
+      state.reveal = 0;
+      state.verdict = null;
+      $('answerBox').value = '';
+    }
+    function newQuestion() {
+      setQuestion(makeQuestion(Math.random, state.qType));
+    }
+    function questionText(q) {
+      const c = q.ctx;
+      const v = c.mu === 0 && c.sigma === 1 ? 'Z' : 'X';
+      const unit = c.unit ? `, in ${c.unit}` : '';
+      const head = `${c.what} ${v} ∼ ${normName(c.mu, c.sigma)}${unit}.`;
+      const r = q.region;
+      if (q.type === 'lt') return `${head} Find P(${v} < ${fmtX(r.a)}).`;
+      if (q.type === 'gt') return `${head} Find P(${v} > ${fmtX(r.a)}).`;
+      if (q.type === 'between') return `${head} Find P(${fmtX(r.a)} < ${v} < ${fmtX(r.b)}).`;
+      if (q.type === 'quantile') return `${head} Find x so that P(${v} ${q.side === 'below' ? '<' : '>'} x) = ${q.p}.`;
+      return `${head} Find c so that P(${fmtX(c.mu)} − c < ${v} < ${fmtX(c.mu)} + c) = ${q.q}.`;
+    }
+    // One short line for each move a student makes on paper.
+    function lookupWords(L) {
+      const k = L.look;
+      const zs = num(Math.abs(L.z));
+      if (k.route === 'direct') return `Φ(${zs}): the row z = ${k.rows[0].zs} reads ${k.rows[0].vs}.`;
+      if (k.route === 'beyond') return `Φ(${zs}): z is past the last row. Take Φ(${zs}) ≈ 1.`;
+      return `Φ(${zs}): between rows ${k.rows[0].zs} → ${k.rows[0].vs} and ${k.rows[1].zs} → ${k.rows[1].vs}. `
+        + `Interpolate: ${num(k.rows[0].v)} + ${num(k.t)} × ${num(k.rows[1].v - k.rows[0].v)} = ${num(k.value)}.`;
+    }
+    function gameSteps(q) {
+      if (!q) return [];
+      const ans = answerOf(q, state.table);
+      if (ans.kind === 'prob') {
+        const { A, B } = ans.tab;
+        const zs = [A, B].filter(Boolean);
+        const out = [`Standardise: ${zs.map((L, i) => `z${zs.length > 1 ? (i ? '_b' : '_a') : ''} = (${fmtX(i ? q.region.b : q.region.a)} − ${fmtX(q.mu)})/${fmtX(q.sigma)} = ${num(L.z)}`).join('; ')}.`];
+        zs.filter((L) => L.neg).forEach((L) => out.push(`Mirror: Φ(${num(L.z)}) = 1 − Φ(${num(-L.z)}).`));
+        zs.forEach((L) => out.push(`Table: ${lookupWords(L)}`));
+        zs.filter((L) => L.neg).forEach((L) => out.push(`So Φ(${num(L.z)}) = 1 − ${num(L.look.value)} = ${num(L.value)}.`));
+        if (q.type === 'lt') out.push(`Answer: P = Φ(${num(A.z)}) ≈ ${num(ans.table)}.`);
+        else if (q.type === 'gt') out.push(`Answer: P = 1 − ${num(A.value)} ≈ ${num(ans.table)}.`);
+        else out.push(`Answer: P = ${num(B.value)} − ${num(A.value)} ≈ ${num(ans.table)}.`);
+        out.push(`Exact value: ${fmtP(ans.exact)}.`);
+        return out;
+      }
+      const { tq } = ans;
+      const out = [];
+      if (q.type === 'central') out.push(`The two tails share ${num(1 - q.q)}. So Φ(z) = (1 + ${q.q})/2 = ${ans.cdfP}.`);
+      else if (q.side === 'above') out.push(`P(X > x) = ${q.p} means P(X ≤ x) = 1 − ${q.p} = ${ans.cdfP}.`);
+      else out.push(`We need Φ(z) = ${ans.cdfP}.`);
+      if (tq.neg) out.push(`${ans.cdfP} < 0.5, so z < 0. Use the mirror: look up ${num(tq.pp)} instead.`);
+      out.push(`Table: the row ${tq.row.zs} reads ${tq.row.vs}. So z = ${num(tq.z)}.`);
+      if (q.type === 'central') out.push(`Answer: c = σz = ${fmtX(q.sigma)} × ${num(tq.z)} = ${num(ans.table)}.`);
+      else out.push(`Answer: x = μ + σz = ${fmtX(q.mu)} + ${fmtX(q.sigma)} × ${paren(tq.z)} = ${num(ans.table)}.`);
+      out.push(`Exact value: ${num(ans.exact)}.`);
+      return out;
+    }
+    function renderGame() {
+      const q = state.question;
+      if (!q) return;
+      document.querySelectorAll('[data-qtype]').forEach((b) => b.classList.toggle('active', b.dataset.qtype === state.qType));
+      $('gameQ').textContent = questionText(q);
+      $('answerBox').placeholder = q.region ? 'Your probability, e.g. 0.933' : q.type === 'central' ? 'Your c, e.g. 19.6' : 'Your x, e.g. 565.8';
+      const steps = gameSteps(q);
+      $('gameSteps').innerHTML = steps.slice(0, state.reveal).map((s, i) => `<div><span>${i + 1}</span>${esc(s)}</div>`).join('');
+      $('revealBtn').disabled = state.reveal >= steps.length;
+      $('revealBtn').textContent = state.reveal >= steps.length ? 'All steps shown' : `Show step ${state.reveal + 1} of ${steps.length}`;
+      const ans = answerOf(q, state.table);
+      const fmtA = (v) => (ans.kind === 'prob' ? fmtP(v) : num(v));
+      if (state.verdict === true) {
+        $('gameVerdict').innerHTML = `<span class="ok">✓ Correct.</span> The ${tableRows(state.table).label} gives ${fmtA(ans.table)}. The exact value is ${fmtA(ans.exact)}.`;
+      } else if (state.verdict === false) {
+        $('gameVerdict').innerHTML = '<span class="bad">✗ Not yet.</span> Show the steps one at a time. Then try again.';
+      } else {
+        $('gameVerdict').textContent = 'Work it out on paper with the table below. Then type your answer.';
+      }
+    }
+
+    function renderPhiTable(hits) {
+      const T = tableRows(state.table);
+      const cols = [T.grid.slice(0, 9), T.grid.slice(9, 18), T.grid.slice(18, 27), T.grid.slice(27).concat(T.quant)];
+      const head = '<tr>' + cols.map((_, j) => `<th class="${j ? 'gap' : ''}">z</th><th>Φ(z)</th>`).join('') + '</tr>';
+      const body = [];
+      for (let i = 0; i < 9; i += 1) {
+        body.push('<tr>' + cols.map((col, j) => {
+          const r = col[i];
+          const hit = hits.has(r) ? ' hit' : '';
+          const q = j === 3 && i === 3 ? ' q' : '';
+          return `<td class="zc${j ? ' gap' : ''}${hit}${q}">${minus(r.zs)}</td><td class="${hit}${q}">${r.vs}</td>`;
+        }).join('') + '</tr>');
+      }
+      $('phiTable').innerHTML = head + body.join('');
+    }
+    function tableHits() {
+      const hits = new Set();
+      if (!model || model.log) return hits;
+      if (model.ans && !model.ans.tab) hits.add(model.ans.tq.row);
+      else [model.tab.A, model.tab.B].filter(Boolean).forEach((L) => L.look.rows.forEach((r) => hits.add(r)));
+      return hits;
+    }
+
+    // ===================== READOUTS =====================
+    function legendHtml() {
+      const L = (cls, label) => `<span class="legend"><span class="swatch ${cls}"></span>${label}</span>`;
+      if (state.view === 'lognormal') {
+        return L('blue', 'Y = eˣ, lognormal') + L('orange', 'X ∼ N(μ, σ²)') + L('grey', 'deciles: each slice holds 10%')
+          + L('mean', 'mean') + 'Hover a chart for its numbers.';
+      }
+      let s = L('blue', 'X: pdf on top, cdf below');
+      if (state.view === 'symmetry') s += L('area-orange', 'left tail Φ(−z)') + L('area-blue', 'right tail 1 − Φ(z)');
+      else s += L('area-blue', 'shaded area = the probability');
+      if (state.view === 'bell' && state.compare) s += L('orange', 'N(0, 1)');
+      if (state.view === 'bell' && state.tf.on) s += L('orange', 'Y = aX + b');
+      if (state.samples.length && state.view !== 'table') s += L('hist', `${state.samples.length} samples, as a density`);
+      return s + L('mean', 'μ') + L('sigma', 'μ ± σ') + L('handle', 'handle') + 'Hover for numbers.';
+    }
+    function caption() {
+      const m = model;
+      if (m.log) {
+        return '<strong>Equal slices.</strong> Each slice between grey lines holds 10% on both charts. '
+          + 'eˣ squeezes the left slices and stretches the right ones. So the mean sits right of the median.';
+      }
+      if (state.view === 'table') {
+        return '<strong>Table game.</strong> Standardise first. Use the mirror if z &lt; 0. '
+          + 'Read the two rows around z. Then draw a straight line between them.';
+      }
+      if (state.view === 'symmetry') {
+        return `<strong>Mirror tails.</strong> The orange tail below z = −${num(state.z)} has the same area as the blue tail above +${num(state.z)}. `
+          + 'So Φ(−z) = 1 − Φ(z). The table never needs negative rows.';
+      }
+      if (state.view === 'landmarks') {
+        return `<strong>Landmarks.</strong> The middle μ ± ${state.k}σ holds ${fmtP(m.exact)}. Each tail holds ${fmtP((1 - m.exact) / 2)}. `
+          + 'The same numbers hold for every μ and σ.';
+      }
+      const h = m.region.type === 'between' ? 'two handles' : 'the handle';
+      return `<strong>Area is probability.</strong> Drag ${h}. The shaded area is ${regionText(m.region)} = ${fmtP(m.exact)}. `
+        + 'The z ruler shows the same point in σ-steps. The cdf below shows the area as a height.';
+    }
+    function renderReadouts() {
+      const m = model;
+      $('legend').innerHTML = legendHtml();
+      $('caption').innerHTML = caption();
+      if (m.log) {
+        const { st } = m;
+        $('receipt').innerHTML = `
+          <div>Y = eˣ, X ∼ ${normName(m.mu, m.sigma)} · median e^μ = ${num(st.median)} · mode e^(μ − σ²) = ${num(st.mode)}</div>
+          <div class="big">mean = e^(μ + σ²/2) = e^(${num(m.mu)} + ${num(m.sigma ** 2 / 2)}) = <strong>${num(st.mean)}</strong></div>
+          <div>The mean exceeds the median by ${num(st.mean - st.median)}. The right tail pulls it.</div>`;
+        return;
+      }
+      const show = spoilerFree();
+      const T = tableRows(state.table);
+      const head = `<div>X ∼ ${normName(m.mu, m.sigma)} · μ = ${fmtX(m.mu)} · σ² = ${num(m.sigma ** 2)} · σ = ${fmtX(m.sigma)} · peak 1/(σ√(2π)) = ${num(1 / (m.sigma * SQRT2PI))}</div>`;
+      if (m.ans && !m.q.region) {
+        const a = m.ans;
+        const what = m.q.type === 'central' ? 'c' : 'x';
+        $('receipt').innerHTML = head + (show
+          ? `<div class="big">${what} = ${m.q.type === 'central' ? 'σz' : 'μ + σz'} = <strong>${num(a.table)}</strong> from the ${T.label} · exact ${num(a.exact)}</div>
+             <div>The table row has z rounded. So ${what} can be off by up to ${num(a.bound)}. <span class="ok">✓ off by ${num(Math.abs(a.table - a.exact))}</span></div>`
+          : `<div class="big">${what} = <strong>?</strong></div><div>Type your answer in the panel. Then check it.</div>`);
+        return;
+      }
+      const diff = Math.abs(m.tab.value - m.exact);
+      const ok = diff <= m.tab.bound + 1e-12;
+      $('receipt').innerHTML = head + (show
+        ? `<div class="big">${regionText(m.region)} = ${phiExpr(m.region, m.mu, m.sigma)} = <strong>${fmtP(m.exact)}</strong></div>
+           <div>The ${T.label} gives ${fmtP(m.tab.value)} · off by ${num(diff)} · the table allows ${num(m.tab.bound)} `
+           + (ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>') + '</div>'
+        : `<div class="big">${regionText(m.region)} = <strong>?</strong></div><div>Type your answer in the panel. Then check it.</div>`);
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    function lookupLines(L, label) {
+      const k = L.look;
+      const z = Math.abs(L.z);
+      const zs = num(z);
+      const lines = [];
+      if (L.neg) lines.push(`${label}: z = ${num(L.z)} < 0, so use the mirror`, `Φ(${num(L.z)}) = 1 − Φ(${zs})`);
+      if (k.route === 'direct') {
+        lines.push(`Φ(${zs}) = ${k.rows[0].vs}     the row z = ${k.rows[0].zs}`);
+      } else if (k.route === 'beyond') {
+        lines.push(`Φ(${zs}): ${zs} is past the last row ${k.rows[0].zs}`, `Φ(${zs}) > ${k.rows[0].vs}, so take Φ(${zs}) ≈ 1`);
+      } else {
+        const [r0, r1] = k.rows;
+        lines.push(`Φ(${zs}): ${zs} lies between rows ${r0.zs} and ${r1.zs}`,
+          `  Φ(${r0.zs}) = ${r0.vs}    Φ(${r1.zs}) = ${r1.vs}`,
+          ...chain(`  Φ(${zs})`, [
+            `Φ(z₀) + (z − z₀)/(z₁ − z₀) × (Φ(z₁) − Φ(z₀))`,
+            `${num(r0.v)} + (${zs} − ${r0.zs})/(${r1.zs} − ${r0.zs}) × (${num(r1.v)} − ${num(r0.v)})`,
+            `${num(r0.v)} + ${num(k.t)} × ${num(r1.v - r0.v)}`,
+            num(k.value),
+          ]));
+      }
+      if (L.neg) lines.push(...chain(`Φ(${num(L.z)})`, [`1 − ${num(k.value)}`, num(L.value)]));
+      return lines;
+    }
+    function renderArithmetic() {
+      const m = model;
+      const parts = [];
+      if (m.log) {
+        const { mu, sigma, st } = m;
+        $('arithHead').innerHTML = `<strong>Y = eˣ with X ∼ ${normName(mu, sigma)}.</strong> Each block follows one quantity of Y back to X.`;
+        parts.push(block('1 · The median', 'P(Y ≤ e^μ) = P(X ≤ μ) = 0.5',
+          linesHtml([{ note: 'eˣ keeps the order of values. So the middle value of X maps to the middle value of Y.' },
+            ...chain('median', ['e^μ', `e^(${num(mu)})`, num(st.median)])]),
+          `median = <strong>${num(st.median)}</strong>`));
+        parts.push(block('2 · The mean, a standard result', 'E(Y) = E(e^X) = e^(μ + σ²/2)',
+          linesHtml([...chain('σ²/2', [`${num(sigma)}² / 2`, `${num(sigma ** 2)} / 2`, num(sigma ** 2 / 2)]),
+            ...chain('mean', [`e^(${num(mu)} + ${num(sigma ** 2 / 2)})`, `e^(${num(mu + sigma ** 2 / 2)})`, num(st.mean)]),
+            { note: 'This is the Normal mgf M(t) = e^(μt + σ²t²/2) at t = 1. Chapter 5 derives it.' }]),
+          `mean = <strong>${num(st.mean)}</strong>, which is ${num(st.mean / st.median)} times the median`));
+        const ps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9];
+        let prev = null;
+        const col = (v) => num(v).padEnd(10);
+        const rows = ps.map((p) => {
+          const z = PhiInv(p);
+          const x = mu + sigma * z;
+          const y = Math.exp(x);
+          const gap = prev === null ? '' : num(y - prev);
+          prev = y;
+          return `${p.toFixed(1)}   ${col(z)}${col(x)}${col(y)}${gap}`;
+        });
+        parts.push(block('3 · The deciles', 'x_p = μ + σ z_p,   y_p = e^(x_p)',
+          linesHtml([{ note: `Each row uses x = ${num(mu)} + ${num(sigma)} × z. Equal steps in x become growing steps in y. That growth is the long right tail.` },
+            `p     ${'z_p'.padEnd(10)}${'x_p'.padEnd(10)}${'y_p'.padEnd(10)}gap in y`, ...rows]),
+          'Each pair of neighbouring lines holds 10% of the probability.'));
+        const { area, mean } = lognormCheck(mu, sigma);
+        const ok = Math.abs(area - 1) < 1e-6 && Math.abs(mean - st.mean) < 1e-6 * st.mean;
+        parts.push(block('4 · Check by numeric integration', '∫ f_Y(y) dy = 1 and ∫ y f_Y(y) dy = mean',
+          linesHtml([`Simpson's rule from e^(μ − 12σ) = ${num(Math.exp(mu - 12 * sigma))} to e^(μ + 12σ) = ${num(Math.exp(mu + 12 * sigma))}:`,
+            `∫ f_Y(y) dy   = ${area.toFixed(8)}`, `∫ y f_Y(y) dy = ${num(mean)}   formula ${num(st.mean)}`]),
+          ok ? '<span class="ok">✓ The pdf has area 1 and the formula mean matches the integral.</span>'
+            : '<span class="bad">✗ The integral and the formula disagree.</span>'));
+        $('arithBody').innerHTML = parts.join('');
+        return;
+      }
+
+      const { mu, sigma } = m;
+      const T = tableRows(state.table);
+      $('arithHead').innerHTML = state.view === 'table'
+        ? `<strong>${esc(questionText(m.q))}</strong> The full working is below. Try it on paper first.`
+        : `<strong>X ∼ ${normName(mu, sigma)}.</strong> Each block is one step on paper. The ${T.label} supplies Φ.`;
+      parts.push(block('1 · The parameters', 'X ∼ N(μ, σ²)',
+        linesHtml([`μ  = ${fmtX(mu)}`, `σ² = ${num(sigma ** 2)}`, ...chain('σ ', [`√${num(sigma ** 2)}`, fmtX(sigma)]),
+          ...chain('peak', ['1/(σ√(2π))', `1/(${fmtX(sigma)} × ${num(SQRT2PI)})`, num(1 / (sigma * SQRT2PI))])]),
+        `σ = <strong>${fmtX(sigma)}</strong>`));
+
+      if (m.ans && !m.q.region) {
+        const a = m.ans;
+        const { tq } = a;
+        const zl = [];
+        if (m.q.type === 'central') {
+          zl.push({ note: 'The middle holds q. The two tails share 1 − q. So Φ(z) covers the middle plus one tail.' },
+            ...chain('Φ(z)', [`(1 + q)/2`, `(1 + ${m.q.q})/2`, `${a.cdfP}`]));
+        } else if (m.q.side === 'above') {
+          zl.push(...chain('P(X ≤ x)', [`1 − P(X > x)`, `1 − ${m.q.p}`, `${a.cdfP}`]));
+        } else zl.push(`P(X ≤ x) = Φ(z) = ${a.cdfP}`);
+        if (tq.neg) zl.push(`${a.cdfP} < 0.5, so z < 0`, `mirror: Φ(z) = ${a.cdfP} ⇔ Φ(−z) = 1 − ${a.cdfP} = ${num(tq.pp)}`);
+        zl.push(`the row z = ${tq.row.zs} reads ${tq.row.vs}`, `so z = ${num(tq.z)}`);
+        parts.push(block('2 · Read the table backwards', 'find z with Φ(z) = p', linesHtml(zl), `z = <strong>${num(tq.z)}</strong>`));
+        const ul = m.q.type === 'central'
+          ? chain('c', ['σz', `${fmtX(sigma)} × ${num(tq.z)}`, num(a.table)])
+          : chain('x', ['μ + σz', `${fmtX(mu)} + ${fmtX(sigma)} × ${paren(tq.z)}`, num(a.table)]);
+        parts.push(block('3 · Undo the standardising', m.q.type === 'central' ? 'c = σz' : 'x = μ + σz', linesHtml(ul),
+          `${m.q.type === 'central' ? 'c' : 'x'} = <strong>${num(a.table)}</strong>`));
+        const ze = PhiInv(a.cdfP);
+        const ok = Math.abs(a.table - a.exact) <= a.bound + 1e-12;
+        parts.push(block('4 · Check with the exact Φ⁻¹', 'z exact = Φ⁻¹(p)',
+          linesHtml([`Φ⁻¹(${a.cdfP}) = ${ze.toFixed(6)}`, `table z = ${num(tq.z)}, printed to ±${num(tq.bound)}`,
+            `exact answer = ${num(a.exact)}`, `table answer = ${num(a.table)}`, `gap = ${num(Math.abs(a.table - a.exact))}, allowed σ × ${num(tq.bound)} = ${num(a.bound)}`]),
+          ok ? '<span class="ok">✓ The table route lands within its rounding of the exact answer.</span>'
+            : '<span class="bad">✗ The table route and the exact answer disagree.</span>'));
+        $('arithBody').innerHTML = parts.join('');
+        return;
+      }
+
+      const r = m.region;
+      const { A, B } = m.tab;
+      const zLines = [...chain('z_a', ['(a − μ)/σ', `(${fmtX(r.a)} − ${paren(mu)})/${fmtX(sigma)}`, `${num(r.a - mu)}/${fmtX(sigma)}`, num(A.z)])];
+      if (B) zLines.push(...chain('z_b', ['(b − μ)/σ', `(${fmtX(r.b)} − ${paren(mu)})/${fmtX(sigma)}`, `${num(r.b - mu)}/${fmtX(sigma)}`, num(B.z)]));
+      zLines.push({ note: 'z counts σ-steps from μ. A negative z sits left of μ.' });
+      parts.push(block('2 · Standardise', 'z = (x − μ)/σ', linesHtml(zLines),
+        B ? `z_a = <strong>${num(A.z)}</strong>, z_b = <strong>${num(B.z)}</strong>` : `z = <strong>${num(A.z)}</strong>`));
+
+      const look = [...lookupLines(A, 'z_a')];
+      if (B) look.push('', ...lookupLines(B, 'z_b'));
+      parts.push(block(`3 · Read the ${esc(T.label)}`, 'Φ(z) from the table, by row or by straight line', linesHtml(look),
+        B ? `Φ(z_a) ≈ <strong>${num(A.value)}</strong>, Φ(z_b) ≈ <strong>${num(B.value)}</strong>` : `Φ(z) ≈ <strong>${num(A.value)}</strong>`));
+
+      let comb;
+      if (r.type === 'lt') comb = chain(regionText(r), [`Φ(z)`, `Φ(${num(A.z)})`, num(m.tab.value)]);
+      else if (r.type === 'gt') comb = chain(regionText(r), ['1 − Φ(z)', `1 − ${num(A.value)}`, num(m.tab.value)]);
+      else {
+        comb = chain(regionText(r), ['Φ(z_b) − Φ(z_a)', `${num(B.value)} − ${num(A.value)}`, num(m.tab.value)]);
+        if (Math.abs(A.z + B.z) < 1e-9) comb.push({ note: `The interval is symmetric. So this is also 2Φ(${num(B.z)}) − 1 = 2 × ${num(B.value)} − 1.` });
+      }
+      parts.push(block('4 · Combine', r.type === 'lt' ? 'P(X ≤ a) = Φ(z)' : r.type === 'gt' ? 'P(X > a) = 1 − Φ(z)' : 'P(a < X ≤ b) = Φ(z_b) − Φ(z_a)',
+        linesHtml(comb), `table answer = <strong>${num(m.tab.value)}</strong>`));
+
+      if (state.view === 'symmetry') {
+        const zr = -A.z;
+        parts.push(block('5 · The mirror tail', 'P(X > μ + zσ) = 1 − Φ(z)',
+          linesHtml([...chain(`P(X > ${fmtX(2 * mu - r.a)})`, [`1 − Φ(${num(zr)})`, `1 − ${num(A.look.value)}`, num(1 - A.look.value)]),
+            { note: 'The right tail uses the same table row. So the two tails have equal area.' }]),
+          `left tail = right tail = <strong>${num(A.value)}</strong>`));
+      }
+
+      const ex = [];
+      [['z_a', A], ['z_b', B]].filter(([, L]) => L).forEach(([n, L]) => ex.push(`Φ(${num(L.z)}) exact = ${Phi(L.z).toFixed(6)}    ${n}`));
+      const diff = Math.abs(m.tab.value - m.exact);
+      const ok = diff <= m.tab.bound + 1e-12;
+      ex.push(`exact answer = ${m.exact.toFixed(6)}`, `table answer = ${m.tab.value.toFixed(6)}`,
+        `gap = ${num(diff)}`, `allowed = ${num(m.tab.bound)}`,
+        { note: 'The allowance adds the rounding of the printed rows and the bend of Φ between rows.' });
+      parts.push(block(`${state.view === 'symmetry' ? 6 : 5} · Check with the exact Φ`, 'the page computes Φ to about 12 digits',
+        linesHtml(ex),
+        ok ? `<span class="ok">✓ The table route is within ${num(m.tab.bound)} of the exact answer.</span>`
+          : '<span class="bad">✗ The table route misses the exact answer.</span>'));
+
+      let n = state.view === 'symmetry' ? 7 : 6;
+      if (state.samples.length && state.view !== 'table') {
+        const xs = state.samples.map((z) => mu + sigma * z);
+        const inR = (x) => (state.view === 'symmetry' ? x <= r.a
+          : r.type === 'lt' ? x <= r.a : r.type === 'gt' ? x > r.a : x > r.a && x <= r.b);
+        const k = xs.filter(inR).length;
+        const se = Math.sqrt((m.exact * (1 - m.exact)) / xs.length);
+        const okS = Math.abs(k / xs.length - m.exact) <= 4 * se + 1e-9;
+        parts.push(block(`${n} · Check by sampling`, 'share of samples in the region ≈ the probability',
+          linesHtml([`${k} of ${xs.length} samples fall in the region`, ...chain('share', [`${k}/${xs.length}`, num(k / xs.length)]),
+            `exact = ${num(m.exact)}, one standard error = √(p(1 − p)/n) = ${num(se)}`]),
+          okS ? '<span class="ok">✓ The share is within 4 standard errors of the exact value.</span>'
+            : '<span class="bad">✗ The share is far from the exact value. Rare, but it can happen by chance.</span>'));
+        n += 1;
+      }
+
+      if (m.tf) {
+        const { a, b } = m.tf;
+        const muY = a * mu + b;
+        const sY = Math.abs(a) * sigma;
+        const y = muY + 0.7 * sY;
+        const viaX = cdfYviaX(y, a, b, mu, sigma);
+        const viaN = Phi((y - muY) / sY);
+        const ok = Math.abs(viaX - viaN) < 1e-12;
+        const xb = (y - b) / a;
+        parts.push(block(`${n} · Y = ${esc(affine(a, b))} stays Normal`, 'Y ∼ N(aμ + b, a²σ²)',
+          linesHtml([...chain('μ_Y', ['aμ + b', `${paren(a)} × ${paren(mu)} + ${paren(b)}`, num(muY)]),
+            ...chain('σ²_Y', ['a²σ²', `${num(a * a)} × ${num(sigma ** 2)}`, num(sY * sY)]),
+            ...chain('σ_Y', ['|a|σ', num(sY)]),
+            { note: `Test one point: y = ${num(y)}.` },
+            ...chain('P(Y ≤ y)', [a > 0 ? `P(X ≤ (y − b)/a)` : `P(X ≥ (y − b)/a)`, a > 0 ? `Φ((${num(xb)} − ${paren(mu)})/${fmtX(sigma)})` : `1 − Φ((${num(xb)} − ${paren(mu)})/${fmtX(sigma)})`, viaX.toFixed(6)]),
+            ...chain('Φ((y − μ_Y)/σ_Y)', [`Φ((${num(y)} − ${paren(muY)})/${num(sY)})`, viaN.toFixed(6)])]),
+          ok ? '<span class="ok">✓ Both routes give the same probability. So Y has this Normal cdf.</span>'
+            : '<span class="bad">✗ The two routes disagree.</span>'));
+      }
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      renderArithmetic();
+      renderGame();
+      renderPhiTable(tableHits());
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${i + 1}</b><span>${v.word}</span>`;
+      b.dataset.view = v.key;
+      b.addEventListener('click', () => setView(v.key));
+      $('viewGrid').append(b);
+    });
+    QTYPE_UI.forEach((t) => {
+      const b = document.createElement('button');
+      b.textContent = t.label;
+      b.dataset.qtype = t.key;
+      b.addEventListener('click', () => {
+        state.qType = t.key;
+        newQuestion();
+        update();
+      });
+      $('qTypeGrid').append(b);
+    });
+    document.querySelectorAll('[data-table]').forEach((b) => b.addEventListener('click', () => {
+      state.table = b.dataset.table;
+      renderControls();
+      update();
+    }));
+    $('checkBtn').addEventListener('click', () => {
+      const v = parseFloat($('answerBox').value.replace('−', '-'));
+      state.verdict = checkAnswer(state.question, v, state.table);
+      update();
+    });
+    $('answerBox').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') $('checkBtn').click();
+    });
+    $('revealBtn').addEventListener('click', () => {
+      state.reveal += 1;
+      update();
+    });
+    $('newQBtn').addEventListener('click', () => {
+      newQuestion();
+      update();
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out working needs a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-5]$/.test(e.key)) setView(VIEWS[+e.key - 1].key);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

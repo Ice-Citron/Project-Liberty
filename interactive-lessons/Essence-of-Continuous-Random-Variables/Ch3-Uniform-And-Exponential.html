@@ -1,0 +1,1609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Uniform and Exponential · Flat, then Memoryless</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.left { background: var(--left); }
+    .swatch.right { background: var(--right); }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.query { width: 12px; height: 0; border-top: 2px dotted var(--ink); border-radius: 0; }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .nav .formula-chip { font-family: var(--mono); color: var(--ink); }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .view-grid { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .view-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .view-grid button b { font-size: 14px; }
+    .btn-row { display: grid; gap: 6px; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); }
+    .btn-row button { padding: 8px 6px; font-size: 12.5px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .body a, .essence a, .src a { color: var(--blue-1); }
+    .body ul { margin: 4px 0 0; padding-left: 18px; }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 340px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.eq { color: var(--ink); }
+    .arith div.note { color: var(--muted); font-style: italic; }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 3</div>
+        <h1>Uniform and Exponential: flat, then memoryless</h1>
+        <p class="lead">
+          Two shapes do most of the work. The <strong>Uniform</strong> spreads probability flat across an interval.
+          The <strong>Exponential</strong> waits for an event with the same risk at every moment.
+          That constant risk gives it <strong>no memory</strong>.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="index.html">← Index</a>
+        <span>Chapter 3 of 5</span>
+        <a href="Ch4-Normal-Standardise-And-Read-The-Table.html">Ch 4 →</a>
+      </nav>
+      <div class="nav">
+        <span>50008 Probability · L04</span>
+        <span id="chip" class="formula-chip"></span>
+      </div>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · flat, then memoryless</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 7 pick a picture.
+            The Arithmetic tab writes out every step for the picture on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a picture</div>
+          <div id="viewGrid" class="view-grid"></div>
+        </section>
+
+        <section class="section">
+          <div id="controlTitle" class="section-title"></div>
+          <div id="controlHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · U(0, 0.5) has height 2. Is a density above 1 a problem?</summary>
+            <div class="answer"><strong>No.</strong> A density is not a probability. Only area is probability.
+              Here the area is 2 × 0.5 = 1.</div>
+            <button data-predict="0">Set it up: U(0, 0.5)</button>
+          </details>
+          <details class="predict">
+            <summary>2 · Take U(2, 8). Guess σ² before you compute.</summary>
+            <div class="answer"><strong>σ² = 3.</strong> The width is 6. So σ² = 6²/12 = 36/12 = 3 and σ ≈ 1.732.</div>
+            <button data-predict="1">Set it up: U(2, 8)</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Exp(0.5) has a mean wait of 2. You already waited 3. What is the mean wait still to come?</summary>
+            <div class="answer"><strong>Still 2.</strong> The past wait carries no information.
+              The wait ahead is again Exp(0.5).</div>
+            <button data-predict="2">Set it up: the no-memory picture</button>
+          </details>
+          <details class="predict">
+            <summary>4 · Exp(λ): does the median sit above or below the mean?</summary>
+            <div class="answer"><strong>Below.</strong> The median is ln 2/λ ≈ 0.6931/λ. The mean is 1/λ.
+              The long right tail pulls the mean up.</div>
+            <button data-predict="3">Set it up: Exp(1), mean and median</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Calls arrive at rate 2 per hour. What is the chance of no call in the next 30 minutes?</summary>
+            <div class="answer"><strong>About 0.368.</strong> The count in half an hour is Poi(2 × 0.5) = Poi(1).
+              So P(no call) = e^(−1) ≈ 0.368. This is also P(first wait &gt; 0.5).</div>
+            <button data-predict="4">Set it up: rate 2, x = 0.5</button>
+          </details>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Exponential waits on the slides</div>
+          <div class="body">The Examples slide lists these waits:
+            <ul>
+              <li>the time until the next customer arrives at a cashpoint;</li>
+              <li>the time to failure of a component in a system;</li>
+              <li>the time until the next mistake on the slides;</li>
+              <li>the distance along a road between potholes;</li>
+              <li>the time until the next request at a web server.</li>
+            </ul>
+            Each one assumes a <strong>constant risk</strong> per unit of time or distance.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The checks use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Uniform U(a, b)</div>
+          <div class="formula">f(x) = 1/(b − a)        for a &lt; x &lt; b
+     = 0                otherwise
+F(x) = 0                for x ≤ a
+     = (x − a)/(b − a)  for a &lt; x &lt; b
+     = 1                for x ≥ b</div>
+          <div class="body">The height must make the area 1. The width is b − a. So the height is 1/(b − a).</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">From U(0, 1) to U(a, b)</div>
+          <div class="formula">X ~ U(0, 1),  Y = a + (b − a)X
+
+F_Y(y) = P(Y ≤ y)
+       = P(a + (b − a)X ≤ y)
+       = P(X ≤ (y − a)/(b − a))     as b − a &gt; 0
+       = F_X((y − a)/(b − a))
+       = (y − a)/(b − a)</div>
+          <div class="body">The event does not change. Only the ruler changes. So the probability stays the same.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why the 12</div>
+          <div class="formula">U(0, 1):  E(X)  = ∫₀¹ x dx  = 1/2
+          E(X²) = ∫₀¹ x² dx = 1/3
+          σ²    = 1/3 − (1/2)² = 1/12
+
+U(a, b) = a + (b − a)X:
+          μ  = a + (b − a)/2 = (a + b)/2
+          σ² = (b − a)² × 1/12
+
+Direct route, as on the slide:
+E(X)  = ∫ₐᵇ x/(b − a) dx
+      = (b² − a²)/(2(b − a)) = (a + b)/2
+E(X²) = ∫ₐᵇ x²/(b − a) dx
+      = (b³ − a³)/(3(b − a))
+      = (a² + ab + b²)/3
+σ²    = (a² + ab + b²)/3 − (a + b)²/4
+      = (b − a)²/12</div>
+          <div class="body">The 3 comes from the integral of x². The 4 comes from the square of the mean ½.
+            Their difference is 1/3 − 1/4 = 1/12. The stretch step uses Var(aX + b) = a²Var(X).</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Exponential Exp(<span class="nocase">λ</span>)</div>
+          <div class="formula">f(x) = λe^(−λx),  x ≥ 0
+F(x) = ∫₀ˣ λe^(−λt) dt
+     = [−e^(−λt)]₀ˣ = 1 − e^(−λx)
+P(X &gt; x)     = e^(−λx)
+P(c &lt; X ≤ d) = F(d) − F(c)
+             = e^(−λc) − e^(−λd)</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Mean and variance, by parts</div>
+          <div class="formula">∫ u dv = uv − ∫ v du
+u = x,    dv = λe^(−λx) dx
+du = dx,  v = −e^(−λx)
+
+E(X)  = [−x e^(−λx)]₀^∞ + ∫₀^∞ e^(−λx) dx
+      = 0 + 1/λ
+E(X²) = [−x² e^(−λx)]₀^∞ + ∫₀^∞ 2x e^(−λx) dx
+      = 0 + (2/λ) E(X) = 2/λ²
+σ²    = 2/λ² − 1/λ² = 1/λ²
+
+median m:  1 − e^(−λm) = 1/2
+       so  m = ln 2/λ ≈ 0.6931/λ</div>
+          <div class="body">The boundary terms vanish. At 0 the factor x is 0.
+            At ∞ the exponential decays faster than any power of x grows.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">No memory</div>
+          <div class="formula">P(X &gt; s + x | X &gt; s)
+  = P(X &gt; s + x and X &gt; s) / P(X &gt; s)
+  = P(X &gt; s + x) / P(X &gt; s)
+  = e^(−λ(s + x)) / e^(−λs)
+  = e^(−λx)
+  = P(X &gt; x)</div>
+          <div class="body">The event X &gt; s + x already contains X &gt; s. So the joint event is just X &gt; s + x.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Slots: the continuous Geometric</div>
+          <div class="formula">slot width h,  chance per slot p = λh
+K ~ Geometric(λh),  the wait is Kh
+
+P(Kh &gt; x) = (1 − λh)^(x/h),  x a multiple of h
+ln of it  = (x/h) ln(1 − λh)
+          ≈ (x/h)(−λh) = −λx
+so (1 − λh)^(x/h) → e^(−λx)  as h → 0
+
+E(Kh)   = h × 1/(λh) = 1/λ,  at every h
+Var(Kh) = h²(1 − λh)/(λh)²
+        = (1 − λh)/λ² → 1/λ²</div>
+          <div class="body">This is a standard result. It is not on the L04 slides.
+            It joins the L03 Geometric to Exp(λ).</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Link with Poisson</div>
+          <div class="formula">N_x ~ Poi(λx): the count of events in [0, x]
+X = the time of the first event
+
+X &gt; x  ⇔  no event in [0, x]  ⇔  N_x = 0
+P(X &gt; x) = P(N_x = 0)
+         = (λx)⁰ e^(−λx) / 0! = e^(−λx)
+So X ~ Exp(λ).</div>
+          <div class="body">The same argument works for every later gap. So all gaps are Exp(λ).</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L04 Continuous Random Variables.
+            Slides: U(a, b); Example: U(0,1); Relationship between U(a, b) and U(0,1); Mean and Variance of X ∼ U(a, b);
+            Exponential Distribution Exp(λ); Example: Exp(1), Exp(0.5) &amp; Exp(0.2) pdfs; Memoryless Property of the Exponential;
+            Residual time; Examples; Link with Poisson Distribution; Proof.
+            The integration by parts, the median and the slot model are standard results.
+            Every number on this page comes from one maths block. A Node test checks it.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Flat means length.</strong> For U(a, b) the chance of an interval is its length over b − a.</div>
+          <div class="essence"><strong>One uniform makes them all.</strong> Y = a + (b − a)X turns U(0, 1) into U(a, b).</div>
+          <div class="essence"><strong>The 12 is 1/3 − 1/4.</strong> Stretch by b − a and the variance grows by (b − a)².</div>
+          <div class="essence"><strong>Exponential means constant risk.</strong> It is a Geometric with infinitely thin slots.</div>
+          <div class="essence"><strong>No memory.</strong> A wait of s tells you nothing about the wait ahead.</div>
+          <div class="essence"><strong>Poisson counts, exponential gaps.</strong> No event in [0, x] is the same event as a first wait above x.</div>
+          <div class="essence"><strong>Mean above median.</strong> The mean is 1/λ. The median is ln 2/λ.
+            The skewness is exactly 2, the lower limit of the Geometric on the <a href="../Essence-of-Skewness.html">skewness page</a>.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can draw U(a, b) and give its height.</label>
+            <label><input type="checkbox"> I can derive (b − a)²/12 from 1/3 − 1/4.</label>
+            <label><input type="checkbox"> I can prove the cdf of a + (b − a)X from the cdf of X.</label>
+            <label><input type="checkbox"> I can write F(x), P(X &gt; x) and P(c &lt; X ≤ d) for Exp(λ).</label>
+            <label><input type="checkbox"> I can explain no memory with cut, rescale and shift.</label>
+            <label><input type="checkbox"> I can explain why Poisson counts give exponential gaps.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Rate or mean?</strong> Some books write Exp(θ) with mean θ.
+            The lecture uses the rate λ. So the mean is 1/λ.</div>
+          <div class="body"><strong>Constant risk is an assumption.</strong> Parts that wear out fail more often with age.
+            The slide calls no memory "not always desirable".</div>
+          <div class="body"><strong>Open or closed ends do not matter.</strong> P(X = a) = 0 for a continuous X.
+            So (a, b) and [a, b] give the same probabilities.</div>
+          <div class="body"><strong>The slot model is a standard result.</strong> It is not on the slides.
+            The same goes for the integration by parts and the median.</div>
+          <div class="body"><strong>Simulations wobble.</strong> A histogram of a few thousand gaps never matches the curve exactly.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Related pages</div>
+          <div class="body">
+            <a href="../Essence-of-Geometric.html">Essence of the Geometric</a> · the discrete wait behind the slot model.<br>
+            <a href="../Essence-of-Poisson.html">Essence of the Poisson</a> · the counts behind the gaps.<br>
+            <a href="../Essence-of-Skewness.html">Essence of Skewness</a> · why a long right tail skews right.
+          </div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_ch3.js) =====================
+    // KIT START
+    const unif = {
+      pdf: (x, a, b) => (x >= a && x <= b ? 1 / (b - a) : 0),
+      cdf: (x, a, b) => (x <= a ? 0 : x >= b ? 1 : (x - a) / (b - a)),
+      mean: (a, b) => (a + b) / 2,
+      variance: (a, b) => (b - a) ** 2 / 12,
+    };
+    const expo = {
+      pdf: (x, l) => (x < 0 ? 0 : l * Math.exp(-l * x)),
+      cdf: (x, l) => (x <= 0 ? 0 : 1 - Math.exp(-l * x)),
+      surv: (x, l) => (x <= 0 ? 1 : Math.exp(-l * x)),
+      mean: (l) => 1 / l,
+      variance: (l) => 1 / l ** 2,
+      median: (l) => Math.LN2 / l,
+    };
+
+    // Composite Simpson's rule with n (even) strips.
+    function simpson(f, lo, hi, n = 2000) {
+      const h = (hi - lo) / n;
+      let s = f(lo) + f(hi);
+      for (let i = 1; i < n; i += 1) s += (i % 2 ? 4 : 2) * f(lo + i * h);
+      return (s * h) / 3;
+    }
+
+    // Mass, mean and variance of a density on [lo, hi], by Simpson.
+    function numMoments(pdf, lo, hi, n = 4000) {
+      const mass = simpson(pdf, lo, hi, n);
+      const mean = simpson((x) => x * pdf(x), lo, hi, n);
+      const e2 = simpson((x) => x * x * pdf(x), lo, hi, n);
+      return { mass, mean, e2, variance: e2 - mean * mean };
+    }
+
+    // Time cut into slots of width h. Each slot holds the event with chance p = λh.
+    // The slot count K is Geometric(λh), lecture convention, and the wait is Kh.
+    function slotDensity(x, l, h) {
+      if (x <= 0) return 0;
+      const k = Math.ceil(x / h - 1e-9);
+      return l * (1 - l * h) ** (k - 1);
+    }
+    function slotSurvival(x, l, h) {
+      return x <= 0 ? 1 : (1 - l * h) ** Math.floor(x / h + 1e-9);
+    }
+
+    // Wait still to come after surviving to s: density f(s + x) / P(X > s).
+    const residual = (pdf, surv, x, s) => pdf(s + x) / surv(s);
+
+    const sampleExp = (l, rng) => -Math.log(1 - rng()) / l;
+
+    // One Poisson-process timeline on [0, T] from exponential gaps.
+    // Every gap is a full Exp(λ) draw, including the one that crosses T.
+    function timeline(l, T, rng) {
+      const times = [];
+      const gaps = [];
+      let t = 0;
+      for (;;) {
+        const g = sampleExp(l, rng);
+        gaps.push(g);
+        t += g;
+        if (t > T) break;
+        times.push(t);
+      }
+      return { times, gaps };
+    }
+
+    // Histogram heights as densities: count / (N × width). Values past x1 count in N only.
+    function histogram(values, x1, width) {
+      const n = Math.ceil(x1 / width - 1e-9);
+      const counts = new Array(n).fill(0);
+      values.forEach((v) => {
+        const i = Math.floor(v / width);
+        if (i < n) counts[i] += 1;
+      });
+      return counts.map((c, i) => ({ lo: i * width, hi: (i + 1) * width, count: c, density: c / (values.length * width) }));
+    }
+
+    const shareAbove = (values, x) => values.filter((v) => v > x).length / values.length;
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmtP = (v) => minus(String(+v.toFixed(2)));
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    const noteHtml = (l) => `<div class="note">${esc(l)}</div>`;
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+    const same = (u, v, tol = 1e-6) => Math.abs(u - v) <= tol * Math.max(1, Math.abs(v));
+    const tick = (ok, what) => (ok ? `<span class="ok">✓ ${what}</span>` : `<span class="bad">✗ ${what} disagrees</span>`);
+
+    // ===================== STATE =====================
+    const X_MAX = 10;
+    const H_STEPS = [1, 0.5, 0.2, 0.1, 0.05, 0.02, 0.01];
+    const VIEWS = [
+      { key: 'uniform', n: 1, word: 'U(a, b)', title: 'Stretch the flat density', chip: 'f(x) = 1/(b − a) on (a, b)' },
+      { key: 'map', n: 2, word: 'Map', title: 'Map U(0, 1) onto U(a, b)', chip: 'Y = a + (b − a)X' },
+      { key: 'exp', n: 3, word: 'Exp(λ)', title: 'The exponential density', chip: 'f(x) = λe^(−λx), x ≥ 0' },
+      { key: 'slots', n: 4, word: 'Slots', title: 'Thin slots: Geometric to Exponential', chip: '(1 − λh)^(x/h) → e^(−λx)' },
+      { key: 'memory', n: 5, word: 'Memory', title: 'Cut, rescale, shift', chip: 'P(X > s + x | X > s) = P(X > x)' },
+      { key: 'poisson', n: 6, word: 'Poisson', title: 'Gaps of a Poisson process', chip: 'P(X > x) = P(N_x = 0) = e^(−λx)' },
+      { key: 'moments', n: 7, word: 'Mean', title: 'Mean, median and spread', chip: 'μ = 1/λ, σ² = 1/λ², m = ln 2/λ' },
+    ];
+    const VIEW = Object.fromEntries(VIEWS.map((v) => [v.key, v]));
+    const SLIDERS = {
+      a: { label: 'a, the left end', min: -5, max: 10, step: 0.5 },
+      b: { label: 'b, the right end', min: -4, max: 12, step: 0.5 },
+      y: { label: 'y, the query point', min: -5, max: 12, step: 0.1 },
+      lambda: { label: 'λ, the rate', min: 0.2, max: 3, step: 0.05 },
+      c: { label: 'c, the interval start', min: 0, max: 10, step: 0.1 },
+      d: { label: 'd, the interval end', min: 0, max: 10, step: 0.1 },
+      hIdx: { label: 'h, the slot width', min: 0, max: H_STEPS.length - 1, step: 1, format: (i) => String(H_STEPS[i]) },
+      x: { label: 'x, the query time', min: 0, max: 10, step: 0.1 },
+      s: { label: 's, the time already waited', min: 0, max: 6, step: 0.1 },
+    };
+    const CONTROLS = {
+      uniform: ['a', 'b', 'y'],
+      map: ['a', 'b', 'y', 'mapButtons'],
+      exp: ['lambda', 'c', 'd'],
+      slots: ['lambda', 'hIdx', 'x'],
+      memory: ['lambda', 's', 'x', 'memSteps', 'memKind'],
+      poisson: ['lambda', 'x', 'simButtons'],
+      moments: ['lambda', 'integrand'],
+    };
+
+    const TOUR = [
+      { title: 'U(0, 1): the flat density', view: 'uniform', set: { a: 0, b: 1, y: 0.5 },
+        note: 'This is the slide\'s U(0, 1). The density is 1 on the interval and 0 outside it. The chance of a sub-interval is its length. So the cdf F(x) = x is a straight ramp. The variance is 1/3 − 1/4 = 1/12. That is where the 12 comes from.' },
+      { title: 'Stretch it to U(2, 8)', view: 'uniform', set: { a: 2, b: 8, y: 5 },
+        note: 'The rectangle widens to b − a = 6. So its height drops to 1/6. The area stays 1. The mean sits in the middle at 5. The variance is 6²/12 = 3. Drag a and b yourself.' },
+      { title: 'Every uniform is a stretched U(0, 1)', view: 'map', set: { a: 2, b: 8, y: 5 }, sample: true,
+        note: 'Each orange point is a draw of X from U(0, 1). The map Y = 2 + 6X sends it into (2, 8). The event Y ≤ 5 is the same event as X ≤ 0.5. So both shaded areas equal 0.5. That is the slide\'s cdf proof.' },
+      { title: 'The slide\'s Exp(1)', view: 'exp', set: { lambda: 1, c: 0, d: 1 },
+        note: 'The density starts at f(0) = λ = 1 and decays. Short waits are the most likely. The shaded area is P(X ≤ 1) = 1 − e^(−1) ≈ 0.632. The cdf below climbs by the same amount.' },
+      { title: 'Exp(0.5): half the rate', view: 'exp', set: { lambda: 0.5, c: 1, d: 3 },
+        note: 'Half the rate means twice the wait. The curve starts lower at 0.5 and decays more slowly. The mean is 1/λ = 2. The shaded area is P(1 < X ≤ 3) = e^(−0.5) − e^(−1.5) ≈ 0.383.' },
+      { title: 'Exp(0.2): the flattest slide curve', view: 'exp', set: { lambda: 0.2, c: 0, d: 10 },
+        note: 'The mean wait is now 5. The shaded area up to 10 is only 0.865. So a long tail remains: P(X > 10) = e^(−2) ≈ 0.135.' },
+      { title: 'Wide slots: a Geometric wait', view: 'slots', set: { lambda: 0.5, hIdx: 0, x: 2 },
+        note: 'Chop time into slots of width h = 1. Each slot holds the event with chance p = λh = 0.5. The slot count is Geometric(0.5) from L03. So the wait is a staircase, not a curve.' },
+      { title: 'Thin slots: the staircase becomes the curve', view: 'slots', set: { lambda: 0.5, hIdx: 6, x: 2 },
+        note: 'Now h = 0.01 and p = 0.005. The staircase hugs λe^(−λx). P(wait > 2) = 0.995^200 ≈ 0.3670. The curve gives e^(−1) ≈ 0.3679. Exp(λ) is a Geometric with infinitely thin slots.' },
+      { title: 'No memory: cut, rescale, shift', view: 'memory', set: { lambda: 0.5, s: 3, x: 2, memKind: 'exp', memStep: 3 }, replay: true,
+        note: 'You already waited s = 3. Cut off the past. Rescale what remains so its area is 1. Shift it back to 0. It lands exactly on the original curve. So the wait ahead is again Exp(0.5).' },
+      { title: 'A uniform wait remembers', view: 'memory', set: { lambda: 0.5, s: 3, x: 0.5, memKind: 'unif', memStep: 3 }, replay: true,
+        note: 'Now the wait is U(0, 4) with the same mean of 2. After 3 minutes at most 1 minute remains. The shifted tail is U(0, 1). It does not match the original. This wait remembers.' },
+      { title: 'Gaps of a Poisson process', view: 'poisson', set: { lambda: 1, x: 2 }, sim: 1000,
+        note: 'Events arrive at rate λ = 1. The page plays 1000 timelines. The gaps between events stack into the Exp(1) curve. No event in [0, 2] means the first wait is above 2. Both have chance e^(−2) ≈ 0.135.' },
+      { title: 'The mean sits above the median', view: 'moments', set: { lambda: 0.5, integrand: 1 },
+        note: 'The mean is 1/λ = 2. The median is ln 2/λ ≈ 1.386. Half of all waits end before 1.386. The long right tail drags the mean higher. The lower chart shows x·f(x). Its area is the mean.' },
+    ];
+    const PREDICT = [
+      { view: 'uniform', set: { a: 0, b: 0.5, y: 0.2 } },
+      { view: 'uniform', set: { a: 2, b: 8, y: 5 } },
+      { view: 'memory', set: { lambda: 0.5, s: 3, x: 2, memKind: 'exp', memStep: 3 }, replay: true },
+      { view: 'moments', set: { lambda: 1, integrand: 1 } },
+      { view: 'poisson', set: { lambda: 2, x: 0.5 }, sim: 1000 },
+    ];
+
+    const state = {
+      view: 'uniform', a: 0, b: 1, y: 0.5, lambda: 1, c: 0, d: 1, hIdx: 0, x: 2,
+      s: 3, memStep: 3, memKind: 'exp', integrand: 1, tour: 0, hoverX: null, hoverPx: null,
+    };
+    const sim = { lambda: null, gaps: [], firsts: [], last: null, runs: 0 };
+    let mapPts = [];
+    let memAnim = 3;
+    let dirty = true;
+    const sliders = {};
+
+    const effH = () => H_STEPS.slice(state.hIdx).find((h) => state.lambda * h < 1);
+    function waitModel() {
+      const l = state.lambda;
+      if (state.memKind === 'exp') {
+        return { kind: 'exp', name: `Exp(${fmtP(l)})`, s: state.s, pdf: (x) => expo.pdf(x, l), surv: (x) => expo.surv(x, l), breaks: [], mean: 1 / l };
+      }
+      const w = 2 / l;
+      return {
+        kind: 'unif', name: `U(0, ${num(w)})`, w, s: Math.min(state.s, 0.9 * w), mean: w / 2, breaks: [0, w],
+        pdf: (x) => unif.pdf(x, 0, w), surv: (x) => 1 - unif.cdf(x, 0, w),
+      };
+    }
+    function resetSim() {
+      Object.assign(sim, { lambda: state.lambda, gaps: [], firsts: [], last: null, runs: 0 });
+    }
+    function simulate(n) {
+      if (sim.lambda !== state.lambda) resetSim();
+      for (let i = 0; i < n; i += 1) {
+        const run = timeline(state.lambda, X_MAX, Math.random);
+        sim.gaps.push(...run.gaps);
+        sim.firsts.push(run.gaps[0]);
+        sim.last = run;
+        sim.runs += 1;
+      }
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mean: '#a0e7a0', ink: '#ebf2ff', muted: '#8aa1c0',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)',
+    };
+    const FONT = '12px Inter, ui-sans-serif, system-ui, sans-serif';
+    const MONO = '12px ui-monospace, Menlo, monospace';
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const strip = state.view === 'poisson' ? 58 : 0;
+      const gap = state.view === 'map' ? Math.max(84, H * 0.2) : 46;
+      const topY = 22 + strip;
+      const avail = Math.max(150, H - topY - gap - 22);
+      const topH = avail * (state.view === 'map' ? 0.5 : 0.56);
+      return { W, H, x: 56, w: Math.max(80, W - 56 - 18), strip, top: { y: topY, h: topH }, bot: { y: topY + topH + gap, h: avail - topH } };
+    }
+    const chartOf = (g, part, x0, x1, y1) => ({ x: g.x, w: g.w, y: g[part].y, h: g[part].h, x0, x1, y1 });
+    const X = (ch, v) => ch.x + ((v - ch.x0) / (ch.x1 - ch.x0)) * ch.w;
+    const Y = (ch, v) => ch.y + ch.h - (v / ch.y1) * ch.h;
+    const xOf = (ch, px) => ch.x0 + ((px - ch.x) / ch.w) * (ch.x1 - ch.x0);
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || FONT;
+      ctx.textAlign = o.align || 'left';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    // Text on a dark pill, kept inside the canvas.
+    function tag(str, px, py, o = {}) {
+      ctx.save();
+      ctx.font = o.font || MONO;
+      const w = ctx.measureText(str).width + 10;
+      let x = o.align === 'right' ? px - w : o.align === 'center' ? px - w / 2 : px;
+      x = clamp(x, 2, canvas.clientWidth - w - 2);
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.86)';
+      ctx.beginPath();
+      ctx.roundRect(x, py - 13, w, 18, 5);
+      ctx.fill();
+      ctx.fillStyle = o.color || C.ink;
+      ctx.fillText(str, x + 5, py);
+      ctx.restore();
+    }
+    function line(x0, y0, x1, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function dot(px, py, r, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#07111f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function axes(ch, title) {
+      const xs = niceStep(ch.x1 - ch.x0, Math.max(4, Math.floor(ch.w / 70)));
+      for (let v = Math.ceil(ch.x0 / xs - 1e-9) * xs; v <= ch.x1 + 1e-9; v += xs) {
+        const px = X(ch, v);
+        line(px, ch.y, px, ch.y + ch.h, C.grid);
+        text(fmtTick(v, xs), px, ch.y + ch.h + 15, { align: 'center' });
+      }
+      const ys = niceStep(ch.y1, 4);
+      for (let v = 0; v <= ch.y1 + 1e-9; v += ys) {
+        const py = Y(ch, v);
+        line(ch.x, py, ch.x + ch.w, py, C.grid);
+        text(fmtTick(v, ys), ch.x - 8, py + 4, { align: 'right' });
+      }
+      line(ch.x, ch.y + ch.h, ch.x + ch.w, ch.y + ch.h, C.axis);
+      text(title, ch.x, ch.y - 8, { color: C.ink, font: `600 ${FONT}` });
+    }
+
+    // Plot fn over [from, to]. Breaks are x values where fn jumps.
+    function curve(ch, fn, o = {}) {
+      const lo = Math.max(ch.x0, o.from ?? ch.x0);
+      const hi = Math.min(ch.x1, o.to ?? ch.x1);
+      if (hi <= lo) return;
+      const n = Math.max(2, Math.ceil((X(ch, hi) - X(ch, lo)) / 1.5));
+      const xs = [];
+      for (let i = 0; i <= n; i += 1) xs.push(lo + ((hi - lo) * i) / n);
+      const eps = 1e-7 * (ch.x1 - ch.x0);
+      (o.breaks || []).forEach((b) => { if (b > lo && b < hi) xs.push(b - eps, b + eps); });
+      xs.sort((p, q) => p - q);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(ch.x, ch.y - 2, ch.w, ch.h + 3);
+      ctx.clip();
+      ctx.beginPath();
+      xs.forEach((v, i) => {
+        const py = Y(ch, Math.min(fn(v), ch.y1 * 1.5));
+        if (i) ctx.lineTo(X(ch, v), py);
+        else ctx.moveTo(X(ch, v), py);
+      });
+      if (o.fill) {
+        ctx.lineTo(X(ch, hi), Y(ch, 0));
+        ctx.lineTo(X(ch, lo), Y(ch, 0));
+        ctx.closePath();
+        ctx.globalAlpha = o.alpha ?? 0.26;
+        ctx.fillStyle = o.fill;
+        ctx.fill();
+      } else {
+        ctx.strokeStyle = o.color;
+        ctx.lineWidth = o.width ?? 2;
+        ctx.globalAlpha = o.alpha ?? 1;
+        if (o.dash) ctx.setLineDash(o.dash);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function markMean(ch, mu, sd, label = 'μ') {
+      [mu - sd, mu + sd].forEach((v) => {
+        if (v > ch.x0 && v < ch.x1) line(X(ch, v), ch.y, X(ch, v), ch.y + ch.h, C.muted, 1, [5, 4]);
+      });
+      if (mu > ch.x0 && mu < ch.x1) {
+        line(X(ch, mu), ch.y, X(ch, mu), ch.y + ch.h, C.mean, 2);
+        tag(`${label} = ${num(mu)}`, X(ch, mu) + 4, ch.y + 12);
+      }
+    }
+    function query(ch, v, label) {
+      if (v < ch.x0 || v > ch.x1) return;
+      line(X(ch, v), ch.y, X(ch, v), ch.y + ch.h, C.ink, 1.5, [2, 3]);
+      if (label) tag(label, X(ch, v) + 4, ch.y + ch.h - 8);
+    }
+    const maxOf = (fn, lo, hi) => {
+      let m = 0;
+      for (let i = 0; i <= 400; i += 1) m = Math.max(m, fn(lo + ((hi - lo) * i) / 400));
+      return m;
+    };
+
+    // ----- one draw function per picture -----
+    function uniformRange() {
+      return [Math.min(-1, state.a - 1), Math.max(2, state.b + 1), Math.max(1.25, 1.2 / (state.b - state.a))];
+    }
+    function drawUniform(g) {
+      const { a, b, y } = state;
+      const [x0, x1, y1] = uniformRange();
+      const top = chartOf(g, 'top', x0, x1, y1);
+      const bot = chartOf(g, 'bot', x0, x1, 1.08);
+      const pdf = (v) => unif.pdf(v, a, b);
+      const cdf = (v) => unif.cdf(v, a, b);
+      axes(top, `pdf f(y) of U(${fmtP(a)}, ${fmtP(b)})`);
+      axes(bot, 'cdf F(y) = P(Y ≤ y)');
+      if (a !== 0 || b !== 1) {
+        curve(top, (v) => unif.pdf(v, 0, 1), { color: C.muted, width: 1.5, dash: [4, 4], breaks: [0, 1] });
+        tag('U(0, 1)', X(top, 1) + 4, Y(top, 1) + 4, { color: C.muted });
+      }
+      const yc = clamp(y, a, b);
+      if (yc > a) curve(top, pdf, { from: a, to: yc, fill: C.left, alpha: 0.3 });
+      curve(top, pdf, { color: C.left, breaks: [a, b] });
+      markMean(top, unif.mean(a, b), Math.sqrt(unif.variance(a, b)));
+      query(top, y, `area to y = ${num(cdf(y))}`);
+      tag(`height 1/(b − a) = ${num(1 / (b - a))}`, X(top, (a + b) / 2), Y(top, 1 / (b - a)) - 8, { align: 'center' });
+      curve(bot, cdf, { color: C.left });
+      query(bot, y);
+      if (y >= x0 && y <= x1) {
+        line(X(bot, x0), Y(bot, cdf(y)), X(bot, y), Y(bot, cdf(y)), C.ink, 1, [2, 3]);
+        dot(X(bot, y), Y(bot, cdf(y)), 5, C.left);
+        tag(`F(${fmtP(y)}) = ${num(cdf(y))}`, X(bot, y) + 8, Y(bot, cdf(y)) - 8);
+      }
+    }
+
+    function drawMap(g) {
+      const { a, b, y } = state;
+      const [x0, x1, y1] = uniformRange();
+      const top = chartOf(g, 'top', x0, x1, y1);
+      const bot = chartOf(g, 'bot', x0, x1, y1);
+      const u = (y - a) / (b - a);
+      axes(top, 'X ~ U(0, 1)');
+      axes(bot, `Y = a + (b − a)X = ${fmtP(a)} + ${fmtP(b - a)}X ~ U(${fmtP(a)}, ${fmtP(b)})`);
+      const uc = clamp(u, 0, 1);
+      if (uc > 0) curve(top, (v) => unif.pdf(v, 0, 1), { from: 0, to: uc, fill: C.left, alpha: 0.3 });
+      curve(top, (v) => unif.pdf(v, 0, 1), { color: C.left, breaks: [0, 1] });
+      const yc = clamp(y, a, b);
+      if (yc > a) curve(bot, (v) => unif.pdf(v, a, b), { from: a, to: yc, fill: C.left, alpha: 0.3 });
+      curve(bot, (v) => unif.pdf(v, a, b), { color: C.left, breaks: [a, b] });
+      tag(`shaded area = ${num(uc)}`, X(top, 1) + 8, Y(top, 1) + 16);
+      tag(`shaded area = ${num(uc)}`, X(bot, yc > a ? (a + yc) / 2 : (a + b) / 2), Y(bot, 1 / (b - a)) - 8, { align: 'center' });
+      const yTop = top.y + top.h + 22;
+      const yBot = bot.y - 22;
+      mapPts.forEach((p) => {
+        line(X(top, p), yTop, X(bot, a + (b - a) * p), yBot, 'rgba(221, 116, 37, 0.45)', 1);
+        dot(X(top, p), yTop, 3.5, C.right);
+        dot(X(bot, a + (b - a) * p), yBot, 3.5, C.right);
+      });
+      line(X(top, u), yTop, X(bot, y), yBot, C.ink, 1.5, [3, 3]);
+      query(top, u);
+      query(bot, y);
+      tag(`u = (y − a)/(b − a) = ${num(u)}  ↦  y = ${fmtP(y)}`, X(bot, y) + 6, bot.y + 16);
+    }
+
+    function drawExp(g) {
+      const { lambda: l, c, d } = state;
+      const top = chartOf(g, 'top', 0, X_MAX, l * 1.18);
+      const bot = chartOf(g, 'bot', 0, X_MAX, 1.08);
+      const pdf = (v) => expo.pdf(v, l);
+      const cdf = (v) => expo.cdf(v, l);
+      axes(top, `pdf f(x) = λe^(−λx) of Exp(${fmtP(l)})`);
+      axes(bot, 'cdf F(x) = 1 − e^(−λx)');
+      if (d > c) curve(top, pdf, { from: c, to: d, fill: C.left, alpha: 0.3 });
+      curve(top, pdf, { color: C.left });
+      markMean(top, expo.mean(l), Math.sqrt(expo.variance(l)));
+      tag(`f(0) = λ = ${fmtP(l)}`, X(top, 0) + 8, Y(top, l) + 14);
+      if (d > c) tag(`area = ${num(cdf(d) - cdf(c))}`, X(top, (c + d) / 2), Y(top, pdf((c + d) / 2) / 2) + 4, { align: 'center' });
+      curve(bot, cdf, { color: C.left });
+      [c, d].forEach((v) => {
+        line(X(bot, 0), Y(bot, cdf(v)), X(bot, v), Y(bot, cdf(v)), C.ink, 1, [2, 3]);
+        dot(X(bot, v), Y(bot, cdf(v)), 4.5, C.left);
+      });
+      const px = Math.min(X(bot, d) + 12, bot.x + bot.w - 4);
+      line(px, Y(bot, cdf(c)), px, Y(bot, cdf(d)), C.ink, 2);
+      tag(`F(d) − F(c) = ${num(cdf(d) - cdf(c))}`, px + 6, (Y(bot, cdf(c)) + Y(bot, cdf(d))) / 2 + 4);
+    }
+
+    function drawSlots(g) {
+      const { lambda: l, x } = state;
+      const h = effH();
+      const top = chartOf(g, 'top', 0, X_MAX, l * 1.18);
+      const bot = chartOf(g, 'bot', 0, X_MAX, 1.08);
+      const breaks = [];
+      for (let k = 1; k * h < X_MAX; k += 1) breaks.push(k * h);
+      axes(top, `density: slots of width h = ${h} against λe^(−λx)`);
+      axes(bot, 'P(wait > x): (1 − λh)^(x/h) against e^(−λx)');
+      curve(top, (v) => slotDensity(v, l, h), { fill: C.right, alpha: 0.2, breaks });
+      curve(top, (v) => slotDensity(v, l, h), { color: C.right, width: 1.5, breaks });
+      curve(top, (v) => expo.pdf(v, l), { color: C.left });
+      tag(`p = λh = ${num(l * h)}`, X(top, X_MAX) - 4, top.y + 12, { align: 'right' });
+      curve(bot, (v) => slotSurvival(v, l, h), { color: C.right, width: 2, breaks });
+      curve(bot, (v) => expo.surv(v, l), { color: C.left, dash: [6, 4] });
+      query(bot, x);
+      dot(X(bot, x), Y(bot, slotSurvival(x, l, h)), 4.5, C.right);
+      dot(X(bot, x), Y(bot, expo.surv(x, l)), 4.5, C.left);
+      tag(`${num(slotSurvival(x, l, h))} versus ${num(expo.surv(x, l))}`, X(bot, x) + 8, Y(bot, expo.surv(x, l)) - 10);
+    }
+
+    function drawMemory(g) {
+      const W = waitModel();
+      const { s } = W;
+      const l = state.lambda;
+      const k = 1 / W.surv(s);
+      const cut = clamp(memAnim, 0, 1);
+      const grow = clamp(memAnim - 1, 0, 1);
+      const shift = clamp(memAnim - 2, 0, 1) * s;
+      const scale = 1 + grow * (k - 1);
+      const peak = W.kind === 'exp' ? l : (1 / W.w) * k;
+      const top = chartOf(g, 'top', 0, X_MAX, peak * 1.2);
+      const bot = chartOf(g, 'bot', 0, X_MAX, 1.08);
+      axes(top, `${W.name}: the wait ahead after waiting s = ${fmtP(s)}`);
+      axes(bot, 'P(X > x) against P(X > s + x | X > s)');
+      curve(top, W.pdf, { color: C.left, alpha: 1 - 0.6 * cut, breaks: W.breaks });
+      if (cut > 0) {
+        const tail = (v) => W.pdf(v + shift) * scale;
+        const from = Math.max(0, s - shift);
+        const tb = W.breaks.map((b) => b - shift);
+        curve(top, tail, { from, fill: C.right, alpha: 0.22 * cut, breaks: tb });
+        curve(top, tail, { from, color: C.right, alpha: cut, breaks: tb });
+        curve(top, W.pdf, { color: C.left, width: 1.5, dash: [6, 5], breaks: W.breaks });
+      }
+      line(X(top, s), top.y, X(top, s), top.y + top.h, C.ink, 1, [2, 3]);
+      tag(`s = ${fmtP(s)}`, X(top, s) + 4, top.y + top.h - 8);
+      const words = ['0 · the whole wait', '1 · cut off the past', `2 · rescale by 1/P(X > s) = ${num(k)}`, `3 · shift left by s = ${fmtP(s)}`];
+      tag(words[Math.round(memAnim)], X(top, X_MAX) - 4, top.y + 12, { align: 'right' });
+      const cond = (v) => W.surv(s + v) / W.surv(s);
+      curve(bot, W.surv, { color: C.left });
+      curve(bot, cond, { color: C.right, dash: [6, 5] });
+      query(bot, state.x);
+      dot(X(bot, state.x), Y(bot, W.surv(state.x)), 4.5, C.left);
+      dot(X(bot, state.x), Y(bot, cond(state.x)), 4.5, C.right);
+      const eq = Math.abs(cond(state.x) - W.surv(state.x)) < 1e-9;
+      tag(eq ? `both = ${num(W.surv(state.x))}` : `${num(cond(state.x))} versus ${num(W.surv(state.x))}`,
+        X(bot, state.x) + 8, Y(bot, Math.max(cond(state.x), W.surv(state.x))) - 10);
+    }
+
+    function drawPoisson(g) {
+      const { lambda: l, x } = state;
+      const width = clamp(0.25 / l, 0.05, 0.5);
+      const hist = sim.gaps.length ? histogram(sim.gaps, X_MAX, width) : [];
+      const top = chartOf(g, 'top', 0, X_MAX, Math.max(l, ...hist.map((r) => r.density)) * 1.15);
+      const bot = chartOf(g, 'bot', 0, X_MAX, 1.08);
+      const yS = 22 + 22;
+      text('One timeline: events at rate λ', g.x, 14, { color: C.ink, font: `600 ${FONT}` });
+      ctx.save();
+      ctx.fillStyle = 'rgba(61, 149, 236, 0.18)';
+      ctx.fillRect(X(top, 0), yS - 12, X(top, x) - X(top, 0), 24);
+      ctx.restore();
+      line(X(top, 0), yS, X(top, X_MAX), yS, C.axis);
+      for (let t = 0; t <= X_MAX; t += 1) line(X(top, t), yS - 4, X(top, t), yS + 4, C.axis);
+      if (sim.last) {
+        sim.last.times.forEach((t) => dot(X(top, t), yS, 4, C.right));
+        const first = sim.last.gaps[0];
+        tag(first > x ? `no event in [0, ${fmtP(x)}]` : `first event at ${num(first)}`, X(top, X_MAX) - 4, yS + 22, { align: 'right' });
+      } else {
+        tag('Press "Play one timeline"', X(top, X_MAX) - 4, yS + 22, { align: 'right', color: C.muted });
+      }
+      axes(top, sim.gaps.length ? `${sim.gaps.length} simulated gaps against λe^(−λx)` : 'gap density λe^(−λx)');
+      hist.forEach((r) => {
+        if (r.lo >= X_MAX || !r.count) return;
+        const x0 = X(top, r.lo) + 1;
+        const w = Math.max(1, X(top, Math.min(r.hi, X_MAX)) - X(top, r.lo) - 2);
+        ctx.save();
+        ctx.fillStyle = C.right;
+        ctx.globalAlpha = 0.45;
+        ctx.beginPath();
+        ctx.roundRect(x0, Y(top, r.density), w, Y(top, 0) - Y(top, r.density), [Math.min(3, w / 2), Math.min(3, w / 2), 0, 0]);
+        ctx.fill();
+        ctx.restore();
+      });
+      curve(top, (v) => expo.pdf(v, l), { color: C.left });
+      axes(bot, 'P(first wait > x) = P(N_x = 0) = e^(−λx)');
+      curve(bot, (v) => expo.surv(v, l), { color: C.left });
+      if (sim.firsts.length) {
+        const sorted = sim.firsts.slice().sort((p, q) => p - q);
+        const n = sorted.length;
+        ctx.save();
+        ctx.strokeStyle = C.right;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(X(bot, 0), Y(bot, 1));
+        let k = 0;
+        for (let px = bot.x; px <= bot.x + bot.w; px += 2) {
+          const v = xOf(bot, px);
+          while (k < n && sorted[k] <= v) k += 1;
+          ctx.lineTo(px, Y(bot, (n - k) / n));
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      query(bot, x);
+      dot(X(bot, x), Y(bot, expo.surv(x, l)), 4.5, C.left);
+      tag(`e^(−λx) = ${num(expo.surv(x, l))}`, X(bot, x) + 8, Y(bot, expo.surv(x, l)) - 10);
+    }
+
+    function drawMoments(g) {
+      const l = state.lambda;
+      const pdf = (v) => expo.pdf(v, l);
+      const integrand = state.integrand === 1 ? (v) => v * pdf(v) : (v) => v * v * pdf(v);
+      const top = chartOf(g, 'top', 0, X_MAX, l * 1.18);
+      const bot = chartOf(g, 'bot', 0, X_MAX, maxOf(integrand, 0, X_MAX) * 1.25);
+      const m = expo.median(l);
+      axes(top, `pdf of Exp(${fmtP(l)}): mean, median and μ ± σ`);
+      axes(bot, state.integrand === 1 ? 'x · f(x): its area is E(X)' : 'x² · f(x): its area is E(X²)');
+      curve(top, pdf, { to: m, fill: C.left, alpha: 0.3 });
+      curve(top, pdf, { color: C.left });
+      markMean(top, expo.mean(l), Math.sqrt(expo.variance(l)));
+      if (m < X_MAX) {
+        line(X(top, m), top.y + 22, X(top, m), top.y + top.h, C.ink, 1.5, [2, 3]);
+        tag(`median = ${num(m)}`, X(top, m) - 4, top.y + 34, { align: 'right' });
+        tag('area ½', X(top, m / 2), Y(top, pdf(m) / 2) + 4, { align: 'center' });
+      }
+      curve(bot, integrand, { fill: C.right, alpha: 0.25 });
+      curve(bot, integrand, { color: C.right });
+      const area = state.integrand === 1 ? 1 / l : 2 / l ** 2;
+      const shown = simpson(integrand, 0, X_MAX, 2000);
+      tag(`area = ${num(area)}${shown < 0.99 * area ? `, of which ${num(shown)} lies left of ${X_MAX}` : ''}`,
+        X(bot, X_MAX) - 4, bot.y + 12, { align: 'right' });
+    }
+
+    function hoverLines(v) {
+      const l = state.lambda;
+      switch (state.view) {
+        case 'uniform': case 'map': {
+          const { a, b } = state;
+          const out = [`y = ${num(v)}`, `f(y) = ${num(unif.pdf(v, a, b))}`, `F(y) = ${num(unif.cdf(v, a, b))}`];
+          if (state.view === 'map') out.unshift(`x = (y − a)/(b − a) = ${num((v - a) / (b - a))}`);
+          return out;
+        }
+        case 'slots': {
+          const h = effH();
+          return [`x = ${num(v)}`, `λe^(−λx) = ${num(expo.pdf(v, l))}`, `slot density = ${num(slotDensity(v, l, h))}`,
+            `e^(−λx) = ${num(expo.surv(v, l))}`, `(1 − λh)^⌊x/h⌋ = ${num(slotSurvival(v, l, h))}`];
+        }
+        case 'memory': {
+          const W = waitModel();
+          return [`x = ${num(v)}`, `f(x) = ${num(W.pdf(v))}`, `f(s + x)/P(X > s) = ${num(W.pdf(W.s + v) / W.surv(W.s))}`,
+            `P(X > x) = ${num(W.surv(v))}`, `P(X > s + x | X > s) = ${num(W.surv(W.s + v) / W.surv(W.s))}`];
+        }
+        case 'poisson': {
+          const out = [`x = ${num(v)}`, `λe^(−λx) = ${num(expo.pdf(v, l))}`, `e^(−λx) = ${num(expo.surv(v, l))}`];
+          if (sim.firsts.length) out.push(`simulated P(first > x) = ${num(shareAbove(sim.firsts, v))}`);
+          return out;
+        }
+        case 'moments':
+          return [`x = ${num(v)}`, `f(x) = ${num(expo.pdf(v, l))}`, `x · f(x) = ${num(v * expo.pdf(v, l))}`, `x² · f(x) = ${num(v * v * expo.pdf(v, l))}`];
+        default:
+          return [`x = ${num(v)}`, `f(x) = ${num(expo.pdf(v, l))}`, `F(x) = ${num(expo.cdf(v, l))}`, `P(X > x) = ${num(expo.surv(v, l))}`];
+      }
+    }
+    function drawHover(g) {
+      if (state.hoverPx == null) return;
+      const px = state.hoverPx;
+      line(px, g.top.y, px, g.top.y + g.top.h, 'rgba(235, 242, 255, 0.35)');
+      line(px, g.bot.y, px, g.bot.y + g.bot.h, 'rgba(235, 242, 255, 0.35)');
+      const lines = hoverLines(state.hoverX);
+      ctx.font = MONO;
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let x = px + 12;
+      if (x + w > g.x + g.w) x = px - 12 - w;
+      x = Math.max(4, x);
+      const y = g.top.y + 24;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 10, y + 20 + i * 17, { color: i ? C.ink : C.muted, font: MONO }));
+    }
+
+    const DRAW = { uniform: drawUniform, map: drawMap, exp: drawExp, slots: drawSlots, memory: drawMemory, poisson: drawPoisson, moments: drawMoments };
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (W < 50 || H < 50) return;
+      const g = geom();
+      DRAW[state.view](g);
+      drawHover(g);
+    }
+    function frame() {
+      if (state.view === 'memory' && memAnim !== state.memStep) {
+        const step = state.memStep - memAnim;
+        memAnim = Math.abs(step) < 0.01 ? state.memStep : memAnim + Math.sign(step) * Math.min(Math.abs(step), 0.035);
+        dirty = true;
+      }
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener('pointermove', (e) => {
+      const r = canvas.getBoundingClientRect();
+      const px = e.clientX - r.left;
+      const g = geom();
+      const inside = px >= g.x && px <= g.x + g.w && e.clientY - r.top >= g.top.y;
+      state.hoverPx = inside ? px : null;
+      if (inside) {
+        const [x0, x1] = state.view === 'uniform' || state.view === 'map' ? uniformRange() : [0, X_MAX];
+        const v = x0 + ((px - g.x) / g.w) * (x1 - x0);
+        state.hoverX = state.view === 'map' && e.clientY - r.top < g.bot.y - 10 ? state.a + (state.b - state.a) * v : v;
+      }
+      dirty = true;
+    });
+    canvas.addEventListener('pointerleave', () => {
+      state.hoverPx = null;
+      dirty = true;
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(key, onInput) {
+      const spec = SLIDERS[key];
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = spec.format ? spec.format(v) : minus(v.toFixed(decimals)); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value: state[key] });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(state[key]);
+      row.append(label, input);
+      sliders[key] = { input, show };
+      return row;
+    }
+    // Move another slider without rebuilding the one under the pointer.
+    function setVal(key, v) {
+      state[key] = v;
+      if (sliders[key]) {
+        sliders[key].input.value = v;
+        sliders[key].show(v);
+      }
+    }
+    function buttons(items) {
+      const row = document.createElement('div');
+      row.className = 'btn-row';
+      items.forEach(([label, onClick, active]) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        if (active) b.classList.add('active');
+        b.addEventListener('click', onClick);
+        row.append(b);
+      });
+      return row;
+    }
+
+    const ON_INPUT = {
+      a: (v) => { state.a = v; if (state.b - state.a < 0.5) setVal('b', state.a + 0.5); },
+      b: (v) => { state.b = v; if (state.b - state.a < 0.5) setVal('a', state.b - 0.5); },
+      c: (v) => { state.c = v; if (state.d < v) setVal('d', v); },
+      d: (v) => { state.d = v; if (state.c > v) setVal('c', v); },
+      lambda: (v) => { state.lambda = v; resetSim(); },
+    };
+    function renderControls() {
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === state.view));
+      $('controlTitle').textContent = VIEW[state.view].title;
+      $('chip').textContent = VIEW[state.view].chip;
+      const host = $('controlHost');
+      host.innerHTML = '';
+      Object.keys(sliders).forEach((k) => delete sliders[k]);
+      CONTROLS[state.view].forEach((key) => {
+        if (SLIDERS[key]) {
+          host.append(makeSlider(key, (v) => {
+            (ON_INPUT[key] || ((w) => { state[key] = w; }))(v);
+            update();
+          }));
+        } else if (key === 'mapButtons') {
+          host.append(buttons([
+            ['Sample 20 points', () => { for (let i = 0; i < 20; i += 1) mapPts.push(Math.random()); update(); }],
+            ['Clear points', () => { mapPts = []; update(); }],
+          ]));
+        } else if (key === 'memSteps') {
+          host.append(buttons(['Whole', 'Cut', 'Rescale', 'Shift'].map((w, i) => [`${i} ${w}`, () => { state.memStep = i; renderControls(); update(); }, state.memStep === i])));
+        } else if (key === 'memKind') {
+          host.append(buttons([
+            ['Exponential wait', () => { state.memKind = 'exp'; renderControls(); update(); }, state.memKind === 'exp'],
+            ['Uniform wait U(0, 2/λ)', () => { state.memKind = 'unif'; renderControls(); update(); }, state.memKind === 'unif'],
+          ]));
+        } else if (key === 'simButtons') {
+          host.append(buttons([
+            ['Play one timeline', () => { simulate(1); update(); }],
+            ['Sample ×1000', () => { simulate(1000); update(); }],
+            ['Reset', () => { resetSim(); update(); }],
+          ]));
+        } else if (key === 'integrand') {
+          host.append(buttons([
+            ['x · f(x) → E(X)', () => { state.integrand = 1; renderControls(); update(); }, state.integrand === 1],
+            ['x² · f(x) → E(X²)', () => { state.integrand = 2; renderControls(); update(); }, state.integrand === 2],
+          ]));
+        }
+      });
+    }
+
+    function apply(s) {
+      state.view = s.view;
+      const oldLambda = state.lambda;
+      Object.assign(state, s.set);
+      if (state.lambda !== oldLambda) resetSim();
+      if (s.sample && !mapPts.length) for (let i = 0; i < 20; i += 1) mapPts.push(Math.random());
+      if (s.sim && sim.runs < s.sim) simulate(s.sim - sim.runs);
+      if (s.replay) memAnim = 0;
+      else memAnim = state.memStep;
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      const t = TOUR[state.tour];
+      apply(t);
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(v) {
+      state.view = v;
+      memAnim = state.memStep;
+      renderControls();
+      update();
+    }
+
+    // ===================== READOUTS =====================
+    function readouts() {
+      const { a, b, y, lambda: l, c, d, x } = state;
+      const w = b - a;
+      const ok = (cond, what) => `<span class="${cond ? 'ok' : 'bad'}">${cond ? '✓' : '✗'} ${what}</span>`;
+      switch (state.view) {
+        case 'uniform': {
+          const F = unif.cdf(y, a, b);
+          const area = y > a ? simpson((v) => unif.pdf(v, a, b), a, Math.min(y, b)) : 0;
+          return {
+            r: [`U(${fmtP(a)}, ${fmtP(b)}) · height 1/(b − a) = ${num(1 / w)} · μ = (a + b)/2 = ${num(unif.mean(a, b))} · σ² = (b − a)²/12 = ${num(unif.variance(a, b))}`,
+              y <= a || y >= b
+                ? `P(Y ≤ ${fmtP(y)}) = <strong>${num(F)}</strong> because y ${y <= a ? '≤ a' : '≥ b'}`
+                : `P(Y ≤ ${fmtP(y)}) = (y − a)/(b − a) = ${num(y - a)}/${num(w)} = <strong>${num(F)}</strong>`,
+              `Area under f from a to y by Simpson = ${num(area)} ${ok(same(area, F), 'same as the formula')}`],
+            cap: `<strong>Area is probability.</strong> The rectangle has width ${num(w)} and height ${num(1 / w)}. So its area is 1.
+              The shaded part up to y has area ${num(F)}. The cdf below rises at a constant slope of ${num(1 / w)}. That slope is the height of the density.`,
+          };
+        }
+        case 'map': {
+          const u = (y - a) / w;
+          const F = clamp(u, 0, 1);
+          const k = mapPts.filter((p) => a + w * p <= y).length;
+          return {
+            r: [`X ~ U(0, 1) · Y = a + (b − a)X = ${fmtP(a)} + ${fmtP(w)}X ~ U(${fmtP(a)}, ${fmtP(b)})`,
+              `P(Y ≤ ${fmtP(y)}) = P(X ≤ (y − a)/(b − a)) = P(X ≤ ${num(u)}) = <strong>${num(F)}</strong>`,
+              mapPts.length ? `${k} of ${mapPts.length} sampled points have Y ≤ ${fmtP(y)}, a share of ${num(k / mapPts.length)}.` : 'Press "Sample 20 points" to throw darts at U(0, 1).'],
+            cap: `<strong>One event, two rulers.</strong> X ≤ ${num(u)} happens exactly when Y ≤ ${fmtP(y)}. So the two shaded areas are equal.
+              The map stretches lengths by b − a = ${num(w)}. So it divides the height by ${num(w)}.`,
+          };
+        }
+        case 'exp': {
+          const P = Math.exp(-l * c) - Math.exp(-l * d);
+          const area = simpson((v) => expo.pdf(v, l), c, d);
+          return {
+            r: [`Exp(${fmtP(l)}) · f(0) = λ = ${fmtP(l)} · μ = 1/λ = ${num(1 / l)} · σ² = 1/λ² = ${num(1 / l ** 2)}`,
+              `P(${fmtP(c)} < X ≤ ${fmtP(d)}) = e^(−λc) − e^(−λd) = ${num(Math.exp(-l * c))} − ${num(Math.exp(-l * d))} = <strong>${num(P)}</strong>`,
+              `Simpson area under f = ${num(area)} ${ok(same(area, P), 'same as the formula')}`],
+            cap: `<strong>Short waits are the most likely.</strong> The density is highest at 0 and falls by the factor e^(−λ) = ${num(Math.exp(-l))} per unit of time.
+              The cdf climbs from F(c) = ${num(expo.cdf(c, l))} to F(d) = ${num(expo.cdf(d, l))}. The climb equals the shaded area.`,
+          };
+        }
+        case 'slots': {
+          const h = effH();
+          const p = l * h;
+          const S = slotSurvival(x, l, h);
+          const E = expo.surv(x, l);
+          const capped = h !== H_STEPS[state.hIdx] ? ` The chosen h = ${H_STEPS[state.hIdx]} makes λh ≥ 1. So the page uses h = ${h}.` : '';
+          return {
+            r: [`h = ${h} · p = λh = ${num(p)} · slot count K ~ Geometric(${num(p)}) · wait = Kh`,
+              `P(wait > ${fmtP(x)}) = (1 − p)^⌊x/h⌋ = ${num(1 - p)}^${Math.floor(x / h + 1e-9)} = <strong>${num(S)}</strong> · e^(−λx) = <strong>${num(E)}</strong>`,
+              `gap = ${num(E - S)} · mean wait h/p = 1/λ = ${num(1 / l)} at every h`],
+            cap: `<strong>Constant risk, one slot at a time.</strong> Each slot of width ${h} holds the event with chance ${num(p)}.
+              So each orange step is ${num(1 - p)} times the step before. Drag h down. The steps shrink and the staircase melts into λe^(−λx).${capped}`,
+          };
+        }
+        case 'memory': {
+          const W = waitModel();
+          const ratio = W.surv(W.s + x) / W.surv(W.s);
+          const S = W.surv(x);
+          const resMean = simpson((v) => v * W.pdf(W.s + v), 0, Math.max(1e-9, (W.w ?? 60 / l) - W.s), 4000) / W.surv(W.s);
+          const eq = same(ratio, S, 1e-9);
+          const capped = W.kind === 'unif' && W.s < state.s ? ` No wait lasts beyond ${num(W.w)}. So the page uses s = ${num(W.s)}.` : '';
+          return {
+            r: [`${W.name} · mean wait ${num(W.mean)} · already waited s = ${fmtP(W.s)}`,
+              `P(X > s + x | X > s) = <strong>${num(ratio)}</strong> · P(X > x) = <strong>${num(S)}</strong> · ${eq ? 'equal: no memory' : 'not equal: this wait remembers'}`,
+              `Mean wait still to come: ${num(resMean)}. At the start it was ${num(W.mean)}.`],
+            cap: W.kind === 'exp'
+              ? `<strong>The wait forgets.</strong> Use the step buttons. The cut tail has area P(X > s) = ${num(W.surv(W.s))}. Rescale it by ${num(1 / W.surv(W.s))}. Then shift it left by s. It lands on the original curve.`
+              : `<strong>This wait remembers.</strong> After s = ${fmtP(W.s)} at most ${num(W.w - W.s)} remains. The rescaled tail is U(0, ${num(W.w - W.s)}). It does not match U(0, ${num(W.w)}).${capped}`,
+          };
+        }
+        case 'poisson': {
+          const E = expo.surv(x, l);
+          const sims = sim.runs
+            ? `${sim.runs} timelines: ${sim.firsts.filter((f) => f > x).length} had no event in [0, ${fmtP(x)}], a share of ${num(shareAbove(sim.firsts, x))}. Mean of ${sim.gaps.length} gaps = ${num(sim.gaps.reduce((s, v) => s + v, 0) / sim.gaps.length)}. 1/λ = ${num(1 / l)}.`
+            : 'Press "Sample ×1000" to play 1000 timelines.';
+          return {
+            r: [`rate λ = ${fmtP(l)} per unit time · N_x ~ Poi(λx) = Poi(${num(l * x)})`,
+              `P(first wait > ${fmtP(x)}) = P(N_x = 0) = e^(−λx) = e^(−${num(l * x)}) = <strong>${num(E)}</strong>`, sims],
+            cap: `<strong>Counts and gaps are two views of one process.</strong> Orange dots are events. The shaded window is [0, x].
+              No dot in the window means the first wait is longer than x. Changing λ clears the samples.`,
+          };
+        }
+        default: {
+          const m = expo.median(l);
+          const val = state.integrand === 1 ? 1 / l : 2 / l ** 2;
+          const nm = numMoments((v) => expo.pdf(v, l), 0, 60 / l);
+          const numeric = state.integrand === 1 ? nm.mean : nm.e2;
+          return {
+            r: [`Exp(${fmtP(l)}) · μ = 1/λ = ${num(1 / l)} · median = ln 2/λ = ${num(m)} · σ = 1/λ = ${num(1 / l)}`,
+              state.integrand === 1 ? `E(X) = ∫ x λe^(−λx) dx = 1/λ = <strong>${num(val)}</strong>` : `E(X²) = ∫ x² λe^(−λx) dx = 2/λ² = <strong>${num(val)}</strong> · σ² = 2/λ² − 1/λ² = <strong>${num(1 / l ** 2)}</strong>`,
+              `Simpson on [0, ${num(60 / l)}] gives ${num(numeric)} ${ok(same(numeric, val), 'same as by parts')}`],
+            cap: `<strong>The tail drags the mean.</strong> Half of the area lies left of the median ${num(m)}. The mean ${num(1 / l)} sits further right.
+              The lower curve weights each x by its size. Its area is ${state.integrand === 1 ? 'the mean' : 'E(X²)'}.`,
+          };
+        }
+      }
+    }
+    const LEGENDS = {
+      uniform: [['left', 'pdf and cdf of U(a, b)'], ['sigma', 'U(0, 1) for comparison, and μ ± σ'], ['mean', 'μ'], ['query', 'the query point y']],
+      map: [['left', 'densities of X and Y'], ['right', 'sampled points and their images'], ['query', 'the query point']],
+      exp: [['left', 'pdf and cdf of Exp(λ)'], ['mean', 'μ = 1/λ'], ['sigma', 'μ ± σ']],
+      slots: [['left', 'Exp(λ), the limit'], ['right', 'the Geometric staircase with slot width h'], ['query', 'the query time x']],
+      memory: [['left', 'the original wait'], ['right', 'the wait ahead after s'], ['query', 's and x']],
+      poisson: [['left', 'Exp(λ) theory'], ['right', 'simulated events, gaps and first waits'], ['query', 'the query time x']],
+      moments: [['left', 'pdf of Exp(λ)'], ['right', 'the integrand for the moment'], ['mean', 'μ'], ['sigma', 'μ ± σ'], ['query', 'median']],
+    };
+
+    function update() {
+      const { r, cap } = readouts();
+      $('receipt').innerHTML = `<div>${r[0]}</div><div class="big">${r[1]}</div><div>${r[2]}</div>`;
+      $('caption').innerHTML = cap;
+      $('legend').innerHTML = LEGENDS[state.view].map(([s, t]) => `<span class="legend"><span class="swatch ${s}"></span>${t}</span>`).join('')
+        + ' Hover the charts for exact numbers.';
+      renderArithmetic();
+      dirty = true;
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    function arithUniform() {
+      const { a, b, y } = state;
+      const w = b - a;
+      const u = (y - a) / w;
+      const F = clamp(u, 0, 1);
+      const area = y > a ? simpson((v) => unif.pdf(v, a, b), a, Math.min(y, b)) : 0;
+      const nm = numMoments((v) => unif.pdf(v, a, b), a, b);
+      const mu = unif.mean(a, b);
+      const e2 = (b ** 3 - a ** 3) / (3 * w);
+      const L = (s) => s.padEnd(6);
+      const cdfLines = [
+        ...chain('F_Y(y)', ['P(Y ≤ y)', 'P(a + (b − a)X ≤ y)', 'P(X ≤ (y − a)/(b − a))',
+          `P(X ≤ (${num(y)} − ${paren(a)})/(${num(b)} − ${paren(a)}))`, `P(X ≤ ${num(y - a)}/${num(w)})`,
+          `P(X ≤ ${num(u)})`, `F_X(${num(u)})`, num(F)]),
+      ];
+      const tail = u < 0 ? 'F_X(u) = 0 because u < 0.' : u > 1 ? 'F_X(u) = 1 because u > 1.' : 'F_X(u) = u for 0 ≤ u ≤ 1.';
+      return [
+        { tag: 'uniform', html: (n) => block(`${n} · The cdf of Y = a + (b − a)X`, `a = ${fmtP(a)}, b = ${fmtP(b)}, y = ${fmtP(y)}`,
+          linesHtml(cdfLines) + noteHtml(tail),
+          `Simpson area of f from a to y = ${num(area)} ${tick(same(area, F), 'matches')}`) },
+        { tag: 'uniform', html: (n) => block(`${n} · The mean of U(a, b)`, 'E(X) = ∫ x · 1/(b − a) dx, from a to b',
+          linesHtml([
+            ...chain(L('E(X)'), ['[x² / (2(b − a))] from a to b', '(b² − a²) / (2(b − a))',
+              `(${num(b * b)} − ${num(a * a)}) / (2 × ${num(w)})`, `${num(b * b - a * a)} / ${num(2 * w)}`, num(mu)]),
+            '',
+            ...chain(L('check'), ['(a + b)/2', `(${num(a)} + ${num(b)})/2`, num(mu)]),
+          ]),
+          `μ = <strong>${num(mu)}</strong>. Simpson gives ${num(nm.mean)} ${tick(same(nm.mean, mu), 'matches')}`) },
+        { tag: 'uniform', html: (n) => block(`${n} · The variance of U(a, b), and the 12`, 'σ² = E(X²) − μ²',
+          linesHtml([
+            ...chain(L('E(X²)'), ['∫ x² · 1/(b − a) dx, from a to b', '(b³ − a³) / (3(b − a))',
+              `(${num(b ** 3)} − ${paren(a ** 3)}) / (3 × ${num(w)})`, `${num(b ** 3 - a ** 3)} / ${num(3 * w)}`, num(e2)]),
+            ...chain(L('σ²'), ['E(X²) − μ²', `${num(e2)} − ${paren(mu)}²`, `${num(e2)} − ${num(mu * mu)}`, num(e2 - mu * mu)]),
+            ...chain(L('check'), ['(b − a)²/12', `${num(w)}²/12`, `${num(w * w)}/12`, num(w * w / 12)]),
+            '',
+            'Where the 12 comes from, for U(0, 1):',
+            ...chain(L('E(X²)'), ['∫₀¹ x² dx', '1/3', num(1 / 3)]),
+            ...chain(L('μ²'), ['(1/2)²', '1/4', num(0.25)]),
+            ...chain(L('σ²'), ['1/3 − 1/4', '1/12', num(1 / 12)]),
+            `Stretch by b − a = ${num(w)}. Var(aX + b) = a²Var(X) gives`,
+            ...chain(L('σ²'), [`${num(w)}² × 1/12`, `${num(w * w)} × ${num(1 / 12)}`, num(w * w / 12)]),
+          ]),
+          `σ² = <strong>${num(unif.variance(a, b))}</strong>. Simpson gives ${num(nm.variance)} ${tick(same(nm.variance, unif.variance(a, b)), 'matches')}`) },
+      ];
+    }
+    function arithExp() {
+      const { lambda: l, c, d } = state;
+      const L = (s) => s.padEnd(6);
+      const Fd = expo.cdf(d, l);
+      const P = Math.exp(-l * c) - Math.exp(-l * d);
+      const nm = numMoments((v) => expo.pdf(v, l), 0, 60 / l);
+      const m = expo.median(l);
+      return [
+        { tag: 'exp', html: (n) => block(`${n} · The cdf of Exp(<span class="nocase">λ</span>)`, `λ = ${fmtP(l)}, x = d = ${fmtP(d)}`,
+          linesHtml([
+            ...chain('F(x)', ['∫₀ˣ λe^(−λt) dt', '[−e^(−λt)]₀ˣ', '−e^(−λx) − (−e^0)', '1 − e^(−λx)']),
+            '',
+            ...chain(`F(${fmtP(d)})`, [`1 − e^(−${fmtP(l)} × ${fmtP(d)})`, `1 − e^(−${num(l * d)})`, `1 − ${num(Math.exp(-l * d))}`, num(Fd)]),
+          ]),
+          `Simpson area from 0 to d = ${num(simpson((v) => expo.pdf(v, l), 0, d))} ${tick(same(simpson((v) => expo.pdf(v, l), 0, d), Fd), 'matches')}`) },
+        { tag: 'exp', html: (n) => block(`${n} · An interval P(c &lt; X ≤ d)`, `c = ${fmtP(c)}, d = ${fmtP(d)}`,
+          linesHtml(chain('P(c < X ≤ d)', ['F(d) − F(c)', '(1 − e^(−λd)) − (1 − e^(−λc))', 'e^(−λc) − e^(−λd)',
+            `e^(−${fmtP(l)} × ${fmtP(c)}) − e^(−${fmtP(l)} × ${fmtP(d)})`, `e^(−${num(l * c)}) − e^(−${num(l * d)})`,
+            `${num(Math.exp(-l * c))} − ${num(Math.exp(-l * d))}`, num(P)])),
+          `Simpson area from c to d = ${num(simpson((v) => expo.pdf(v, l), c, d))} ${tick(same(simpson((v) => expo.pdf(v, l), c, d), P), 'matches')}`) },
+        { tag: 'exp', html: (n) => block(`${n} · The mean, by parts`, 'E(X) = ∫₀^∞ x · λe^(−λx) dx',
+          linesHtml([
+            'u = x          dv = λe^(−λx) dx',
+            'du = dx        v = −e^(−λx)',
+            ...chain(L('E(X)'), ['[−x e^(−λx)]₀^∞ + ∫₀^∞ e^(−λx) dx', '(0 − 0) + [−e^(−λx)/λ]₀^∞', '0 + 1/λ',
+              `1/${fmtP(l)}`, num(1 / l)]),
+          ]),
+          `μ = <strong>${num(1 / l)}</strong>. Simpson gives ${num(nm.mean)} ${tick(same(nm.mean, 1 / l), 'matches')}`) },
+        { tag: 'exp', html: (n) => block(`${n} · E(X²) and the variance, by parts`, 'E(X²) = ∫₀^∞ x² · λe^(−λx) dx',
+          linesHtml([
+            'u = x²         dv = λe^(−λx) dx',
+            'du = 2x dx     v = −e^(−λx)',
+            ...chain(L('E(X²)'), ['[−x² e^(−λx)]₀^∞ + ∫₀^∞ 2x e^(−λx) dx', '0 + (2/λ) ∫₀^∞ x · λe^(−λx) dx', '(2/λ) × E(X)',
+              `(2/${fmtP(l)}) × ${num(1 / l)}`, num(2 / l ** 2)]),
+            ...chain(L('σ²'), ['E(X²) − μ²', `${num(2 / l ** 2)} − ${num(1 / l)}²`, `${num(2 / l ** 2)} − ${num(1 / l ** 2)}`, num(1 / l ** 2)]),
+            ...chain(L('check'), ['1/λ²', `1/${fmtP(l)}²`, `1/${num(l * l)}`, num(1 / l ** 2)]),
+            ...chain(L('σ'), [`√${num(1 / l ** 2)}`, num(1 / l)]),
+          ]),
+          `σ² = <strong>${num(1 / l ** 2)}</strong>. Simpson gives ${num(nm.variance)} ${tick(same(nm.variance, 1 / l ** 2, 1e-5), 'matches')}`) },
+        { tag: 'exp', html: (n) => block(`${n} · The median`, 'F(m) = 1/2',
+          linesHtml([
+            '1 − e^(−λm) = 1/2',
+            '    e^(−λm) = 1/2',
+            '       −λm = ln(1/2) = −ln 2',
+            ...chain('         m', ['ln 2 / λ', `${num(Math.LN2)} / ${fmtP(l)}`, num(m)]),
+            '',
+            `μ − m = ${num(1 / l)} − ${num(m)} = ${num(1 / l - m)}`,
+          ]),
+          `F(m) = ${num(expo.cdf(m, l))} ${tick(same(expo.cdf(m, l), 0.5), 'half the area')}. The mean sits ${num(1 / l - m)} above the median.`) },
+      ];
+    }
+    function arithSlots() {
+      const { lambda: l, x } = state;
+      const h = effH();
+      const p = l * h;
+      const k = Math.floor(x / h + 1e-9);
+      const S = slotSurvival(x, l, h);
+      const E = expo.surv(x, l);
+      const hs = [1, 0.5, 0.2, 0.1, 0.05, 0.01, 0.001, 0.0001].filter((v) => l * v < 1);
+      const rows = hs.map((v) => {
+        const kk = Math.floor(x / v + 1e-9);
+        return `h = ${String(v).padEnd(7)}(1 − ${num(l * v)})^${String(kk).padEnd(7)}= ${num(slotSurvival(x, l, v))}`;
+      });
+      let mean = 0;
+      let e2 = 0;
+      for (let j = 1; j < 200000; j += 1) {
+        const pk = p * (1 - p) ** (j - 1);
+        if (pk < 1e-18 && j > 10) break;
+        mean += j * h * pk;
+        e2 += (j * h) ** 2 * pk;
+      }
+      const L = (s) => s.padEnd(11);
+      return [
+        { tag: 'slots', html: (n) => block(`${n} · Slots: the Geometric wait`, `λ = ${fmtP(l)}, h = ${h}, x = ${fmtP(x)}`,
+          linesHtml([
+            ...chain(L('p'), ['λh', `${fmtP(l)} × ${h}`, num(p)]),
+            ...chain(L('slots in x'), ['⌊x/h⌋', `⌊${fmtP(x)}/${h}⌋`, String(k)]),
+            ...chain(L('P(wait > x)'), ['(1 − p)^⌊x/h⌋', `(1 − ${num(p)})^${k}`, `${num(1 - p)}^${k}`, num(S)]),
+            ...chain(L('e^(−λx)'), [`e^(−${fmtP(l)} × ${fmtP(x)})`, `e^(−${num(l * x)})`, num(E)]),
+            ...chain(L('gap'), [`${num(E)} − ${num(S)}`, num(E - S)]),
+          ]),
+          `Each slot multiplies the survival by 1 − p = ${num(1 - p)}.`) },
+        { tag: 'slots', html: (n) => block(`${n} · Shrink h and watch the gap close`, '(1 − λh)^⌊x/h⌋ → e^(−λx) as h → 0',
+          linesHtml([...rows, `limit          e^(−${num(l * x)})        = ${num(E)}`]),
+          `The thinnest row differs from e^(−λx) by ${num(Math.abs(slotSurvival(x, l, hs[hs.length - 1]) - E))} ${tick(Math.abs(slotSurvival(x, l, hs[hs.length - 1]) - E) < 1e-3, 'the limit holds')}`) },
+        { tag: 'slots', html: (n) => block(`${n} · Mean and variance of the wait Kh`, 'E(Kh) = h/p,  Var(Kh) = h²(1 − p)/p²',
+          linesHtml([
+            ...chain(L('E(Kh)'), ['h × 1/p', 'h/(λh)', '1/λ', `1/${fmtP(l)}`, num(1 / l)]),
+            ...chain(L('Var(Kh)'), ['h²(1 − p)/p²', '(1 − λh)/λ²', `(1 − ${num(p)})/${num(l * l)}`, num((1 - p) / l ** 2)]),
+            ...chain(L('1/λ²'), [num(1 / l ** 2)]),
+            '',
+            `The mean is 1/λ at every h. The variance gap ${num(1 / l ** 2 - (1 - p) / l ** 2)} closes as h → 0.`,
+          ]),
+          `Summing k·h·P(K = k) over slots gives ${num(mean)} ${tick(same(mean, 1 / l, 1e-8), 'matches')}. The variance sum gives ${num(e2 - mean * mean)} ${tick(same(e2 - mean * mean, (1 - p) / l ** 2, 1e-6), 'matches')}`) },
+      ];
+    }
+    function arithMemory() {
+      const W = waitModel();
+      const { x, lambda: l } = state;
+      const { s } = W;
+      const ratio = W.surv(s + x) / W.surv(s);
+      const S = W.surv(x);
+      const L = (s2) => s2.padEnd(20);
+      const numeric = simpson((v) => W.pdf(s + v), x, Math.max(x + 1e-9, (W.w ?? 60 / l) - s), 4000) / W.surv(s);
+      const lines = W.kind === 'exp'
+        ? [
+          ...chain(L('P(X > s + x | X > s)'), ['P(X > s + x) / P(X > s)', 'e^(−λ(s + x)) / e^(−λs)',
+            `e^(−${fmtP(l)} × ${num(s + x)}) / e^(−${fmtP(l)} × ${fmtP(s)})`, `e^(−${num(l * (s + x))}) / e^(−${num(l * s)})`,
+            `${num(Math.exp(-l * (s + x)))} / ${num(Math.exp(-l * s))}`, num(ratio)]),
+          ...chain(L('P(X > x)'), ['e^(−λx)', `e^(−${fmtP(l)} × ${fmtP(x)})`, `e^(−${num(l * x)})`, num(S)]),
+        ]
+        : [
+          `X ~ U(0, w) with w = 2/λ = ${num(W.w)}, the same mean as Exp(λ).`,
+          ...chain(L('P(X > s + x | X > s)'), ['P(X > s + x) / P(X > s)', '(w − s − x)/(w − s), floored at 0',
+            `(${num(W.w)} − ${fmtP(s)} − ${fmtP(x)})/(${num(W.w)} − ${fmtP(s)})`, `${num(Math.max(0, W.w - s - x))}/${num(W.w - s)}`, num(ratio)]),
+          ...chain(L('P(X > x)'), ['(w − x)/w, floored at 0', `(${num(W.w)} − ${fmtP(x)})/${num(W.w)}`, num(S)]),
+        ];
+      const resMean = W.kind === 'exp' ? 1 / l : (W.w - s) / 2;
+      return [
+        { tag: 'memory', html: (n) => block(`${n} · The memoryless ratio`, `${W.name}, s = ${fmtP(s)}, x = ${fmtP(x)}`,
+          linesHtml(lines),
+          `${same(ratio, S, 1e-9) ? 'Equal: the wait ahead ignores the wait behind.' : 'Not equal: this wait remembers.'}<br>`
+            + `Simpson area of f(s + t)/P(X > s) beyond t = x = ${num(numeric)} ${tick(same(numeric, ratio, 1e-5), 'matches the ratio')}`) },
+        { tag: 'memory', html: (n) => block(`${n} · The mean wait still to come`, 'E(X − s | X > s) = ∫₀^∞ t f(s + t) dt / P(X > s)',
+          linesHtml(W.kind === 'exp'
+            ? chain(L('E(X − s | X > s)'), ['1/λ, the same as at the start', `1/${fmtP(l)}`, num(1 / l)])
+            : chain(L('E(X − s | X > s)'), ['(w − s)/2, the mean of U(0, w − s)', `(${num(W.w)} − ${fmtP(s)})/2`, num(resMean)])),
+          `At the start the mean wait was ${num(W.mean)}. ${tick(same(simpson((v) => v * W.pdf(s + v), 0, Math.max(1e-9, (W.w ?? 60 / l) - s), 4000) / W.surv(s), resMean, 1e-5), 'Simpson agrees')}`) },
+      ];
+    }
+    function arithPoisson() {
+      const { lambda: l, x } = state;
+      const m = l * x;
+      const E = Math.exp(-m);
+      const L = (s) => s.padEnd(10);
+      const simLines = sim.runs
+        ? [`Simulated: ${sim.firsts.filter((f) => f > x).length} of ${sim.runs} timelines had no event in [0, ${fmtP(x)}].`,
+          `That share is ${num(shareAbove(sim.firsts, x))}. Theory says ${num(E)}.`,
+          `Mean of ${sim.gaps.length} gaps = ${num(sim.gaps.reduce((s, v) => s + v, 0) / sim.gaps.length)}. Theory says 1/λ = ${num(1 / l)}.`]
+        : ['Press "Sample ×1000" to compare with a simulation.'];
+      return [
+        { tag: 'poisson', html: (n) => block(`${n} · The link with Poisson`, `λ = ${fmtP(l)}, x = ${fmtP(x)}`,
+          linesHtml([
+            ...chain(L('N_x'), ['Poi(λx)', `Poi(${fmtP(l)} × ${fmtP(x)})`, `Poi(${num(m)})`]),
+            ...chain(L('P(N_x = 0)'), ['(λx)⁰ e^(−λx) / 0!', `${num(m)}⁰ × e^(−${num(m)}) / 1`, `1 × ${num(E)} / 1`, num(E)]),
+            ...chain(L('P(X > x)'), ['1 − F(x)', 'e^(−λx)', num(expo.surv(x, l))]),
+            '',
+            ...simLines,
+          ]),
+          `${tick(same(E, expo.surv(x, l)), 'P(N_x = 0) = P(X > x)')}: no event in [0, x] is the same event as a first wait above x.`) },
+      ];
+    }
+    const GROUP = { uniform: 'uniform', map: 'uniform', exp: 'exp', moments: 'exp', slots: 'slots', memory: 'memory', poisson: 'poisson' };
+    function renderArithmetic() {
+      const all = [...arithUniform(), ...arithExp(), ...arithSlots(), ...arithMemory(), ...arithPoisson()];
+      const here = GROUP[state.view];
+      const sorted = [...all.filter((b) => b.tag === here), ...all.filter((b) => b.tag !== here)];
+      $('arithHead').innerHTML = `<strong>On screen: ${esc(VIEW[state.view].title)}.</strong> Its blocks come first.
+        The other blocks follow the same sliders. Every block ends with a check.`;
+      $('arithBody').innerHTML = sorted.map((b, i) => b.html(i + 1)).join('');
+    }
+
+    // ===================== WIRING =====================
+    VIEWS.forEach((v) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${v.n}</b><span>${v.word}</span>`;
+      b.dataset.view = v.key;
+      b.addEventListener('click', () => setView(v.key));
+      $('viewGrid').append(b);
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out steps need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-7]$/.test(e.key)) setView(VIEWS[+e.key - 1].key);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

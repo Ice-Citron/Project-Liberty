@@ -1,0 +1,2193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch 5 · The Moment Generating Function</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.base { background: var(--left); }
+    .swatch.tilt { background: var(--right); }
+    .swatch.dot { background: var(--right); border-radius: 50%; box-shadow: 0 0 0 2px var(--bg); }
+    .swatch.ring { background: var(--ink); width: 8px; height: 8px; transform: rotate(45deg); border-radius: 1px; }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .formula-chip {
+      font-family: var(--mono); font-size: 12px; color: var(--ink); padding: 6px 10px; border-radius: 8px;
+      border: 1px solid var(--line); background: rgba(8, 23, 40, 0.7); overflow-wrap: anywhere;
+    }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .preset-grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .preset-grid.four button { padding: 8px 4px; font-size: 12px; }
+    .lens-grid { display: grid; gap: 6px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .lens-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .lens-grid button b { font-size: 15px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; margin: 4px 0; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .body a, .src a { color: var(--blue-1); }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.l { box-shadow: inset 3px 0 0 var(--left); }
+    .arith div.r { box-shadow: inset 3px 0 0 var(--right); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith div.dim { opacity: 0.55; }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    table.forms { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.forms th, table.forms td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    table.forms th { color: var(--blue-1); font-weight: 700; }
+    table.forms td.f { font-family: var(--mono); color: var(--ink); }
+    table.forms tr.current td { background: rgba(19, 52, 92, 0.45); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 5</div>
+        <h1>The mgf: every moment on one washing line</h1>
+        <p class="lead">
+          E[X], E[X²] and E[X³] each need their own sum or integral.
+          The moment generating function M(t) = E[e^(tX)] stores all of them in one curve.
+          <strong>Its slope at t = 0 is the mean.</strong>
+          Its curvature at t = 0 is E[X²].
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div id="legend" class="hint"></div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="Ch4-Normal-Standardise-And-Read-The-Table.html">← Ch 4</a>
+        <span>Chapter 5 of 5</span>
+        <a href="index.html">Index →</a>
+      </nav>
+      <div class="formula-chip">M(t) = E[e^(tX)] · E[Xⁿ] = M⁽ⁿ⁾(0)</div>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · one function, every moment</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 4 pick a view.
+            The Arithmetic tab writes out every number on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a view</div>
+          <div id="viewGrid" class="lens-grid"></div>
+          <div id="viewNote" class="body"></div>
+        </section>
+
+        <section id="famSection" class="section">
+          <div class="section-title">Pick a distribution</div>
+          <div id="famGrid" class="preset-grid four"></div>
+          <div id="paramHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section id="sumSection" class="section" hidden>
+          <div class="section-title">Pick a sum of independent parts</div>
+          <div id="sumGrid" class="preset-grid"></div>
+          <div id="sumHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section id="diceSection" class="section" hidden>
+          <div class="section-title">Pick how the two dice relate</div>
+          <div id="diceGrid" class="preset-grid three"></div>
+        </section>
+
+        <section id="tSection" class="section">
+          <div class="section-title">Choose <span class="nocase">t</span></div>
+          <div id="tHost" style="display: grid; gap: 8px;"></div>
+          <div id="kHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section id="sampleSection" class="section">
+          <div class="section-title">Sample and average</div>
+          <div id="sampleNote" class="body"></div>
+          <div class="preset-grid three">
+            <button id="sample1">Sample ×1</button>
+            <button id="sample1000">Sample ×1000</button>
+            <button id="sampleReset">Reset</button>
+          </div>
+          <div id="sampleLine" class="live-line"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · What is M(0) for any distribution?</summary>
+            <div class="answer"><strong>Always 1.</strong> At t = 0 every weight e^(0·x) equals 1.
+              So M(0) = E[1] = 1. Every mgf passes through the point (0, 1).</div>
+            <button data-predict="0">Set it up: Exp(1) at t = 0</button>
+          </details>
+          <details class="predict">
+            <summary>2 · X ~ Exp(1). Is M(1.2) finite?</summary>
+            <div class="answer"><strong>No.</strong> The weight e^(1.2x) grows faster than e^(−x) shrinks.
+              So the tilted curve rises for ever. Its area is infinite. Exp(λ) has an mgf only for t &lt; λ.</div>
+            <button data-predict="1">Set it up: Exp(1) at t = 1.2</button>
+          </details>
+          <details class="predict">
+            <summary>3 · X ~ Poisson(3). What are M′(0) and M″(0)?</summary>
+            <div class="answer"><strong>M′(0) = 3 and M″(0) = 12.</strong> The slope gives E[X] = λ.
+              The curvature gives E[X²] = λ + λ². So σ² = 12 − 9 = 3.</div>
+            <button data-predict="2">Set it up: Poisson(3) in the Moments view</button>
+          </details>
+          <details class="predict">
+            <summary>4 · X₁ ~ Poisson(2) and X₂ ~ Poisson(3) are independent. What is X₁ + X₂?</summary>
+            <div class="answer"><strong>Poisson(5).</strong> Multiply the mgfs: e^(2(e^t − 1)) × e^(3(e^t − 1)) = e^(5(e^t − 1)).
+              That is the Poisson(5) mgf. The uniqueness theorem does the rest.</div>
+            <button data-predict="3">Set it up: Poisson(2) + Poisson(3)</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Roll one die and set Z₁ = Z₂ = the result. Is E[Z₁Z₂] = 3.5²?</summary>
+            <div class="answer"><strong>No.</strong> E[Z₁Z₂] = E[Z₁²] = 91/6 ≈ 15.17. But 3.5² = 12.25.
+              The product rule needs independence.</div>
+            <button data-predict="4">Set it up: Z₂ = Z₁</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The definition</div>
+          <div class="formula">Continuous X:
+  M_X(t) = E(e^(tX)) = ∫ e^(tx) f_X(x) dx
+Discrete X:
+  M_X(t) = E(e^(tX)) = Σ e^(t xᵢ) p(xᵢ)</div>
+          <div class="body">M is a function of t, not of x. Each t gives one weighted average of X.
+            The slide Moment Generating Function gives both forms.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Why derivatives give moments</div>
+          <div class="formula">e^(tX) = 1 + tX + t²X²/2! + t³X³/3! + …
+M(t)   = 1 + t E[X] + t² E[X²]/2! + t³ E[X³]/3! + …
+
+M′(t)  = E[X e^(tX)]     →  M′(0) = E[X]
+M″(t)  = E[X² e^(tX)]    →  M″(0) = E[X²]
+M⁽ⁿ⁾(0) = E[Xⁿ]
+σ²     = M″(0) − M′(0)²</div>
+          <div class="body">Each derivative brings down one more factor X. Then t = 0 removes the weight.
+            The slide Properties of the mgf states this rule. It assumes we may differentiate inside the integral.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Uniqueness</div>
+          <div class="body">If M_X(t) = M_Y(t) then X and Y have the same cdf.
+            The slide Properties of the mgf states this theorem.
+            The two mgfs must agree on an open interval around 0.
+            So an mgf is a fingerprint. Recognise it and you know the distribution.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The family table · standard results</div>
+          <table id="famTable" class="forms"></table>
+          <div class="formula">Poisson:
+  Σ e^(tx) e^(−λ) λ^x / x!
+    = e^(−λ) Σ (λe^t)^x / x!
+    = e^(−λ) e^(λe^t)
+    = e^(λ(e^t − 1))
+
+Exponential, only for t &lt; λ:
+  ∫₀^∞ e^(tx) λe^(−λx) dx
+    = λ ∫₀^∞ e^(−(λ − t)x) dx
+    = λ / (λ − t)
+
+Normal, complete the square:
+  tx − (x − μ)²/(2σ²)
+    = μt + σ²t²/2 − (x − μ − σ²t)²/(2σ²)
+  The last term integrates to σ√(2π).
+  So M(t) = e^(μt + σ²t²/2).</div>
+          <div class="body">These mgfs are not on the slides. A Node test checks each one against a direct sum or integral.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The characteristic function</div>
+          <div class="formula">φ_X(t) = M_X(it) = ∫ e^(itx) f_X(x) dx
+|e^(itx)| = 1, so |φ_X(t)| ≤ ∫ f_X(x) dx = 1
+E[Xⁿ] = i^(−n) φ⁽ⁿ⁾(0)</div>
+          <div class="body">The mgf integral can diverge. The Lognormal is an example.
+            The characteristic function always exists. Its weight only turns in the complex plane. It never grows.
+            The slide Characteristic function gives these lines.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Products and sums</div>
+          <div class="formula">Z₁, Z₂ independent:  E[Z₁Z₂] = E[Z₁] E[Z₂]
+
+M_(Z₁+Z₂)(t) = E(e^(t(Z₁+Z₂))) = E(e^(tZ₁) e^(tZ₂))
+             = E(e^(tZ₁)) E(e^(tZ₂))
+             = M_Z₁(t) M_Z₂(t)
+
+Sₙ = X₁ + … + Xₙ:   M_Sₙ(t) = Π M_Xⱼ(t)</div>
+          <div class="body">The second line uses the product rule for e^(tZ₁) and e^(tZ₂).
+            Those are independent because Z₁ and Z₂ are.
+            The slides Product of Independent Random Variables and Sum of Independent Random Variables give these rules.</div>
+          <div class="formula">Poisson(λ₁) + Poisson(λ₂), independent:
+  e^(λ₁(e^t − 1)) × e^(λ₂(e^t − 1))
+    = e^((λ₁ + λ₂)(e^t − 1))
+  → Poisson(λ₁ + λ₂) by uniqueness
+
+n independent Bernoulli(p):
+  (1 − p + pe^t) × … × (1 − p + pe^t)
+    = (1 − p + pe^t)ⁿ
+  → Binomial(n, p) by uniqueness</div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L04 Continuous Random Variables.
+            Five slides give the definitions and rules.
+            They are Moment Generating Function; Properties of the mgf; Characteristic function.
+            The other two are Product of Independent Random Variables and Sum of Independent Random Variables.
+            The family mgfs and the two worked sums are standard results.
+            Every number on this page comes from one maths block. A Node test checks it against direct sums and integrals.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>One curve, every moment.</strong> M(t) = 1 + tE[X] + t²E[X²]/2! + … .
+            Each power of t carries one moment.</div>
+          <div class="essence"><strong>Slope and curvature at 0.</strong> M′(0) = E[X] and M″(0) = E[X²].
+            So σ² = M″(0) − M′(0)².</div>
+          <div class="essence"><strong>The tilt picture.</strong> M(t) is the area under e^(tx)·f(x).
+            Positive t lifts the right tail. Negative t lifts the left tail.</div>
+          <div class="essence"><strong>It may not exist.</strong> A heavy tail makes the tilted area infinite.
+            Exp(λ) allows only t &lt; λ. The Lognormal allows no t &gt; 0.</div>
+          <div class="essence"><strong>Sums become products.</strong> Independent parts multiply their mgfs.
+            Uniqueness then names the distribution of the sum.</div>
+          <div class="essence"><strong>Products need independence.</strong> E[Z₁Z₂] = E[Z₁]E[Z₂] holds for independent Z₁ and Z₂.
+            Dependence breaks it.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can explain why every mgf passes through (0, 1).</label>
+            <label><input type="checkbox"> I can read E[X] off an mgf as its slope at 0.</label>
+            <label><input type="checkbox"> I can get σ² from M″(0) − M′(0)².</label>
+            <label><input type="checkbox"> I can say why Exp(λ) has an mgf only for t &lt; λ.</label>
+            <label><input type="checkbox"> I can show Poisson(λ₁) + Poisson(λ₂) = Poisson(λ₁ + λ₂) with mgfs.</label>
+            <label><input type="checkbox"> I know when E[Z₁Z₂] = E[Z₁]E[Z₂] holds.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>The mgf must exist near 0.</strong> The moment rule and uniqueness need M(t) finite on an open interval around 0.</div>
+          <div class="body"><strong>Moments alone may not pin down a distribution.</strong> The Lognormal is the classic case.
+            Other distributions share all of its moments. This is a standard result.</div>
+          <div class="body"><strong>The Uniform formula reads 0/0 at t = 0.</strong> Its limit is 1, as for every mgf.</div>
+          <div class="body"><strong>The family table is not on the slides.</strong> These mgfs are standard results.
+            A Node test checks each one against a direct sum or integral.</div>
+          <div class="body"><strong>This page draws no complex numbers.</strong> The characteristic function needs them.
+            The Math tab gives its definition and its moment rule.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">See also</div>
+          <div class="body"><a href="../Essence-of-Poisson.html">Essence of the Poisson</a> builds the Poisson pmf from scratch.
+            <a href="../Essence-of-Skewness.html">Essence of Skewness</a> puts the third moment to work.
+            <a href="Ch4-Normal-Standardise-And-Read-The-Table.html">Chapter 4</a> introduces the Lognormal.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_ch5.js) =====================
+    // KIT START
+    const SQRT_2PI = Math.sqrt(2 * Math.PI);
+    const DISCRETE = new Set(['bernoulli', 'binomial', 'poisson']);
+
+    function mulberry32(seed) {
+      let a = seed >>> 0;
+      return () => {
+        a = (a + 0x6d2b79f5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // pmf as parallel arrays from x = 0. Poisson runs far enough for tilts up to t = 1.
+    function pmf(fam, P) {
+      const xs = [];
+      const ps = [];
+      if (fam === 'bernoulli') {
+        xs.push(0, 1);
+        ps.push(1 - P.p, P.p);
+      } else if (fam === 'binomial') {
+        const ratio = P.p / (1 - P.p);
+        let pr = Math.pow(1 - P.p, P.n);
+        for (let x = 0; x <= P.n; x += 1) {
+          xs.push(x);
+          ps.push(pr);
+          pr *= ((P.n - x) / (x + 1)) * ratio;
+        }
+      } else {
+        const top = Math.ceil(P.lambda * Math.E + 12 * Math.sqrt(P.lambda * Math.E) + 20);
+        let pr = Math.exp(-P.lambda);
+        for (let x = 0; x <= top; x += 1) {
+          xs.push(x);
+          ps.push(pr);
+          pr *= P.lambda / (x + 1);
+        }
+      }
+      return { xs, ps };
+    }
+
+    function density(fam, P, x) {
+      if (fam === 'exponential') return x < 0 ? 0 : P.lambda * Math.exp(-P.lambda * x);
+      if (fam === 'uniform') return x > P.a && x < P.b ? 1 / (P.b - P.a) : 0;
+      if (fam === 'normal') return Math.exp(-((x - P.mu) ** 2) / (2 * P.sigma ** 2)) / (P.sigma * SQRT_2PI);
+      if (x <= 0) return 0;
+      return Math.exp(-((Math.log(x) - P.mu) ** 2) / (2 * P.sigma ** 2)) / (P.sigma * x * SQRT_2PI);
+    }
+
+    // M(t) in closed form (standard results). Infinity where the integral diverges.
+    // null where no closed form exists: the Lognormal at t ≤ 0.
+    function mgf(fam, P, t) {
+      if (fam === 'bernoulli') return 1 - P.p + P.p * Math.exp(t);
+      if (fam === 'binomial') return (1 - P.p + P.p * Math.exp(t)) ** P.n;
+      if (fam === 'poisson') return Math.exp(P.lambda * (Math.exp(t) - 1));
+      if (fam === 'exponential') return t < P.lambda ? P.lambda / (P.lambda - t) : Infinity;
+      if (fam === 'uniform') {
+        // (e^(tb) − e^(ta)) / (t(b − a)), written with expm1 so small t loses no digits. It reads 0/0 at t = 0.
+        if (t === 0) return 1;
+        const tw = t * (P.b - P.a);
+        return (Math.exp(t * P.a) * Math.expm1(tw)) / tw;
+      }
+      if (fam === 'normal') return Math.exp(P.mu * t + (P.sigma ** 2 * t * t) / 2);
+      return t > 0 ? Infinity : null;
+    }
+
+    function simpson(f, a, b, n = 2000) {
+      const h = (b - a) / n;
+      let s = f(a) + f(b);
+      for (let i = 1; i < n; i += 1) s += f(a + i * h) * (i % 2 ? 4 : 2);
+      return (s * h) / 3;
+    }
+
+    // M(t) straight from the definition: a sum over the pmf, or Simpson's rule on e^(tx) f(x).
+    function directMgf(fam, P, t) {
+      if (DISCRETE.has(fam)) {
+        const { xs, ps } = pmf(fam, P);
+        return xs.reduce((s, x, i) => s + Math.exp(t * x) * ps[i], 0);
+      }
+      if (fam === 'exponential') {
+        if (t >= P.lambda) return Infinity;
+        return simpson((x) => P.lambda * Math.exp((t - P.lambda) * x), 0, 60 / (P.lambda - t), 6000);
+      }
+      if (fam === 'uniform') return simpson((x) => Math.exp(t * x) / (P.b - P.a), P.a, P.b, 200);
+      if (fam === 'normal') {
+        const c = P.mu + P.sigma ** 2 * t;
+        return simpson((x) => Math.exp(t * x) * density(fam, P, x), c - 12 * P.sigma, c + 12 * P.sigma, 2000);
+      }
+      if (t > 0) return Infinity;
+      // Lognormal: substitute x = e^u so the integrand stays smooth.
+      return simpson((u) => Math.exp(t * Math.exp(u) - ((u - P.mu) ** 2) / (2 * P.sigma ** 2)) / (P.sigma * SQRT_2PI),
+        P.mu - 12 * P.sigma, P.mu + 12 * P.sigma, 2000);
+    }
+
+    const mValue = (fam, P, t) => mgf(fam, P, t) ?? directMgf(fam, P, t);
+
+    // E[X^j]: sums for the pmfs, standard closed forms for the densities.
+    function rawMoment(fam, P, j) {
+      if (DISCRETE.has(fam)) {
+        const { xs, ps } = pmf(fam, P);
+        return xs.reduce((s, x, i) => s + x ** j * ps[i], 0);
+      }
+      if (fam === 'exponential') {
+        let f = 1;
+        for (let i = 2; i <= j; i += 1) f *= i;
+        return f / P.lambda ** j;
+      }
+      if (fam === 'uniform') return (P.b ** (j + 1) - P.a ** (j + 1)) / ((j + 1) * (P.b - P.a));
+      if (fam === 'normal') {
+        if (j === 0) return 1;
+        let prev = 1;
+        let cur = P.mu;
+        for (let i = 2; i <= j; i += 1) {
+          const next = P.mu * cur + (i - 1) * P.sigma ** 2 * prev;
+          prev = cur;
+          cur = next;
+        }
+        return cur;
+      }
+      return Math.exp(j * P.mu + (j * j * P.sigma ** 2) / 2);
+    }
+
+    // M′(0) and M″(0) from differentiating the closed forms. null without an mgf near 0.
+    function mgfDerivs(fam, P) {
+      if (fam === 'bernoulli') return { d1: P.p, d2: P.p };
+      if (fam === 'binomial') return { d1: P.n * P.p, d2: P.n * (P.n - 1) * P.p ** 2 + P.n * P.p };
+      if (fam === 'poisson') return { d1: P.lambda, d2: P.lambda + P.lambda ** 2 };
+      if (fam === 'exponential') return { d1: 1 / P.lambda, d2: 2 / P.lambda ** 2 };
+      if (fam === 'uniform') return { d1: (P.a + P.b) / 2, d2: (P.a ** 2 + P.a * P.b + P.b ** 2) / 3 };
+      if (fam === 'normal') return { d1: P.mu, d2: P.sigma ** 2 + P.mu ** 2 };
+      return null;
+    }
+
+    function variance(fam, P) {
+      if (fam === 'bernoulli') return P.p * (1 - P.p);
+      if (fam === 'binomial') return P.n * P.p * (1 - P.p);
+      if (fam === 'poisson') return P.lambda;
+      if (fam === 'exponential') return 1 / P.lambda ** 2;
+      if (fam === 'uniform') return (P.b - P.a) ** 2 / 12;
+      if (fam === 'normal') return P.sigma ** 2;
+      return (Math.exp(P.sigma ** 2) - 1) * Math.exp(2 * P.mu + P.sigma ** 2);
+    }
+
+    // The washing line: term j = t^j E[X^j] / j!, for j = 0 … k.
+    function taylorTerms(fam, P, t, k = 8) {
+      const out = [];
+      let fact = 1;
+      for (let j = 0; j <= k; j += 1) {
+        if (j) fact *= j;
+        out.push((t ** j * rawMoment(fam, P, j)) / fact);
+      }
+      return out;
+    }
+
+    function convolve(a, b) {
+      const out = new Array(a.length + b.length - 1).fill(0);
+      a.forEach((u, i) => b.forEach((v, j) => { out[i + j] += u * v; }));
+      return out;
+    }
+
+    // S = X₁ + X₂ the slow way (convolution) and the fast way (product of mgfs).
+    function sumCase(S) {
+      if (S.kind === 'poisson') {
+        const p1 = pmf('poisson', { lambda: S.l1 }).ps;
+        const p2 = pmf('poisson', { lambda: S.l2 }).ps;
+        const conv = convolve(p1, p2);
+        const target = [];
+        let pr = Math.exp(-(S.l1 + S.l2));
+        for (let s = 0; s < conv.length; s += 1) {
+          target.push(pr);
+          pr *= (S.l1 + S.l2) / (s + 1);
+        }
+        return {
+          parts: [p1, p2], conv, target,
+          mgfParts: (t) => [mgf('poisson', { lambda: S.l1 }, t), mgf('poisson', { lambda: S.l2 }, t)],
+          targetMgf: (t) => mgf('poisson', { lambda: S.l1 + S.l2 }, t),
+        };
+      }
+      // n Bernoulli(p) trials, added one at a time. prev is the pmf of the first n − 1.
+      let conv = [1];
+      let prev = [1];
+      for (let i = 0; i < S.n; i += 1) {
+        prev = conv;
+        conv = convolve(conv, [1 - S.p, S.p]);
+      }
+      return {
+        prev, conv, target: pmf('binomial', { n: S.n, p: S.p }).ps,
+        mgfParts: (t) => Array(S.n).fill(mgf('bernoulli', { p: S.p }, t)),
+        targetMgf: (t) => mgf('binomial', { n: S.n, p: S.p }, t),
+      };
+    }
+
+    // J[i][j] = P(Z₁ = i + 1, Z₂ = j + 1) for two fair dice.
+    function diceJoint(mode) {
+      return [0, 1, 2, 3, 4, 5].map((i) => [0, 1, 2, 3, 4, 5].map((j) => {
+        if (mode === 'independent') return 1 / 36;
+        if (mode === 'same') return i === j ? 1 / 6 : 0;
+        return i + j === 5 ? 1 / 6 : 0;
+      }));
+    }
+    function diceStats(J) {
+      let e12 = 0;
+      let e1 = 0;
+      let e2 = 0;
+      J.forEach((row, i) => row.forEach((p, j) => {
+        e12 += (i + 1) * (j + 1) * p;
+        e1 += (i + 1) * p;
+        e2 += (j + 1) * p;
+      }));
+      return { e12, e1, e2 };
+    }
+    function rollDice(mode, rng) {
+      const z1 = 1 + Math.floor(rng() * 6);
+      if (mode === 'independent') return [z1, 1 + Math.floor(rng() * 6)];
+      return [z1, mode === 'same' ? z1 : 7 - z1];
+    }
+
+    function sample(fam, P, rng) {
+      if (fam === 'bernoulli') return rng() < P.p ? 1 : 0;
+      if (fam === 'binomial') {
+        let k = 0;
+        for (let i = 0; i < P.n; i += 1) if (rng() < P.p) k += 1;
+        return k;
+      }
+      if (fam === 'poisson') {
+        // Count exponential gaps that fit inside one unit of time.
+        let k = 0;
+        let clock = -Math.log(1 - rng()) / P.lambda;
+        while (clock <= 1) {
+          k += 1;
+          clock += -Math.log(1 - rng()) / P.lambda;
+        }
+        return k;
+      }
+      if (fam === 'exponential') return -Math.log(1 - rng()) / P.lambda;
+      if (fam === 'uniform') return P.a + (P.b - P.a) * rng();
+      const z = Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+      return fam === 'normal' ? P.mu + P.sigma * z : Math.exp(P.mu + P.sigma * z);
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmtX = (v) => minus(String(+v.toFixed(2)));
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      if (step >= 1000) return minus(`${+(v / 1000).toFixed(1)}k`);
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))));
+    };
+    const num = (v) => {
+      if (v === Infinity) return '∞';
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of [label, working, value, class], padded into aligned columns.
+    function rowsHtml(rows) {
+      const wl = Math.max(...rows.map((r) => r[0].length));
+      const ww = Math.max(...rows.map((r) => r[1].length));
+      return rows.map(([label, work, value, cls]) => {
+        const line = `${label.padEnd(wl)}  ${work.padEnd(ww)}${value ? ` = ${value}` : ''}`;
+        return `<div class="${cls || ''}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+    const same = (u, v, tol = 1e-6) => (u === Infinity && v === Infinity) || Math.abs(u - v) <= tol * Math.max(1, Math.abs(v));
+    const tick = (ok, yes, no) => (ok ? `<span class="ok">✓ ${yes}</span>` : `<span class="bad">✗ ${no}</span>`);
+    const SUP = { 0: '⁰', 1: '¹', 2: '²', 3: '³', 4: '⁴', 5: '⁵', 6: '⁶', 7: '⁷', 8: '⁸', 9: '⁹' };
+    const sup = (n) => String(n).split('').map((c) => SUP[c]).join('');
+
+    // ===================== STATE =====================
+    const FAM = {
+      bernoulli: {
+        label: 'Bernoulli', name: (P) => `Bernoulli(${fmtX(P.p)})`, formula: '1 − p + p·e^t',
+        params: [{ key: 'p', label: 'p = P(X = 1)', min: 0.01, max: 0.99, step: 0.01 }],
+      },
+      binomial: {
+        label: 'Binomial', name: (P) => `Binomial(${P.n}, ${fmtX(P.p)})`, formula: '(1 − p + p·e^t)ⁿ',
+        params: [
+          { key: 'n', label: 'n, the number of trials', min: 1, max: 30, step: 1 },
+          { key: 'p', label: 'p, the success chance', min: 0.01, max: 0.99, step: 0.01 },
+        ],
+      },
+      poisson: {
+        label: 'Poisson', name: (P) => `Poisson(${fmtX(P.lambda)})`, formula: 'e^(λ(e^t − 1))',
+        params: [{ key: 'lambda', label: 'λ, the mean count', min: 0.2, max: 10, step: 0.1 }],
+      },
+      exponential: {
+        label: 'Exponential', name: (P) => `Exp(${fmtX(P.lambda)})`, formula: 'λ / (λ − t)',
+        params: [{ key: 'lambda', label: 'λ, the rate', min: 0.5, max: 3, step: 0.1 }],
+      },
+      uniform: {
+        label: 'Uniform', name: (P) => `U(${fmtX(P.a)}, ${fmtX(P.b)})`, formula: '(e^(tb) − e^(ta)) / (t(b − a))',
+        params: [
+          { key: 'a', label: 'a, the left end', min: -2, max: 2, step: 0.1 },
+          { key: 'w', label: 'b − a, the width', min: 0.2, max: 4, step: 0.1 },
+        ],
+      },
+      normal: {
+        label: 'Normal', name: (P) => `N(${fmtX(P.mu)}, ${minus(String(+(P.sigma ** 2).toFixed(4)))})`, formula: 'e^(μt + σ²t²/2)',
+        params: [
+          { key: 'mu', label: 'μ, the mean', min: -2, max: 2, step: 0.1 },
+          { key: 'sigma', label: 'σ, the standard deviation', min: 0.3, max: 2, step: 0.05 },
+        ],
+      },
+      lognormal: {
+        label: 'Lognormal', name: (P) => `Lognormal(μ = ${fmtX(P.mu)}, σ = ${fmtX(P.sigma)})`, formula: 'no closed form',
+        params: [
+          { key: 'mu', label: 'μ of log X', min: -0.5, max: 0.5, step: 0.05 },
+          { key: 'sigma', label: 'σ of log X', min: 0.5, max: 1.2, step: 0.05 },
+        ],
+      },
+    };
+    const params = {
+      bernoulli: { p: 0.3 }, binomial: { n: 10, p: 0.3 }, poisson: { lambda: 3 }, exponential: { lambda: 1 },
+      uniform: { a: 0, w: 2 }, normal: { mu: 1, sigma: 0.5 }, lognormal: { mu: 0, sigma: 1 },
+    };
+    // The kit wants U(a, b). The sliders hold a and the width, so b > a always.
+    const kitP = (fam) => (fam === 'uniform' ? { a: params.uniform.a, b: +(params.uniform.a + params.uniform.w).toFixed(10) } : params[fam]);
+    const sums = { kind: 'poisson', l1: 2, l2: 3, n: 10, p: 0.3 };
+    const SUMS = {
+      poisson: {
+        label: 'Poisson + Poisson',
+        params: [
+          { key: 'l1', label: 'λ₁ for X₁', min: 0.2, max: 8, step: 0.1 },
+          { key: 'l2', label: 'λ₂ for X₂', min: 0.2, max: 8, step: 0.1 },
+        ],
+      },
+      bernoulli: {
+        label: 'n Bernoulli trials',
+        params: [
+          { key: 'n', label: 'n, the number of trials', min: 1, max: 30, step: 1 },
+          { key: 'p', label: 'p, the success chance', min: 0.01, max: 0.99, step: 0.01 },
+        ],
+      },
+    };
+    const DICE = {
+      independent: { label: 'Independent', long: 'two independent dice' },
+      same: { label: 'Z₂ = Z₁', long: 'Z₂ = Z₁, one die read twice' },
+      opposite: { label: 'Z₂ = 7 − Z₁', long: 'Z₂ = 7 − Z₁, the face underneath' },
+    };
+    const VIEWS = [
+      { key: 'tilt', word: 'Tilt', note: 'M(t) is the area under e^(tx)·f(x). Drag t and watch the orange shape grow or shrink.' },
+      { key: 'moments', word: 'Moments', note: 'The orange curve keeps the first terms of M(t) = Σ t^j E[X^j] / j!. Add terms with the k slider.' },
+      { key: 'sums', word: 'Sums', note: 'Independent parts add. Their pmfs convolve. Their mgfs just multiply.' },
+      { key: 'products', word: 'Products', note: 'Two dice. Is the average of Z₁Z₂ equal to E[Z₁] × E[Z₂]?' },
+    ];
+    const TOUR = [
+      { title: 'Tilt the density', view: 'tilt', fam: 'exponential', P: { lambda: 1 }, t: 0.5,
+        note: 'Blue is the Exp(1) density f(x). Orange is f(x) times the weight e^(tx). For t > 0 the weight lifts the right side. The orange area is M(t) = E[e^(tX)]. Here M(0.5) = 1/(1 − 0.5) = 2. At t = 0 the weight is 1. So every mgf passes through (0, 1).' },
+      { title: 'Too much tilt', view: 'tilt', fam: 'exponential', P: { lambda: 1 }, t: 0.9,
+        note: 'Now M(0.9) = 1/(1 − 0.9) = 10. The orange curve decays like e^(−0.1x). So most of its area lies off to the right. Drag t up to 1. The curve stops decaying and the area becomes infinite. So Exp(λ) has an mgf only for t < λ.' },
+      { title: 'Bars tilt too', view: 'tilt', fam: 'bernoulli', P: { p: 0.3 }, t: 1,
+        note: 'For a pmf the area becomes a sum. Each bar p(x) becomes e^(tx)·p(x). M(1) = 0.7 × e⁰ + 0.3 × e¹ ≈ 1.515. The bar at x = 0 never changes. Its weight e^(t·0) is always 1.' },
+      { title: 'A Poisson, tilted', view: 'tilt', fam: 'poisson', P: { lambda: 3 }, t: 0.5,
+        note: 'Each bar p(x) becomes e^(0.5x)·p(x). Far bars grow the most. The orange bars total M(0.5) = e^(3(e^0.5 − 1)) ≈ 7.00. Drag t below 0. Then the far bars shrink instead.' },
+      { title: 'The slope at 0 is the mean', view: 'moments', fam: 'poisson', P: { lambda: 3 }, t: 0.3, k: 1,
+        note: 'The top chart now has t on its axis. The blue curve is M(t) for Poisson(3). The orange line is 1 + t·E[X]. It is the tangent at t = 0. Its slope is M′(0) = 3 = E[X].' },
+      { title: 'The curvature gives E[X²]', view: 'moments', fam: 'poisson', P: { lambda: 3 }, t: 0.3, k: 2,
+        note: 'Add the next term t²E[X²]/2!. The orange parabola now bends with the curve. Its curvature is M″(0) = 12 = E[X²]. So σ² = 12 − 3² = 3. That is the Poisson variance λ.' },
+      { title: 'The washing line', view: 'moments', fam: 'exponential', P: { lambda: 2 }, t: 0.8, k: 8,
+        note: 'Each peg on the line holds one term t^j E[X^j]/j!. For Exp(2) these terms are (t/2)^j. They shrink fast. With all 9 pegs the sum is 1.666. The true value is M(0.8) = 2/(2 − 0.8) ≈ 1.667.' },
+      { title: 'Normal: complete the square', view: 'moments', fam: 'normal', P: { mu: 1, sigma: 0.5 }, t: 0.5, k: 2,
+        note: 'For N(μ, σ²) the mgf is e^(μt + σ²t²/2). Here μ = 1 and σ = 0.5. The slope at 0 is μ = 1. The curvature at 0 is μ² + σ² = 1.25. Subtract 1² and σ² = 0.25 comes out.' },
+      { title: 'Moments, but no mgf', view: 'tilt', fam: 'lognormal', P: { mu: 0, sigma: 1 }, t: 0.5,
+        note: 'The Lognormal from Chapter 4 has every moment. Yet the orange curve turns up again. The weight e^(0.5x) grows faster than the tail shrinks. So M(t) = ∞ for every t > 0. The characteristic function fixes this. Its weight e^(itx) always has size 1.' },
+      { title: 'Sums become products', view: 'sums', S: { kind: 'poisson', l1: 2, l2: 3 }, t: 0.5,
+        note: 'X₁ ~ Poisson(2) and X₂ ~ Poisson(3) are independent. The blue bars convolve their pmfs. That is slow work. Their mgfs just multiply: e^(2(e^t − 1)) × e^(3(e^t − 1)) = e^(5(e^t − 1)). That is the Poisson(5) mgf. So X₁ + X₂ ~ Poisson(5).' },
+      { title: 'A Binomial is n Bernoullis', view: 'sums', S: { kind: 'bernoulli', n: 10, p: 0.3 }, t: 0.5,
+        note: 'Add 10 independent Bernoulli(0.3) trials. Each trial has mgf 1 − p + pe^t. The sum has the product (1 − p + pe^t)^10. That is the Binomial(10, 0.3) mgf. So the sum is Binomial(10, 0.3).' },
+      { title: 'Products need independence', view: 'products', dice: 'independent',
+        note: 'Two fair dice give 36 equal cells. Each cell holds z₁z₂. The average is 12.25 = 3.5 × 3.5. So E[Z₁Z₂] = E[Z₁]E[Z₂]. The sum rule uses this fact for e^(tX₁) and e^(tX₂). Now pick Z₂ = Z₁. Only the diagonal survives and the rule fails.' },
+    ];
+    const PREDICT = [
+      { view: 'tilt', fam: 'exponential', P: { lambda: 1 }, t: 0 },
+      { view: 'tilt', fam: 'exponential', P: { lambda: 1 }, t: 1.2 },
+      { view: 'moments', fam: 'poisson', P: { lambda: 3 }, t: 0.3, k: 2 },
+      { view: 'sums', S: { kind: 'poisson', l1: 2, l2: 3 }, t: 0.5 },
+      { view: 'products', dice: 'same' },
+    ];
+
+    const state = {
+      view: 'tilt', fam: 'exponential', t: 0.5, k: 2, dice: 'independent', tour: 0,
+      hover: null, pickS: null, samples: [], rolls: [],
+    };
+    let model = null;
+    let dirty = true;
+
+    // ===================== MODEL =====================
+    function tRange() {
+      if (state.view !== 'tilt' && state.view !== 'moments') return [-1, 1];
+      return state.fam === 'exponential' ? [-1, +(params.exponential.lambda + 0.5).toFixed(2)] : [-1, 1];
+    }
+
+    function xWindow(fam, P) {
+      if (fam === 'exponential') return [0, 8 / P.lambda];
+      if (fam === 'uniform') {
+        const w = P.b - P.a;
+        return [P.a - 0.3 * w, P.b + 0.3 * w];
+      }
+      if (fam === 'normal') return [P.mu - 4 * P.sigma - P.sigma ** 2, P.mu + 4 * P.sigma + P.sigma ** 2];
+      return [0, 16 * Math.exp(P.mu)];
+    }
+
+    // Indices worth a bar: visible in either series, at most 60 bars.
+    function barWindow(a, b) {
+      const amax = Math.max(...a);
+      const bmax = Math.max(...b.filter(Number.isFinite));
+      const keep = (i) => a[i] >= 1e-4 * amax || b[i] >= 1e-4 * bmax;
+      let lo = 0;
+      let hi = a.length - 1;
+      while (lo < hi && !keep(lo)) lo += 1;
+      while (hi > lo && !keep(hi)) hi -= 1;
+      return [lo, Math.min(hi, lo + 59)];
+    }
+
+    // Top of the M(t) chart: the curve may climb to 3 times the current value before it is clipped.
+    function mScale(values, current) {
+      const cap = 3 * (Number.isFinite(current) ? Math.max(1, current) : 10);
+      let top = 1.2;
+      values.forEach((v) => { if (Number.isFinite(v)) top = Math.max(top, Math.min(v, cap)); });
+      return top * 1.12;
+    }
+
+    function buildFamily() {
+      const fam = state.fam;
+      const P = kitP(fam);
+      const [t0, t1] = tRange();
+      const t = state.t;
+      const Mt = mValue(fam, P, t);
+      const ts = [];
+      const Ms = [];
+      for (let i = 0; i <= 240; i += 1) {
+        const u = t0 + ((t1 - t0) * i) / 240;
+        ts.push(u);
+        Ms.push(mValue(fam, P, u));
+      }
+      const moms = [];
+      for (let j = 0; j <= 8; j += 1) moms.push(rawMoment(fam, P, j));
+      const terms = taylorTerms(fam, P, t, 8);
+      const poly = (u) => {
+        let s = 0;
+        let f = 1;
+        for (let j = 0; j <= state.k; j += 1) {
+          if (j) f *= j;
+          s += (u ** j * moms[j]) / f;
+        }
+        return s;
+      };
+      const out = {
+        kind: 'family', fam, P, name: FAM[fam].name(P), t, t0, t1, Mt, ts, Ms, moms, terms, poly,
+        polys: ts.map(poly), der: mgfDerivs(fam, P), vari: variance(fam, P), mTop: mScale(Ms, Mt),
+        discrete: DISCRETE.has(fam), diverges: !Number.isFinite(Mt),
+      };
+      if (out.discrete) {
+        const { xs, ps } = pmf(fam, P);
+        const ws = xs.map((x, i) => Math.exp(t * x) * ps[i]);
+        const [lo, hi] = barWindow(ps, ws);
+        out.cols = [];
+        for (let i = lo; i <= hi; i += 1) out.cols.push({ x: xs[i], p: ps[i], w: ws[i] });
+        out.xs = xs;
+        out.ps = ps;
+        out.lo = lo;
+        out.hi = hi;
+        // Keep at least four columns so two bars do not fill the chart.
+        const pad = Math.max(0, (4 - (hi - lo + 1)) / 2);
+        out.x0 = xs[lo] - 0.5 - pad;
+        out.x1 = xs[hi] + 0.5 + pad;
+        out.yTop = 1.12 * Math.max(...out.cols.map((c) => Math.max(c.p, c.w)));
+      } else {
+        const [x0, x1] = xWindow(fam, P);
+        const pts = [];
+        for (let i = 0; i <= 480; i += 1) pts.push(x0 + ((x1 - x0) * i) / 480);
+        const breaks = fam === 'uniform' ? [P.a, P.b] : fam === 'exponential' ? [0] : [];
+        breaks.forEach((b) => pts.push(b - 1e-9, b + 1e-9));
+        pts.sort((u, v) => u - v);
+        out.curve = pts.map((x) => {
+          const f = density(fam, P, x);
+          return { x, f, w: Math.exp(t * x) * f };
+        });
+        out.x0 = x0;
+        out.x1 = x1;
+        const fMax = Math.max(...out.curve.map((c) => c.f));
+        const wMax = Math.max(...out.curve.map((c) => c.w));
+        out.yTop = 1.12 * Math.max(fMax, Math.min(wMax, 3 * fMax));
+      }
+      return out;
+    }
+
+    function buildSums() {
+      const sc = sumCase(sums);
+      const { conv, target } = sc;
+      const [lo, hi] = barWindow(conv, target);
+      const ts = [];
+      const prods = [];
+      for (let i = 0; i <= 200; i += 1) {
+        const u = -1 + i / 100;
+        ts.push(u);
+        prods.push(sc.mgfParts(u).reduce((s, v) => s * v, 1));
+      }
+      const direct = (u) => conv.reduce((s, p, x) => s + Math.exp(u * x) * p, 0);
+      const dots = [];
+      for (let u = -1; u <= 1.0001; u += 0.25) dots.push({ t: u, v: direct(u) });
+      const t = state.t;
+      const parts = sc.mgfParts(t);
+      const product = parts.reduce((s, v) => s * v, 1);
+      let mode = lo;
+      for (let i = lo; i <= hi; i += 1) if (conv[i] > conv[mode]) mode = i;
+      const s = state.pickS !== null && state.pickS >= lo && state.pickS <= hi ? state.pickS : mode;
+      const poisson = sums.kind === 'poisson';
+      const total = sums.l1 + sums.l2;
+      return {
+        kind: 'sums', sc, conv, target, lo, hi, ts, prods, dots, t, parts, product, direct, s,
+        targetName: poisson ? `Poisson(${fmtX(total)})` : `Binomial(${sums.n}, ${fmtX(sums.p)})`,
+        name: poisson ? `X₁ ~ Poisson(${fmtX(sums.l1)}) and X₂ ~ Poisson(${fmtX(sums.l2)})`
+          : `${sums.n} independent Bernoulli(${fmtX(sums.p)}) trials`,
+        mean: poisson ? total : sums.n * sums.p,
+        vari: poisson ? total : sums.n * sums.p * (1 - sums.p),
+        yTop: 1.15 * Math.max(...conv.slice(lo, hi + 1), ...target.slice(lo, hi + 1)),
+        mTop: mScale(prods, product),
+      };
+    }
+
+    function buildProducts() {
+      const J = diceJoint(state.dice);
+      const st = diceStats(J);
+      const n = state.rolls.length;
+      const avg = n ? state.rolls.reduce((s, r) => s + r[0] * r[1], 0) / n : NaN;
+      return { kind: 'products', J, ...st, n, avg, name: DICE[state.dice].long };
+    }
+
+    function buildModel() {
+      if (state.view === 'sums') return buildSums();
+      if (state.view === 'products') return buildProducts();
+      return buildFamily();
+    }
+
+    function sampleAverage() {
+      const n = state.samples.length;
+      if (!n || model.kind !== 'family') return NaN;
+      return state.samples.reduce((s, x) => s + Math.exp(model.t * x), 0) / n;
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mean: '#a0e7a0', ink: '#ebf2ff', muted: '#8aa1c0',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)', surface: '#07111f',
+    };
+    const fill = (hex, a) => {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+    };
+    const BOLD = '600 12px Inter, ui-sans-serif, system-ui, sans-serif';
+    const MONO = '12px ui-monospace, Menlo, monospace';
+    let hatchPattern = null;
+    function hatch() {
+      if (!hatchPattern) {
+        const c = document.createElement('canvas');
+        c.width = 8;
+        c.height = 8;
+        const k = c.getContext('2d');
+        k.strokeStyle = 'rgba(138, 161, 192, 0.35)';
+        k.lineWidth = 1.4;
+        k.beginPath();
+        k.moveTo(0, 8);
+        k.lineTo(8, 0);
+        k.stroke();
+        hatchPattern = ctx.createPattern(c, 'repeat');
+      }
+      return hatchPattern;
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const titleH = 20;
+      const labelsH = 24;
+      const gap = 12;
+      const avail = Math.max(160, H - 2 * titleH - 2 * labelsH - gap);
+      const top = { y: titleH, h: avail * 0.55 };
+      const bot = { y: top.y + top.h + labelsH + gap + titleH, h: avail * 0.45 };
+      return { W, H, x: 62, w: Math.max(40, W - 62 - 16), top, bot };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || '12px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function line(x0, y0, x1, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.lineTo(x1, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A bar from baseline y0 to end y1 with a rounded data end.
+    function bar(cx, w, y0, y1, color, mode = 'fill') {
+      const h = y1 - y0;
+      if (Math.abs(h) < 0.4) return;
+      const r = Math.min(4, w / 2, Math.abs(h));
+      ctx.save();
+      ctx.beginPath();
+      if (h < 0) ctx.roundRect(cx - w / 2, y1, w, -h, [r, r, 0, 0]);
+      else ctx.roundRect(cx - w / 2, y0, w, h, [0, 0, r, r]);
+      if (mode === 'outline') {
+        ctx.fillStyle = fill(color, 0.22);
+        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = mode === 'faint' ? fill(color, 0.28) : color;
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    function dot(x, y, color, r = 4.5) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = C.surface;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // A chart box with linear maps from data to pixels.
+    function frameOf(g, box, x0, x1, y0, y1) {
+      return {
+        ...box, X: g.x, W: g.w, x0, x1, y0, y1,
+        px: (v) => g.x + ((v - x0) / (x1 - x0)) * g.w,
+        py: (v) => box.y + box.h - ((clamp(v, y0 - 3 * (y1 - y0), y1 + 3 * (y1 - y0)) - y0) / (y1 - y0)) * box.h,
+      };
+    }
+    function clip(c, fn) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(c.X, c.y, c.W, c.h);
+      ctx.clip();
+      fn();
+      ctx.restore();
+    }
+    function yGrid(c, count = 3) {
+      const st = niceStep(c.y1 - c.y0, count);
+      for (let v = Math.ceil(c.y0 / st) * st; v <= c.y1 * 0.999 + 1e-12; v += st) {
+        const y = c.py(v);
+        line(c.X, y, c.X + c.W, y, Math.abs(v) < st * 1e-6 ? C.axis : C.grid);
+        text(fmtTick(v, st), c.X - 8, y + 4, { align: 'right' });
+      }
+    }
+    function xAxis(c, label) {
+      const st = niceStep(c.x1 - c.x0, Math.max(3, Math.floor(c.W / 70)));
+      const base = c.py(Math.max(0, c.y0));
+      line(c.X, base, c.X + c.W, base, C.axis);
+      for (let v = Math.ceil(c.x0 / st) * st; v <= c.x1 + 1e-9; v += st) {
+        const x = c.px(v);
+        line(x, c.y + c.h, x, c.y + c.h + 4, C.axis);
+        if (x < c.X + c.W - 22) text(fmtTick(v, st), x, c.y + c.h + 16, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+      text(label, c.X + c.W, c.y + c.h + 16, { align: 'right', color: C.ink, font: '11px Inter, sans-serif' });
+    }
+    function intLabels(c, from, to) {
+      const colW = c.W / (c.x1 - c.x0);
+      const every = Math.max(1, Math.ceil(26 / colW));
+      for (let x = from; x <= to; x += 1) {
+        if ((x - from) % every) continue;
+        text(String(x), c.px(x), c.y + c.h + 16, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+    }
+    function path(c, xs, ys, color, width = 2, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineJoin = 'round';
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      let pen = false;
+      xs.forEach((x, i) => {
+        if (!Number.isFinite(ys[i])) {
+          pen = false;
+          return;
+        }
+        const px = c.px(x);
+        const py = c.py(ys[i]);
+        if (pen) ctx.lineTo(px, py);
+        else ctx.moveTo(px, py);
+        pen = true;
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
+    function area(c, xs, ys, color, alpha) {
+      ctx.save();
+      ctx.fillStyle = fill(color, alpha);
+      ctx.beginPath();
+      ctx.moveTo(c.px(xs[0]), c.py(0));
+      xs.forEach((x, i) => ctx.lineTo(c.px(x), c.py(Number.isFinite(ys[i]) ? ys[i] : 0)));
+      ctx.lineTo(c.px(xs[xs.length - 1]), c.py(0));
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    // A narrow canvas gets the short title, and the right-hand note only when it fits.
+    function title(c, str, right, short) {
+      ctx.font = BOLD;
+      if (short && ctx.measureText(str).width > c.W) str = short;
+      text(str, c.X, c.y - 7, { color: C.ink, font: BOLD });
+      if (right) {
+        if (ctx.measureText(str).width + ctx.measureText(right).width + 24 < c.W) {
+          text(right, c.X + c.W, c.y - 7, { align: 'right', color: C.ink, font: BOLD });
+        }
+      }
+    }
+    function tooltip(lines, x, y, g) {
+      ctx.font = MONO;
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let bx = x + 14;
+      if (bx + w > g.x + g.w) bx = x - 14 - w;
+      bx = Math.max(4, bx);
+      const by = clamp(y - h / 2, 4, g.H - h - 4);
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(bx, by, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, bx + 10, by + 20 + i * 17, { color: i === lines.length - 1 ? C.ink : C.muted, font: MONO }));
+    }
+
+    // A rising curve leaves the space above-left of a point empty, so the label goes there.
+    function placeLabel(c, label, x, y, rising) {
+      ctx.font = BOLD;
+      const w = ctx.measureText(label).width;
+      const left = rising ? x - 9 - w > c.X + 4 : x + 9 + w > c.X + c.W;
+      text(label, left ? x - 9 : x + 9, y, { align: left ? 'right' : 'left', color: C.ink, font: BOLD });
+    }
+
+    // The M(t) chart shared by the Tilt and Moments views.
+    function drawMChart(c, m, withPoly) {
+      yGrid(c, 3);
+      if (m.fam === 'exponential' && m.t1 > m.P.lambda) {
+        const x = c.px(m.P.lambda);
+        ctx.save();
+        ctx.fillStyle = hatch();
+        ctx.fillRect(x, c.y, c.X + c.W - x, c.h);
+        ctx.restore();
+        line(x, c.y, x, c.y + c.h, C.muted, 1, [4, 4]);
+        ctx.font = '12px Inter, sans-serif';
+        const label = 'M = ∞ for t ≥ λ';
+        const room = c.X + c.W - x > ctx.measureText(label).width + 12;
+        text(label, room ? x + 6 : x - 6, c.y + 14, { align: room ? 'left' : 'right', color: C.ink });
+      }
+      if (m.fam === 'lognormal') {
+        const x = c.px(0);
+        ctx.save();
+        ctx.fillStyle = hatch();
+        ctx.fillRect(x, c.y, c.X + c.W - x, c.h);
+        ctx.restore();
+        text('M(t) = ∞ for every t > 0', x + 8, c.y + 14, { color: C.ink });
+      }
+      clip(c, () => {
+        path(c, m.ts, m.Ms, C.left, 2);
+        if (withPoly) path(c, m.ts, m.polys, C.right, 2);
+      });
+      const t = m.t;
+      const xt = c.px(t);
+      line(xt, c.y, xt, c.y + c.h, 'rgba(235, 242, 255, 0.35)', 1, [3, 4]);
+      ctx.save();
+      ctx.strokeStyle = C.ink;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(c.px(0), c.py(1), 5, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+      const below = c.py(1) + 16 < c.y + c.h - 4;
+      text('(0, 1)', c.px(0) + 8, below ? c.py(1) + 16 : c.py(1) - 9, { color: C.ink, font: '11px Inter, sans-serif' });
+      if (withPoly && Number.isFinite(m.poly(t)) && m.poly(t) <= c.y1 && m.poly(t) >= c.y0) dot(xt, c.py(m.poly(t)), C.right);
+      if (Number.isFinite(m.Mt) && m.Mt <= c.y1) dot(xt, c.py(m.Mt), C.left, 5);
+      const avg = sampleAverage();
+      if (!withPoly && Number.isFinite(avg)) {
+        const y = c.py(Math.min(avg, c.y1));
+        dot(xt, y, C.right);
+      }
+      const label = `M(${fmtX(t)}) = ${num(m.Mt)}`;
+      const ly = Number.isFinite(m.Mt) ? clamp(c.py(Math.min(m.Mt, c.y1)) - 10, c.y + 14, c.y + c.h - 6) : c.y + 44;
+      placeLabel(c, label, xt, ly, mValue(m.fam, m.P, t + 0.01) > m.Mt);
+      xAxis(c, 't');
+    }
+
+    function drawFamily(g) {
+      const m = model;
+      const tilt = state.view === 'tilt';
+      if (tilt) {
+        const c = frameOf(g, g.top, m.x0, m.x1, 0, m.yTop);
+        const sym = m.discrete ? 'p(x)' : 'f(x)';
+        title(c, `${sym} in blue · e^(tx)·${sym} in orange, t = ${fmtX(m.t)}`,
+          m.diverges ? 'orange area = ∞' : `orange area = M(t) = ${num(m.Mt)}`, `${sym} blue · e^(tx)·${sym} orange`);
+        yGrid(c, 3);
+        if (m.discrete) {
+          const colW = c.W / (c.x1 - c.x0);
+          const bw = Math.max(3, Math.min(44, colW - 3));
+          clip(c, () => {
+            m.cols.forEach((col) => {
+              bar(c.px(col.x), bw, c.py(0), c.py(Math.min(col.w, m.yTop * 1.2)), C.right, 'outline');
+              bar(c.px(col.x), Math.max(2, bw * 0.5), c.py(0), c.py(col.p), C.left);
+            });
+          });
+          intLabels(c, m.cols[0].x, m.cols[m.cols.length - 1].x);
+          line(c.X, c.py(0), c.X + c.W, c.py(0), C.axis);
+        } else {
+          const xs = m.curve.map((p) => p.x);
+          const ws = m.curve.map((p) => p.w);
+          clip(c, () => {
+            area(c, xs, ws, C.right, 0.2);
+            path(c, xs, ws, C.right, 2);
+            path(c, xs, m.curve.map((p) => p.f), C.left, 2);
+          });
+          xAxis(c, 'x');
+          if (m.diverges) {
+            const last = m.curve[m.curve.length - 1];
+            const msg = m.fam === 'exponential' ? 'never decays: area = ∞' : 'turns up for ever: area = ∞';
+            text(msg, c.X + c.W - 4, Math.max(c.y + 30, c.py(Math.min(last.w, m.yTop)) - 10), { align: 'right', color: C.ink, font: BOLD });
+          }
+        }
+        drawMChart(frameOf(g, g.bot, m.t0, m.t1, 0, m.mTop), m, false);
+        title(frameOf(g, g.bot, m.t0, m.t1, 0, m.mTop), 'M(t) = the orange area, one value for each t', null, 'M(t) = the orange area');
+      } else {
+        const lo = Math.min(0, ...m.polys.filter(Number.isFinite));
+        const c = frameOf(g, g.top, m.t0, m.t1, Math.max(-0.5 * m.mTop, lo), m.mTop);
+        title(c, `M(t) in blue · its first ${state.k + 1} terms in orange`,
+          state.k === 1 ? 'k = 1: the tangent line' : state.k === 2 ? 'k = 2: the touching parabola' : `k = ${state.k}`,
+          `M(t) blue · ${state.k + 1} terms orange`);
+        drawMChart(c, m, true);
+        // The washing line: one bar per term.
+        const kept = m.terms.slice(0, state.k + 1).reduce((s, v) => s + v, 0);
+        const big = Math.max(1e-12, ...m.terms.map((v) => Math.abs(v)).filter(Number.isFinite));
+        const signed = m.terms.some((v) => v < 0);
+        const b = frameOf(g, g.bot, -0.5, 8.5, signed ? -big * 1.15 : 0, big * 1.15);
+        title(b, `The washing line at t = ${fmtX(m.t)} · term j = t^j E[X^j] / j!`,
+          `kept terms sum to ${num(kept)} · M(t) = ${num(m.Mt)}`, `Washing line at t = ${fmtX(m.t)}`);
+        yGrid(b, 2);
+        const bw = Math.min(44, b.W / 9 - 8);
+        m.terms.forEach((v, j) => {
+          if (!Number.isFinite(v)) return;
+          bar(b.px(j), bw, b.py(0), b.py(v), C.left, j <= state.k ? 'fill' : 'faint');
+          text(`j = ${j}`, b.px(j), b.y + b.h + 16, { align: 'center', font: '11px Inter, sans-serif', color: j <= state.k ? C.ink : C.muted });
+        });
+        line(b.X, b.py(0), b.X + b.W, b.py(0), C.axis);
+      }
+    }
+
+    function drawSums(g) {
+      const m = model;
+      const c = frameOf(g, g.top, m.lo - 0.5, Math.max(m.hi + 0.5, m.lo + 3.5), 0, m.yTop);
+      title(c, `P(S = s) by convolution in blue · ${m.targetName} in orange`, null, `Convolution blue · ${m.targetName} orange`);
+      yGrid(c, 3);
+      const colW = c.W / (c.x1 - c.x0);
+      const bw = Math.max(3, Math.min(44, colW - 3));
+      ctx.fillStyle = 'rgba(134, 212, 255, 0.07)';
+      ctx.fillRect(c.px(m.s) - colW / 2, c.y, colW, c.h);
+      for (let s = m.lo; s <= m.hi; s += 1) {
+        bar(c.px(s), bw, c.py(0), c.py(m.conv[s]), C.left);
+        const y = c.py(m.target[s]);
+        line(c.px(s) - bw / 2 - 2, y, c.px(s) + bw / 2 + 2, y, C.right, 2);
+        dot(c.px(s), y, C.right, 3.5);
+      }
+      line(c.X, c.py(0), c.X + c.W, c.py(0), C.axis);
+      intLabels(c, m.lo, m.hi);
+      const b = frameOf(g, g.bot, -1, 1, 0, m.mTop);
+      title(b, 'Product of the part mgfs in blue · Σ e^(ts) P(S = s) as orange dots', null, 'mgf product blue · direct sum orange');
+      yGrid(b, 3);
+      clip(b, () => path(b, m.ts, m.prods, C.left, 2));
+      m.dots.forEach((d) => { if (d.v <= b.y1) dot(b.px(d.t), b.py(d.v), C.right); });
+      const xt = b.px(m.t);
+      line(xt, b.y, xt, b.y + b.h, 'rgba(235, 242, 255, 0.35)', 1, [3, 4]);
+      if (m.product <= b.y1) dot(xt, b.py(m.product), C.left, 5);
+      placeLabel(b, `M_S(${fmtX(m.t)}) = ${num(m.product)}`, xt, clamp(b.py(Math.min(m.product, b.y1)) - 10, b.y + 14, b.y + b.h - 6), true);
+      xAxis(b, 't');
+    }
+
+    // Grid and comparison bars share the canvas: side by side when wide, stacked when narrow.
+    function productsLayout() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const wide = W > H * 1.3;
+      const cell = wide ? Math.min((H - 50) / 7, (W * 0.55) / 7) : Math.min((W - 20) / 7, (H - 205) / 7);
+      const gx = wide ? 16 : (W - cell * 7) / 2;
+      const gy = 28;
+      const comp = wide
+        ? { x: gx + cell * 7 + 40, y: gy + cell, w: W - (gx + cell * 7 + 40) - 20 }
+        : { x: 20, y: gy + cell * 7 + 30, w: W - 40 };
+      // Stacked layouts squeeze the comparison rows.
+      return { cell, gx, gy, comp, gap: wide ? 40 : 26, barH: wide ? 18 : 14 };
+    }
+    function drawProducts() {
+      const m = model;
+      const L = productsLayout();
+      const { cell, gx, gy, comp, gap, barH } = L;
+      text('z₁ down, z₂ across · each cell shows z₁·z₂', gx, gy - 10, { color: C.ink, font: BOLD });
+      for (let k = 0; k < 6; k += 1) {
+        text(String(k + 1), gx + cell * (k + 1.5), gy + cell * 0.62, { align: 'center', color: C.ink, font: BOLD });
+        text(String(k + 1), gx + cell * 0.5, gy + cell * (k + 1.62), { align: 'center', color: C.ink, font: BOLD });
+      }
+      text('×', gx + cell * 0.5, gy + cell * 0.62, { align: 'center' });
+      m.J.forEach((row, i) => row.forEach((p, j) => {
+        const x = gx + cell * (j + 1);
+        const y = gy + cell * (i + 1);
+        ctx.save();
+        ctx.fillStyle = p > 0 ? fill(C.left, 0.25 + 0.55 * (p / (1 / 6))) : 'rgba(8, 23, 40, 0.6)';
+        ctx.strokeStyle = C.surface;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(x + 1, y + 1, cell - 2, cell - 2, 4);
+        ctx.fill();
+        if (state.hover && state.hover.cell && state.hover.cell[0] === i && state.hover.cell[1] === j) {
+          ctx.strokeStyle = C.ink;
+          ctx.stroke();
+        }
+        ctx.restore();
+        text(String((i + 1) * (j + 1)), x + cell / 2, y + cell * 0.6, {
+          align: 'center', color: p > 0 ? C.ink : 'rgba(138, 161, 192, 0.45)', font: `${Math.round(clamp(cell * 0.3, 10, 15))}px Inter, sans-serif`,
+        });
+      }));
+      // Comparison bars on one shared scale.
+      const scaleMax = 20;
+      const bx = comp.x + 110;
+      const bwid = Math.max(40, comp.w - 120);
+      const px = (v) => bx + (v / scaleMax) * bwid;
+      const rows = [
+        { label: 'E[Z₁Z₂]', v: m.e12, color: C.left },
+        { label: 'E[Z₁]·E[Z₂]', v: m.e1 * m.e2, color: C.right },
+      ];
+      text('Average of the product · product of the averages', comp.x, comp.y - 6, { color: C.ink, font: BOLD });
+      rows.forEach((r, k) => {
+        const y = comp.y + 22 + k * gap;
+        text(r.label, comp.x, y + 5, { color: C.ink, font: MONO });
+        ctx.save();
+        ctx.fillStyle = r.color;
+        ctx.beginPath();
+        ctx.roundRect(bx, y - barH / 2, px(r.v) - bx, barH, [0, 4, 4, 0]);
+        ctx.fill();
+        ctx.restore();
+        text(num(r.v), px(r.v) + 6, y + 5, { color: C.ink, font: MONO });
+      });
+      const axisY = comp.y + 22 + 2 * gap - 8;
+      line(bx, axisY, bx + bwid, axisY, C.axis);
+      for (let v = 0; v <= scaleMax; v += 5) {
+        line(px(v), axisY, px(v), axisY + 4, C.axis);
+        text(String(v), px(v), axisY + 16, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+      if (m.n) {
+        const x = px(clamp(m.avg, 0, scaleMax));
+        ctx.save();
+        ctx.fillStyle = C.ink;
+        ctx.strokeStyle = C.surface;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, axisY - 7);
+        ctx.lineTo(x + 6, axisY);
+        ctx.lineTo(x, axisY + 7);
+        ctx.lineTo(x - 6, axisY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+      const equal = Math.abs(m.e12 - m.e1 * m.e2) < 1e-9;
+      text(equal ? 'Equal: independence makes the rule hold.' : `They differ by ${num(m.e12 - m.e1 * m.e2)}: Z₂ depends on Z₁.`,
+        comp.x, axisY + gap + 12, { color: C.ink, font: BOLD });
+      if (m.n) text(`◆ sample average, ${m.n} rolls = ${num(m.avg)}`, comp.x, axisY + gap + 30, { font: MONO });
+    }
+
+    function drawHover(g) {
+      const h = state.hover;
+      if (!h) return;
+      const m = model;
+      if (m.kind === 'products') {
+        if (!h.cell) return;
+        const [i, j] = h.cell;
+        tooltip([`z₁ = ${i + 1}, z₂ = ${j + 1}`, `P = ${num(m.J[i][j])}`, `z₁·z₂ = ${(i + 1) * (j + 1)}`], h.x, h.y, g);
+        return;
+      }
+      const inTop = h.y >= g.top.y && h.y <= g.top.y + g.top.h;
+      const inBot = h.y >= g.bot.y && h.y <= g.bot.y + g.bot.h;
+      if (!inTop && !inBot) return;
+      const frac = (h.x - g.x) / g.w;
+      if (frac < 0 || frac > 1) return;
+      line(h.x, inTop ? g.top.y : g.bot.y, h.x, inTop ? g.top.y + g.top.h : g.bot.y + g.bot.h, 'rgba(134, 212, 255, 0.4)');
+      if (m.kind === 'sums') {
+        if (inTop) {
+          const x0 = m.lo - 0.5;
+          const x1 = Math.max(m.hi + 0.5, m.lo + 3.5);
+          const s = Math.round(x0 + frac * (x1 - x0));
+          if (s < m.lo || s > m.hi) return;
+          tooltip([`s = ${s}`, `${m.targetName} = ${num(m.target[s])}`, `convolution = ${num(m.conv[s])}`], h.x, h.y, g);
+        } else {
+          const t = -1 + 2 * frac;
+          const v = m.sc.mgfParts(t).reduce((s, u) => s * u, 1);
+          tooltip([`t = ${num(t)}`, `Σ e^(ts) P(S = s) = ${num(m.direct(t))}`, `M_X₁ × M_X₂ = ${num(v)}`], h.x, h.y, g);
+        }
+        return;
+      }
+      const tilt = state.view === 'tilt';
+      if (tilt && inTop) {
+        const x = m.x0 + frac * (m.x1 - m.x0);
+        if (m.discrete) {
+          const k = Math.round(x);
+          const col = m.cols.find((cc) => cc.x === k);
+          if (!col) return;
+          tooltip([`x = ${k}`, `p(x) = ${num(col.p)}`, `e^(tx) = ${num(Math.exp(m.t * k))}`, `e^(tx)·p(x) = ${num(col.w)}`], h.x, h.y, g);
+        } else {
+          const f = density(m.fam, m.P, x);
+          tooltip([`x = ${num(x)}`, `f(x) = ${num(f)}`, `e^(tx) = ${num(Math.exp(m.t * x))}`, `e^(tx)·f(x) = ${num(Math.exp(m.t * x) * f)}`], h.x, h.y, g);
+        }
+        return;
+      }
+      if (!tilt && inBot) {
+        const j = Math.round(-0.5 + frac * 9);
+        if (j < 0 || j > 8) return;
+        let fact = 1;
+        for (let i = 2; i <= j; i += 1) fact *= i;
+        tooltip([`j = ${j}`, `E[X^${j}] = ${num(m.moms[j])}`, `t^${j} / ${j}! = ${num(m.t ** j / fact)}`, `term = ${num(m.terms[j])}`], h.x, h.y, g);
+        return;
+      }
+      const t = m.t0 + frac * (m.t1 - m.t0);
+      const lines = [`t = ${num(t)}`, `M(t) = ${num(mValue(m.fam, m.P, t))}`];
+      if (!tilt) lines.push(`first ${state.k + 1} terms = ${num(m.poly(t))}`);
+      tooltip(lines, h.x, h.y, g);
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!model || W < 50) return;
+      const g = geom();
+      if (model.kind === 'products') drawProducts();
+      else if (model.kind === 'sums') drawSums(g);
+      else drawFamily(g);
+      drawHover(g);
+    }
+    function frame() {
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function cellAt(x, y) {
+      const { cell, gx, gy } = productsLayout();
+      const j = Math.floor((x - gx) / cell) - 1;
+      const i = Math.floor((y - gy) / cell) - 1;
+      return i >= 0 && i < 6 && j >= 0 && j < 6 ? [i, j] : null;
+    }
+    function sumsColumn(x) {
+      const g = geom();
+      const x0 = model.lo - 0.5;
+      const x1 = Math.max(model.hi + 0.5, model.lo + 3.5);
+      const s = Math.round(x0 + ((x - g.x) / g.w) * (x1 - x0));
+      return s >= model.lo && s <= model.hi ? s : null;
+    }
+    canvas.addEventListener('pointermove', (e) => {
+      const p = local(e);
+      state.hover = { ...p, cell: model && model.kind === 'products' ? cellAt(p.x, p.y) : null };
+      dirty = true;
+    });
+    canvas.addEventListener('pointerleave', () => {
+      state.hover = null;
+      dirty = true;
+    });
+    canvas.addEventListener('click', (e) => {
+      if (!model || model.kind !== 'sums') return;
+      const p = local(e);
+      const g = geom();
+      if (p.y < g.top.y || p.y > g.top.y + g.top.h) return;
+      const s = sumsColumn(p.x);
+      if (s === null) return;
+      state.pickS = s;
+      update();
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = minus(v.toFixed(decimals)); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+
+    function renderTSlider() {
+      const [t0, t1] = tRange();
+      state.t = clamp(state.t, t0, t1);
+      const host = $('tHost');
+      host.innerHTML = '';
+      host.append(makeSlider({ label: 't, the tilt', min: t0, max: t1, step: 0.01 }, state.t, (v) => {
+        state.t = v;
+        update();
+      }));
+      const kh = $('kHost');
+      kh.innerHTML = '';
+      if (state.view === 'moments') {
+        kh.append(makeSlider({ label: 'k, keep terms j = 0 to k', min: 0, max: 8, step: 1 }, state.k, (v) => {
+          state.k = v;
+          update();
+        }));
+      }
+    }
+
+    function renderControls() {
+      const v = state.view;
+      const family = v === 'tilt' || v === 'moments';
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === v));
+      document.querySelectorAll('[data-fam]').forEach((b) => b.classList.toggle('active', b.dataset.fam === state.fam));
+      document.querySelectorAll('[data-sum]').forEach((b) => b.classList.toggle('active', b.dataset.sum === sums.kind));
+      document.querySelectorAll('[data-dice]').forEach((b) => b.classList.toggle('active', b.dataset.dice === state.dice));
+      $('viewNote').textContent = VIEWS.find((x) => x.key === v).note;
+      $('famSection').hidden = !family;
+      $('sumSection').hidden = v !== 'sums';
+      $('diceSection').hidden = v !== 'products';
+      $('tSection').hidden = v === 'products';
+      $('sampleSection').hidden = v !== 'tilt' && v !== 'products';
+      $('sampleNote').textContent = v === 'products'
+        ? 'Roll the dice many times. The average of z₁z₂ settles near E[Z₁Z₂].'
+        : 'M(t) is an average of e^(tX). So a sample average estimates it. A heavy tail makes the estimate jump.';
+      const host = $('paramHost');
+      host.innerHTML = '';
+      FAM[state.fam].params.forEach((spec) => {
+        host.append(makeSlider(spec, params[state.fam][spec.key], (val) => {
+          params[state.fam][spec.key] = val;
+          state.samples = [];
+          if (state.fam === 'exponential') renderTSlider();
+          update();
+        }));
+      });
+      const sh = $('sumHost');
+      sh.innerHTML = '';
+      SUMS[sums.kind].params.forEach((spec) => {
+        sh.append(makeSlider(spec, sums[spec.key], (val) => {
+          sums[spec.key] = val;
+          state.pickS = null;
+          update();
+        }));
+      });
+      renderTSlider();
+    }
+
+    function apply(s) {
+      state.view = s.view;
+      if (s.fam) state.fam = s.fam;
+      if (s.P) Object.assign(params[s.fam], s.P);
+      if (s.S) Object.assign(sums, s.S);
+      if (s.dice) state.dice = s.dice;
+      if (s.t !== undefined) state.t = s.t;
+      if (s.k !== undefined) state.k = s.k;
+      state.samples = [];
+      state.rolls = [];
+      state.pickS = null;
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      const t = TOUR[state.tour];
+      apply(t);
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(v) {
+      state.view = v;
+      state.pickS = null;
+      renderControls();
+      update();
+    }
+
+    // ===================== READOUTS =====================
+    function legendHtml(items) {
+      return items.map(([cls, label]) => `<span class="legend"><span class="swatch ${cls}"></span>${label}</span>`).join('')
+        + 'Hover a chart for its numbers.';
+    }
+
+    function renderReadouts() {
+      const m = model;
+      let receipt;
+      let caption;
+      let legend;
+      if (m.kind === 'family') {
+        const d = m.der;
+        let formula = m.fam === 'lognormal' ? 'Simpson\'s rule, no closed form = ' : `${FAM[m.fam].formula} = `;
+        if (m.diverges) formula = '';
+        let third;
+        if (d) {
+          const v = d.d2 - d.d1 ** 2;
+          third = `M′(0) = E[X] = ${num(d.d1)} · M″(0) = E[X²] = ${num(d.d2)} · σ² = M″(0) − M′(0)² = ${num(v)} `
+            + tick(same(v, m.vari, 1e-9), 'the known variance', 'differs from the known variance');
+        } else {
+          third = `No mgf near t = 0. So M′(0) does not exist. Yet E[X] = e^(μ + σ²/2) = ${num(m.moms[1])} exists.`;
+        }
+        receipt = `<div>${esc(m.name)} · t = ${fmtX(m.t)}</div>`
+          + `<div class="big">M(t) = E[e^(tX)] = ${esc(formula)}<strong>${num(m.Mt)}</strong>`
+          + `${m.diverges && m.fam === 'exponential' ? ' · λ / (λ − t) holds only for t &lt; λ' : ''}</div><div>${third}</div>`;
+        if (state.view === 'tilt') {
+          caption = m.diverges
+            ? `<strong>The orange area is infinite.</strong> The weight e^(tx) grows faster than the tail shrinks. So M(${fmtX(m.t)}) does not exist.`
+            : `<strong>The orange area is M(${fmtX(m.t)}) = ${num(m.Mt)}.</strong> Positive t lifts the right side. Negative t lifts the left side. At t = 0 nothing moves and the area is 1.`;
+          if (m.fam === 'lognormal' && m.t > 0) caption += ' For a small t or σ the turn happens far off the chart.';
+          legend = legendHtml([['base', m.discrete ? 'p(x), and M(t)' : 'f(x), and M(t)'], ['tilt', 'e^(tx) times it: its area is M(t)'],
+            ['dot', 'sample average of e^(tX)']]);
+        } else {
+          const kept = m.terms.slice(0, state.k + 1).reduce((s, v) => s + v, 0);
+          caption = `<strong>The orange curve keeps terms j = 0 to ${state.k}.</strong> At t = 0 it touches M(t) exactly. `
+            + `k = 1 gives the tangent line. k = 2 gives the touching parabola. At t = ${fmtX(m.t)} the kept terms sum to ${num(kept)}.`;
+          legend = legendHtml([['base', 'M(t), and one bar per term'], ['tilt', `1 + tE[X] + … up to the term in t^${state.k}`]]);
+        }
+      } else if (m.kind === 'sums') {
+        const ok = same(m.product, m.sc.targetMgf(m.t), 1e-9) && same(m.direct(m.t), m.product, 1e-8);
+        const parts = sums.kind === 'poisson' ? m.parts.map(num).join(' × ') : `${num(m.parts[0])}^${sums.n}`;
+        receipt = `<div>${esc(m.name)}, independent · t = ${fmtX(m.t)}</div>`
+          + `<div class="big">M_S(t) = product of the part mgfs = ${parts} = <strong>${num(m.product)}</strong></div>`
+          + `<div>This is the ${m.targetName} mgf at t. ${tick(ok, `So S ~ ${m.targetName}.`, 'The mgfs disagree.')}</div>`;
+        caption = `<strong>Blue bars come from convolution. Orange marks come from ${m.targetName}.</strong> They match bar for bar. `
+          + 'The bottom chart shows the same match for the mgfs. Click a bar to pick the s that the Arithmetic tab works out.';
+        legend = legendHtml([['base', 'P(S = s) by convolution, and the product of mgfs'], ['tilt', `${m.targetName}, and Σ e^(ts) P(S = s)`]]);
+      } else {
+        const prod = m.e1 * m.e2;
+        const equal = Math.abs(m.e12 - prod) < 1e-9;
+        receipt = `<div>Two fair dice · ${esc(m.name)}</div>`
+          + `<div class="big">E[Z₁Z₂] = <strong>${num(m.e12)}</strong> · E[Z₁] × E[Z₂] = ${num(m.e1)} × ${num(m.e2)} = <strong>${num(prod)}</strong></div>`
+          + `<div>${equal ? '<span class="ok">✓ equal: the dice are independent</span>' : 'Not equal. That is expected: the rule needs independence.'}</div>`;
+        caption = state.dice === 'independent'
+          ? '<strong>All 36 cells carry 1/36.</strong> The average of the products equals the product of the averages.'
+          : `<strong>Only 6 cells carry weight, 1/6 each.</strong> ${state.dice === 'same' ? 'Big faces pair with big faces. So the products run high.' : 'Big faces pair with small faces. So the products run low.'}`;
+        legend = legendHtml([['base', 'E[Z₁Z₂], and the cell chances'], ['tilt', 'E[Z₁] × E[Z₂]'], ['ring', 'sample average']]);
+      }
+      $('receipt').innerHTML = receipt;
+      $('caption').innerHTML = caption;
+      $('legend').innerHTML = legend;
+      renderSampleLine();
+      renderFamTable();
+      renderArithmetic();
+    }
+
+    function renderSampleLine() {
+      if (model.kind === 'products') {
+        $('sampleLine').textContent = model.n ? `n = ${model.n} rolls · average of z₁z₂ = ${num(model.avg)} · E[Z₁Z₂] = ${num(model.e12)}` : 'No rolls yet.';
+      } else if (model.kind === 'family') {
+        const n = state.samples.length;
+        $('sampleLine').textContent = n ? `n = ${n} · average of e^(tX) = ${num(sampleAverage())} · M(t) = ${num(model.Mt)}` : 'No samples yet.';
+      }
+    }
+
+    function renderFamTable() {
+      const rows = [
+        ['bernoulli', 'Bernoulli(p)', '1 − p + pe^t', 'p', 'p'],
+        ['binomial', 'Binomial(n, p)', '(1 − p + pe^t)ⁿ', 'np', 'n(n − 1)p² + np'],
+        ['poisson', 'Poisson(λ)', 'e^(λ(e^t − 1))', 'λ', 'λ² + λ'],
+        ['exponential', 'Exp(λ)', 'λ / (λ − t), t < λ', '1/λ', '2/λ²'],
+        ['uniform', 'U(a, b)', '(e^(tb) − e^(ta)) / (t(b − a))', '(a + b)/2', '(a² + ab + b²)/3'],
+        ['normal', 'N(μ, σ²)', 'e^(μt + σ²t²/2)', 'μ', 'μ² + σ²'],
+        ['lognormal', 'Lognormal', '∞ for every t > 0', 'none', 'none'],
+      ];
+      const cur = model.kind === 'family' ? model.fam : '';
+      $('famTable').innerHTML = '<tr><th>X</th><th>M(t)</th><th>M′(0)</th><th>M″(0)</th></tr>'
+        + rows.map(([k, n, f, a, b]) => `<tr class="${k === cur ? 'current' : ''}"><td>${n}</td><td class="f">${esc(f)}</td><td class="f">${a}</td><td class="f">${b}</td></tr>`).join('');
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    const H = 1e-4;
+    const numF = (v) => minus(String(+v.toPrecision(12)));
+
+    // The closed form of M(t) with the numbers substituted.
+    function closedLines(fam, P, t) {
+      const L = 'M(t)';
+      const et = Math.exp(t);
+      const M = mgf(fam, P, t);
+      if (fam === 'bernoulli') {
+        return chain(L, ['1 − p + p·e^t', `${num(1 - P.p)} + ${num(P.p)} × e^${paren(t)}`, `${num(1 - P.p)} + ${num(P.p)} × ${num(et)}`,
+          `${num(1 - P.p)} + ${num(P.p * et)}`, num(M)]);
+      }
+      if (fam === 'binomial') {
+        const base = 1 - P.p + P.p * et;
+        return chain(L, ['(1 − p + p·e^t)ⁿ', `(${num(1 - P.p)} + ${num(P.p)} × ${num(et)})^${P.n}`, `${num(base)}^${P.n}`, num(M)]);
+      }
+      if (fam === 'poisson') {
+        return chain(L, ['e^(λ(e^t − 1))', `e^(${num(P.lambda)} × (${num(et)} − 1))`, `e^(${num(P.lambda * (et - 1))})`, num(M)]);
+      }
+      if (fam === 'exponential') {
+        if (t >= P.lambda) return chain(L, ['λ / (λ − t)', `needs t < λ = ${num(P.lambda)}, but t = ${num(t)}`, '∞']);
+        return chain(L, ['λ / (λ − t)', `${num(P.lambda)} / (${num(P.lambda)} − ${paren(t)})`, `${num(P.lambda)} / ${num(P.lambda - t)}`, num(M)]);
+      }
+      if (fam === 'uniform') {
+        if (t === 0) return chain(L, ['1 at t = 0, the limit of (e^(tb) − e^(ta)) / (t(b − a))']);
+        const w = P.b - P.a;
+        return chain(L, ['(e^(tb) − e^(ta)) / (t(b − a))', `(e^(${paren(t)} × ${paren(P.b)}) − e^(${paren(t)} × ${paren(P.a)})) / (${paren(t)} × ${num(w)})`,
+          `(${num(Math.exp(t * P.b))} − ${num(Math.exp(t * P.a))}) / ${paren(t * w)}`, num(M)]);
+      }
+      const s2 = P.sigma ** 2;
+      return chain(L, ['e^(μt + σ²t²/2)', `e^(${paren(P.mu)} × ${paren(t)} + ${num(s2)} × ${num(t * t)} / 2)`,
+        `e^(${num(P.mu * t + (s2 * t * t) / 2)})`, num(M)]);
+    }
+
+    // M′(0) and M″(0) by differentiating the closed form, with the numbers substituted.
+    function slopeLines(fam, P) {
+      const d = mgfDerivs(fam, P);
+      if (fam === 'bernoulli') {
+        return {
+          one: ['M′(t) = p·e^t', ...chain('M′(0)', ['p × e⁰', `${num(P.p)} × 1`, num(d.d1)])],
+          two: ['M″(t) = p·e^t', ...chain('M″(0)', ['p × e⁰', num(d.d2)])],
+        };
+      }
+      if (fam === 'binomial') {
+        return {
+          one: ['M′(t) = n(1 − p + pe^t)^(n−1) · pe^t', ...chain('M′(0)', ['n × 1^(n−1) × p', `${P.n} × ${num(P.p)}`, num(d.d1)])],
+          two: ['M″(0) = n(n − 1)p² + np, by the product rule',
+            ...chain('M″(0)', [`${P.n} × ${P.n - 1} × ${num(P.p ** 2)} + ${num(P.n * P.p)}`, `${num(P.n * (P.n - 1) * P.p ** 2)} + ${num(P.n * P.p)}`, num(d.d2)])],
+        };
+      }
+      if (fam === 'poisson') {
+        return {
+          one: ['M′(t) = λe^t · M(t)', ...chain('M′(0)', ['λ × e⁰ × M(0)', `${num(P.lambda)} × 1 × 1`, num(d.d1)])],
+          two: ['M″(t) = (λe^t + λ²e^(2t)) · M(t)', ...chain('M″(0)', ['λ + λ²', `${num(P.lambda)} + ${num(P.lambda ** 2)}`, num(d.d2)])],
+        };
+      }
+      if (fam === 'exponential') {
+        return {
+          one: ['M′(t) = λ / (λ − t)²', ...chain('M′(0)', ['λ / λ²', `1 / ${num(P.lambda)}`, num(d.d1)])],
+          two: ['M″(t) = 2λ / (λ − t)³', ...chain('M″(0)', ['2λ / λ³', `2 / ${num(P.lambda ** 2)}`, num(d.d2)])],
+        };
+      }
+      if (fam === 'uniform') {
+        return {
+          one: ['M(t) = 1 + t(a + b)/2 + t²(a² + ab + b²)/6 + …', ...chain('M′(0)', ['(a + b) / 2', `(${num(P.a)} + ${num(P.b)}) / 2`, num(d.d1)])],
+          two: ['M″(0) = 2 × the t² coefficient', ...chain('M″(0)', ['(a² + ab + b²) / 3',
+            `(${num(P.a ** 2)} + ${paren(P.a * P.b)} + ${num(P.b ** 2)}) / 3`, num(d.d2)])],
+        };
+      }
+      return {
+        one: ['M′(t) = (μ + σ²t) · M(t)', ...chain('M′(0)', ['μ × M(0)', `${num(P.mu)} × 1`, num(d.d1)])],
+        two: ['M″(t) = (σ² + (μ + σ²t)²) · M(t)', ...chain('M″(0)', ['σ² + μ²', `${num(P.sigma ** 2)} + ${num(P.mu ** 2)}`, num(d.d2)])],
+      };
+    }
+
+    function varianceLine(fam, P) {
+      const v = variance(fam, P);
+      if (fam === 'bernoulli') return `p(1 − p) = ${num(P.p)} × ${num(1 - P.p)} = ${num(v)}`;
+      if (fam === 'binomial') return `np(1 − p) = ${P.n} × ${num(P.p)} × ${num(1 - P.p)} = ${num(v)}`;
+      if (fam === 'poisson') return `λ = ${num(v)}`;
+      if (fam === 'exponential') return `1/λ² = 1 / ${num(P.lambda ** 2)} = ${num(v)}`;
+      if (fam === 'uniform') return `(b − a)²/12 = ${num((P.b - P.a) ** 2)} / 12 = ${num(v)}`;
+      if (fam === 'normal') return `σ² = ${num(v)}`;
+      return `(e^(σ²) − 1)e^(2μ + σ²) = ${num(v)}`;
+    }
+
+    // Block 1: M(t) as a sum or as thin strips of area.
+    function sumOrStrips(m) {
+      const t = m.t;
+      if (m.discrete) {
+        const rows = m.cols.map((c) => [`x = ${c.x}`, `e^(${num(t)} × ${c.x}) × ${num(c.p)} = ${num(Math.exp(t * c.x))} × ${num(c.p)}`, num(c.w), 'l']);
+        const tail = (from, to, label) => {
+          let s = 0;
+          for (let i = from; i <= to; i += 1) s += Math.exp(t * m.xs[i]) * m.ps[i];
+          return [label, `${to - from + 1} more terms, summed`, num(s), 'tail'];
+        };
+        if (m.hi < m.xs.length - 1) rows.push(tail(m.hi + 1, m.xs.length - 1, `x > ${m.xs[m.hi]}`));
+        const direct = directMgf(m.fam, m.P, t);
+        return block(`1 · <span class="nocase">M(t)</span> as a sum at <span class="nocase">t</span> = ${fmtX(t)}`, 'M(t) = Σ e^(tx) · p(x)',
+          rowsHtml(rows), `M(${fmtX(t)}) = sum of the last column = <strong>${num(direct)}</strong>`);
+      }
+      if (m.diverges) {
+        let rows;
+        let note;
+        if (m.fam === 'exponential') {
+          const r = t - m.P.lambda;
+          rows = [1, 10, 100, 1000].map((x) => [`x = ${x}`, `λe^((t − λ)x) = ${num(m.P.lambda)} × e^(${num(r)} × ${x})`, num(m.P.lambda * Math.exp(r * x)), 'r']);
+          note = 'The integrand never shrinks. So the area under it is infinite.';
+        } else {
+          rows = [10, 100, 1000, 1e4, 1e5, 1e6].map((x) => {
+            const lx = Math.log(x);
+            const v = t * x - ((lx - m.P.mu) ** 2) / (2 * m.P.sigma ** 2) - Math.log(x * m.P.sigma * SQRT_2PI);
+            return [`x = ${num(x)}`, `${num(t * x)} − ${num(((lx - m.P.mu) ** 2) / (2 * m.P.sigma ** 2))} − ${num(Math.log(x * m.P.sigma * SQRT_2PI))}`, numS(v), 'r'];
+          });
+          note = 'These are logs: ln[e^(tx) f(x)] = tx − (ln x − μ)²/(2σ²) − ln(xσ√(2π)). '
+            + 'The first term grows like x. The others grow like (ln x)². So the integrand grows without end.';
+        }
+        return block(`1 · <span class="nocase">M(t)</span> as an integral at <span class="nocase">t</span> = ${fmtX(t)}`, 'M(t) = ∫ e^(tx) f(x) dx',
+          rowsHtml(rows), `${note}<br>M(${fmtX(t)}) = <strong>∞</strong>`);
+      }
+      // Twelve midpoint strips over the chart window, then the tail beyond it.
+      const [a, b] = m.fam === 'uniform' ? [m.P.a, m.P.b]
+        : m.fam === 'normal' ? [m.P.mu + m.P.sigma ** 2 * t - 5 * m.P.sigma, m.P.mu + m.P.sigma ** 2 * t + 5 * m.P.sigma]
+          : [0, m.x1];
+      const h = (b - a) / 12;
+      let strips = 0;
+      const rows = [];
+      for (let i = 0; i < 12; i += 1) {
+        const x = a + (i + 0.5) * h;
+        const f = density(m.fam, m.P, x);
+        const v = Math.exp(t * x) * f * h;
+        strips += v;
+        rows.push([`x = ${num(x)}`, `e^(${num(t)}×${paren(x)}) × ${num(f)} × ${num(h)}`, num(v), 'l']);
+      }
+      let tailNote = '';
+      if (m.fam === 'exponential') {
+        const r = m.P.lambda - t;
+        const tail = (m.P.lambda * Math.exp(-r * b)) / r;
+        rows.push([`x > ${num(b)}`, `λe^(−(λ − t)·${num(b)}) / (λ − t) by integration`, num(tail), 'tail']);
+        strips += tail;
+      } else if (m.fam === 'normal') {
+        tailNote = ' The strips cover ±5σ around the tilted peak. The tails beyond hold less than 1e−6 of the area.';
+      } else if (m.fam === 'lognormal') {
+        tailNote = ' The strips stop at the chart edge. Coarse strips also miss the sharp peak near 0.';
+      }
+      const fine = directMgf(m.fam, m.P, t);
+      return block(`1 · <span class="nocase">M(t)</span> as an integral at <span class="nocase">t</span> = ${fmtX(t)}`, `M(t) = ∫ e^(tx) f(x) dx ≈ Σ e^(tx) × f(x) × h, h = ${num(h)}`,
+        rowsHtml(rows), `12 strips give ≈ ${num(strips)}.${tailNote}<br>Simpson's rule with thousands of strips gives <strong>${num(fine)}</strong>.`);
+    }
+
+    function familyArithmetic(m) {
+      const parts = [sumOrStrips(m)];
+      const direct = directMgf(m.fam, m.P, m.t);
+      if (m.fam === 'lognormal') {
+        parts.push(block('2 · The closed form', 'The Lognormal mgf has no closed form.', '',
+          m.t > 0 ? 'Both routes agree: M(t) = ∞ for every t > 0.' : `Simpson's rule is the whole answer here: M(${fmtX(m.t)}) = <strong>${num(direct)}</strong>.`));
+        const e1 = m.moms[1];
+        const e2 = m.moms[2];
+        const lines = [
+          ...chain('E[X] ', ['e^(μ + σ²/2)', `e^(${paren(m.P.mu)} + ${num(m.P.sigma ** 2)} / 2)`, num(e1)]),
+          ...chain('E[X²]', ['e^(2μ + 2σ²)', `e^(${num(2 * m.P.mu)} + ${num(2 * m.P.sigma ** 2)})`, num(e2)]),
+          ...chain('σ²   ', ['E[X²] − E[X]²', `${num(e2)} − ${num(e1)}²`, num(e2 - e1 * e1)]),
+        ];
+        parts.push(block('3 · The moments without an mgf', 'E[Xᵏ] = e^(kμ + k²σ²/2), a standard result', linesHtml(lines),
+          `M(t) is infinite for every t > 0. So M′(0) does not exist. The moments still exist.<br>`
+            + `Known variance ${varianceLine(m.fam, m.P)} ${tick(same(e2 - e1 * e1, m.vari, 1e-9), 'matches', 'differs')}`));
+      } else {
+        parts.push(block('2 · The closed form', `M(t) = ${FAM[m.fam].formula}, a standard result`, linesHtml(closedLines(m.fam, m.P, m.t)),
+          tick(same(m.Mt, direct, 1e-6), m.discrete ? 'matches the sum in block 1' : 'matches Simpson\'s rule', 'differs from block 1')));
+        const sl = slopeLines(m.fam, m.P);
+        const M = (u) => mgf(m.fam, m.P, u);
+        const fd1 = (M(H) - M(-H)) / (2 * H);
+        const fd2 = (M(H) - 2 * M(0) + M(-H)) / (H * H);
+        const d = m.der;
+        parts.push(block('3 · Slope at 0 gives <span class="nocase">E[X]</span>', 'E[X] = M′(0)', linesHtml([...sl.one, '',
+          'Check by a finite difference with h = 0.0001:',
+          `M(h)  = ${numF(M(H))}`, `M(−h) = ${numF(M(-H))}`,
+          `[M(h) − M(−h)] / 2h = ${num(fd1)}`]),
+        `E[X] = M′(0) = <strong>${num(d.d1)}</strong> ${tick(same(fd1, d.d1, 1e-4), 'the finite difference agrees', 'the finite difference disagrees')}`));
+        parts.push(block('4 · Curvature at 0 gives <span class="nocase">E[X²]</span>', 'E[X²] = M″(0)', linesHtml([...sl.two, '',
+          'Check by a finite difference with h = 0.0001:',
+          `M(h)  = ${numF(M(H))}`, `M(−h) = ${numF(M(-H))}`,
+          `[M(h) − 2M(0) + M(−h)] / h² = ${num(fd2)}`]),
+        `E[X²] = M″(0) = <strong>${num(d.d2)}</strong> ${tick(same(fd2, d.d2, 1e-4), 'the finite difference agrees', 'the finite difference disagrees')}`));
+        const v = d.d2 - d.d1 ** 2;
+        parts.push(block('5 · The variance', 'σ² = M″(0) − M′(0)² = E[X²] − E[X]²',
+          linesHtml(chain('σ²', ['M″(0) − M′(0)²', `${num(d.d2)} − ${paren(d.d1)}²`, `${num(d.d2)} − ${num(d.d1 ** 2)}`, num(v)])),
+          `Known variance ${varianceLine(m.fam, m.P)} ${tick(same(v, m.vari, 1e-9), 'matches', 'differs')}`));
+      }
+      if (state.view === 'moments') {
+        const facts = [1, 1, 2, 6, 24, 120, 720, 5040, 40320];
+        let run = 0;
+        const rows = m.terms.map((v, j) => {
+          if (j <= state.k) run += v;
+          return [`j = ${j}`, `${paren(m.t)}^${j} × ${num(m.moms[j])} / ${facts[j]}`, numS(v), j <= state.k ? 'l' : 'dim'];
+        });
+        const gap = m.Mt - run;
+        parts.push(block(`6 · The washing line at <span class="nocase">t</span> = ${fmtX(m.t)}`, 'term j = t^j × E[X^j] / j!',
+          rowsHtml(rows),
+          `Terms j = 0 to ${state.k} sum to <strong>${num(run)}</strong>. M(t) = ${num(m.Mt)}.`
+            + (Number.isFinite(gap) ? ` The gap is ${num(gap)}.` : ' The series cannot reach ∞.')
+            + (m.fam === 'lognormal' ? ' Term j grows like e^(j²σ²/2) in the end. So the series diverges, even when the first terms shrink.' : '')));
+      }
+      if (state.view === 'tilt' && state.samples.length) {
+        const n = state.samples.length;
+        const rows = state.samples.slice(0, 5).map((x, i) => [`sample ${i + 1}`, `e^(${num(m.t)} × ${paren(x)})`, num(Math.exp(m.t * x))]);
+        let total = 0;
+        state.samples.forEach((x) => { total += Math.exp(m.t * x); });
+        if (n > 5) rows.push([`${n - 5} more`, 'summed', num(total - rows.reduce((s, _, i) => s + Math.exp(m.t * state.samples[i]), 0)), 'tail']);
+        parts.push(block('7 · The sample average', 'M(t) ≈ (1/n) Σ e^(tXᵢ)', rowsHtml(rows),
+          `average = ${num(total)} / ${n} = <strong>${num(total / n)}</strong>. The exact M(t) = ${num(m.Mt)}.`));
+      }
+      return parts;
+    }
+
+    function sumsArithmetic(m) {
+      const parts = [];
+      const s = m.s;
+      const poisson = sums.kind === 'poisson';
+      if (poisson) {
+        const [p1, p2] = m.sc.parts;
+        const rows = [];
+        let total = 0;
+        for (let k = 0; k <= s; k += 1) {
+          const v = (p1[k] || 0) * (p2[s - k] || 0);
+          total += v;
+          rows.push([`k = ${k}`, `P(X₁ = ${k}) × P(X₂ = ${s - k}) = ${num(p1[k] || 0)} × ${num(p2[s - k] || 0)}`, num(v), 'l']);
+        }
+        parts.push(block(`1 · One bar the slow way, <span class="nocase">s</span> = ${s}`, 'P(S = s) = Σₖ P(X₁ = k) P(X₂ = s − k)', rowsHtml(rows),
+          `P(S = ${s}) = <strong>${num(total)}</strong>. ${m.targetName} gives ${num(m.target[s])} `
+            + tick(same(total, m.target[s], 1e-9), 'same', 'different')));
+        const [a, b] = m.parts;
+        const e = Math.exp(m.t) - 1;
+        parts.push(block('2 · Each part\'s mgf at <span class="nocase">t</span>', 'M_X(t) = e^(λ(e^t − 1))', linesHtml([
+          ...chain('M_X₁(t)', [`e^(${num(sums.l1)} × (e^${paren(m.t)} − 1))`, `e^(${num(sums.l1 * e)})`, num(a)]),
+          ...chain('M_X₂(t)', [`e^(${num(sums.l2)} × (e^${paren(m.t)} − 1))`, `e^(${num(sums.l2 * e)})`, num(b)]),
+        ]), 'Two quick closed forms. No convolution needed.'));
+        const total5 = sums.l1 + sums.l2;
+        parts.push(block('3 · Multiply', 'M_S(t) = M_X₁(t) × M_X₂(t)', linesHtml([
+          ...chain('M_S(t)', [`${num(a)} × ${num(b)}`, num(m.product)]),
+          ...chain('      ', [`e^((λ₁ + λ₂)(e^t − 1)) = e^(${num(total5)} × ${num(e)})`, num(m.sc.targetMgf(m.t))]),
+        ]), tick(same(m.product, m.sc.targetMgf(m.t), 1e-9), `the exponents add. This is the ${m.targetName} mgf.`, 'the two lines differ')));
+      } else {
+        const prev = m.sc.prev;
+        const q = 1 - sums.p;
+        const a = prev[s] || 0;
+        const b = s > 0 ? prev[s - 1] || 0 : 0;
+        const v = a * q + b * sums.p;
+        parts.push(block(`1 · One bar the slow way, <span class="nocase">s</span> = ${s}`, `P(Sₙ = s) = P(Sₙ₋₁ = s)(1 − p) + P(Sₙ₋₁ = s − 1)p, n = ${sums.n}`,
+          rowsHtml([
+            ['last trial = 0', `P(Sₙ₋₁ = ${s}) × (1 − p) = ${num(a)} × ${num(q)}`, num(a * q), 'l'],
+            ['last trial = 1', `P(Sₙ₋₁ = ${s - 1}) × p = ${num(b)} × ${num(sums.p)}`, num(b * sums.p), 'l'],
+          ]),
+          `P(S = ${s}) = <strong>${num(v)}</strong>. ${m.targetName} gives ${num(m.target[s])} ${tick(same(v, m.target[s], 1e-9), 'same', 'different')}<br>`
+            + 'The page repeats this step once per trial. That is convolution with one Bernoulli at a time.'));
+        const one = m.parts[0];
+        parts.push(block('2 · Each trial\'s mgf at <span class="nocase">t</span>', 'M_X(t) = 1 − p + p·e^t', linesHtml(
+          chain('M_X(t)', [`${num(q)} + ${num(sums.p)} × ${num(Math.exp(m.t))}`, num(one)]),
+        ), `All ${sums.n} trials share this mgf.`));
+        parts.push(block('3 · Multiply', `M_S(t) = M_X(t)^n with n = ${sums.n}`, linesHtml(chain('M_S(t)', [`${num(one)}^${sums.n}`, num(m.product)])),
+          tick(same(m.product, m.sc.targetMgf(m.t), 1e-9), `this is the ${m.targetName} mgf (1 − p + pe^t)ⁿ.`, 'differs from the Binomial mgf')));
+      }
+      // Block 4: the convolved pmf's own mgf.
+      const rows = [];
+      for (let x = m.lo; x <= m.hi; x += 1) {
+        rows.push([`s = ${x}`, `e^(${num(m.t)} × ${x}) × ${num(m.conv[x])}`, num(Math.exp(m.t * x) * m.conv[x]), 'l']);
+      }
+      let rest = 0;
+      m.conv.forEach((p, x) => { if (x < m.lo || x > m.hi) rest += Math.exp(m.t * x) * p; });
+      if (rest > 0) rows.push(['other s', 'tiny bars, summed', num(rest), 'tail']);
+      const direct = m.direct(m.t);
+      parts.push(block('4 · Check against the convolved pmf', 'M_S(t) = Σ e^(ts) P(S = s)', rowsHtml(rows),
+        `Σ = <strong>${num(direct)}</strong> ${tick(same(direct, m.product, 1e-8), 'same as the product of mgfs', 'differs from the product')}`));
+      parts.push(block('5 · Name the answer', 'uniqueness: same mgf ⇒ same distribution', linesHtml([
+        ...chain('E[S]  ', ['M_S′(0)', num(m.mean)]),
+        ...chain('Var(S)', ['M_S″(0) − M_S′(0)²', num(m.vari)]),
+      ]), `The product equals the ${m.targetName} mgf for every t. So S ~ ${m.targetName}.`));
+      return parts;
+    }
+
+    function productsArithmetic(m) {
+      const parts = [];
+      const rows = m.J.map((row, i) => {
+        const z1 = i + 1;
+        const terms = row.map((p, j) => (p > 0 ? `${z1}×${j + 1}` : null)).filter(Boolean);
+        const v = row.reduce((s, p, j) => s + z1 * (j + 1) * p, 0);
+        const w = state.dice === 'independent' ? `(${terms.join(' + ')}) × 1/36` : `${terms[0]} × 1/6`;
+        return [`z₁ = ${z1}`, w, num(v), 'l'];
+      });
+      parts.push(block('1 · <span class="nocase">E[Z₁Z₂]</span> row by row', 'E[Z₁Z₂] = Σ z₁ z₂ P(Z₁ = z₁, Z₂ = z₂)', rowsHtml(rows),
+        `E[Z₁Z₂] = sum of the last column = <strong>${num(m.e12)}</strong>`
+          + (state.dice === 'independent' ? ' = 441/36' : state.dice === 'same' ? ' = 91/6' : ' = 56/6')));
+      parts.push(block('2 · <span class="nocase">E[Z₁]</span> and <span class="nocase">E[Z₂]</span>', 'E[Z] = Σ z P(Z = z)', linesHtml([
+        ...chain('E[Z₁]', ['(1 + 2 + 3 + 4 + 5 + 6) / 6', '21 / 6', num(m.e1)]),
+        ...chain('E[Z₂]', ['(1 + 2 + 3 + 4 + 5 + 6) / 6', '21 / 6', num(m.e2)]),
+      ]), 'Each die alone is fair in every mode. Only the pairing changes.'));
+      const prod = m.e1 * m.e2;
+      const equal = Math.abs(m.e12 - prod) < 1e-9;
+      parts.push(block('3 · Compare', 'E[Z₁] × E[Z₂]', linesHtml([
+        ...chain('E[Z₁] × E[Z₂]', [`${num(m.e1)} × ${num(m.e2)}`, num(prod)]),
+        ...chain('E[Z₁Z₂] − E[Z₁]E[Z₂]', [`${num(m.e12)} − ${num(prod)}`, num(m.e12 - prod)]),
+      ]), equal ? '<span class="ok">✓ equal, as the slide promises for independent Z₁ and Z₂</span>'
+        : 'Not equal. That is no error: the slide rule needs independence. The gap is called the covariance.'));
+      if (m.n) {
+        parts.push(block('4 · The sample average', 'E[Z₁Z₂] ≈ (1/n) Σ z₁z₂', '',
+          `${m.n} rolls give an average of <strong>${num(m.avg)}</strong>. The exact value is ${num(m.e12)}.`));
+      }
+      return parts;
+    }
+
+    function renderArithmetic() {
+      const m = model;
+      let head;
+      let parts;
+      if (m.kind === 'family') {
+        head = `<strong>${esc(m.name)} at t = ${fmtX(m.t)}.</strong> Block 1 builds M(t) from its definition. `
+          + 'Blocks 2 to 5 read the moments off the closed form.';
+        parts = familyArithmetic(m);
+      } else if (m.kind === 'sums') {
+        head = `<strong>${esc(m.name)}.</strong> The slow route convolves pmfs. The fast route multiplies mgfs. Both must agree.`;
+        parts = sumsArithmetic(m);
+      } else {
+        head = `<strong>Two fair dice: ${esc(m.name)}.</strong> Each row adds the six cells of one value of z₁.`;
+        parts = productsArithmetic(m);
+      }
+      $('arithHead').innerHTML = head;
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${i + 1}</b><span>${v.word}</span>`;
+      b.dataset.view = v.key;
+      b.addEventListener('click', () => setView(v.key));
+      $('viewGrid').append(b);
+    });
+    Object.entries(FAM).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.fam = k;
+      b.addEventListener('click', () => {
+        state.fam = k;
+        state.samples = [];
+        renderControls();
+        update();
+      });
+      $('famGrid').append(b);
+    });
+    Object.entries(SUMS).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.sum = k;
+      b.addEventListener('click', () => {
+        sums.kind = k;
+        state.pickS = null;
+        renderControls();
+        update();
+      });
+      $('sumGrid').append(b);
+    });
+    Object.entries(DICE).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.dice = k;
+      b.addEventListener('click', () => {
+        state.dice = k;
+        state.rolls = [];
+        renderControls();
+        update();
+      });
+      $('diceGrid').append(b);
+    });
+    function draw1(n) {
+      if (state.view === 'products') {
+        for (let i = 0; i < n; i += 1) state.rolls.push(rollDice(state.dice, Math.random));
+        if (state.rolls.length > 20000) state.rolls = state.rolls.slice(-20000);
+      } else {
+        const P = kitP(state.fam);
+        for (let i = 0; i < n; i += 1) state.samples.push(sample(state.fam, P, Math.random));
+        if (state.samples.length > 20000) state.samples = state.samples.slice(-20000);
+      }
+      update();
+    }
+    $('sample1').addEventListener('click', () => draw1(1));
+    $('sample1000').addEventListener('click', () => draw1(1000));
+    $('sampleReset').addEventListener('click', () => {
+      state.samples = [];
+      state.rolls = [];
+      update();
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-4]$/.test(e.key)) setView(VIEWS[+e.key - 1].key);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

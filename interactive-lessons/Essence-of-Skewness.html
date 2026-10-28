@@ -1,0 +1,1524 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Essence of Skewness · The Cubed Seesaw</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .verdict { color: var(--blue-1); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 13px; margin-left: 8px; }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.left { background: var(--left); }
+    .swatch.right { background: var(--right); }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.tail {
+      background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 4px);
+      border: 1px solid var(--muted);
+    }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav .formula-chip { font-family: var(--mono); color: var(--ink); }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .lens-grid { display: grid; gap: 6px; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .lens-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .lens-grid button b { font-size: 15px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.l { box-shadow: inset 3px 0 0 var(--left); }
+    .arith div.r { box-shadow: inset 3px 0 0 var(--right); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+    .kv strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    table.calc { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+    table.calc th, table.calc td { text-align: right; padding: 3px 5px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    table.calc th { color: var(--blue-1); font-weight: 700; position: sticky; top: 0; background: #0a1627; }
+    table.calc td:first-child, table.calc th:first-child { text-align: left; }
+    table.calc tr.l td:first-child { box-shadow: inset 3px 0 0 var(--left); }
+    table.calc tr.r td:first-child { box-shadow: inset 3px 0 0 var(--right); }
+    table.calc tr.tail td { font-style: italic; }
+    table.calc tr.sum td { color: var(--ink); font-weight: 700; border-top: 2px solid var(--line); }
+    .table-wrap { max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+    table.forms { width: 100%; border-collapse: collapse; font-size: 12px; color: var(--muted); }
+    table.forms th, table.forms td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    table.forms th { color: var(--blue-1); font-weight: 700; }
+    table.forms td.f { font-family: var(--mono); color: var(--ink); white-space: nowrap; }
+    table.forms tr.current td { background: rgba(19, 52, 92, 0.45); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Moments · 50008 Lecture 3 · Skewness</div>
+        <h1>Skewness: the cubed seesaw</h1>
+        <p class="lead">
+          The mean is the point where the bars <strong>balance</strong>.
+          Now let every distance from the mean count <strong>cubed</strong>.
+          Which way does the seesaw tip, and how hard?
+          Measured in units of σ³, that tip is the skewness <strong>γ₁</strong>.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div class="hint">
+          <span class="legend"><span class="swatch left"></span>left of μ</span>
+          <span class="legend"><span class="swatch right"></span>right of μ</span>
+          <span class="legend"><span class="swatch mean"></span>μ, the balance point</span>
+          <span class="legend"><span class="swatch sigma"></span>μ ± σ</span>
+          <span class="legend"><span class="swatch tail"></span>far tail, summed into one bar</span>
+          Hover a bar for its numbers.
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <span>50008 Probability · L03 Moments</span>
+        <span class="formula-chip">γ₁ = E[(X − μ)³] / σ³</span>
+      </nav>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · many shapes, one formula</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next shape →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 5 pick a step.
+            The Arithmetic tab writes out every sum for the shape on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Build <span class="nocase">γ₁</span> in five steps</div>
+          <div class="body">The same recipe builds the mean, the variance and γ₁.
+            Each step changes the bottom chart and the tug-of-war bar.</div>
+          <div id="lensGrid" class="lens-grid"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a distribution</div>
+          <div id="kindGrid" class="preset-grid three"></div>
+          <div id="paramHost" style="display: grid; gap: 8px;"></div>
+          <div id="shapeHost" style="display: grid; gap: 8px;" hidden>
+            <div class="body">Drag up and down on the top chart to paint bars.
+              The page rescales them so they sum to 1.</div>
+            <div id="shapeGrid" class="preset-grid"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · A fair die. Is γ₁ positive, negative or zero?</summary>
+            <div class="answer"><strong>Zero.</strong> Each deviation from 3.5 has a twin of the opposite sign.
+              Cubes keep the sign. So the pairs cancel.</div>
+            <button data-predict="0">Set it up: U({1, …, 6})</button>
+          </details>
+          <details class="predict">
+            <summary>2 · Bernoulli(0.1) has its tall bar on the left. Which way does it skew?</summary>
+            <div class="answer"><strong>Right, γ₁ = +2.67.</strong> The tall bar is close to μ = 0.1.
+              The rare 1 is 0.9 away. Distance is cubed but probability is not.
+              A long lever beats a heavy weight.</div>
+            <button data-predict="1">Set it up: Bernoulli(0.1)</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Poisson: raise λ from 1 to 25. What happens to γ₁?</summary>
+            <div class="answer"><strong>It shrinks like 1/√λ.</strong> It falls from 1 to 0.2.
+              The bulk moves away from the wall at 0. The pmf looks more and more symmetric.</div>
+            <button data-predict="2">Set it up: Poisson(1). Then drag λ.</button>
+          </details>
+          <details class="predict">
+            <summary>4 · Stretch X by 3. Does γ₁ change? What if you flip X?</summary>
+            <div class="answer"><strong>Stretch: no change.</strong> E[(X − μ)³] grows by 3³ = 27.
+              σ³ grows by 27 too. <strong>Flip: the sign changes.</strong>
+              Every (x − μ) changes sign. So every cube does too.</div>
+            <button data-predict="3">Set it up: Geometric(0.25). Then use Move, stretch, flip.</button>
+          </details>
+          <details class="predict">
+            <summary>5 · Can a lopsided pmf have γ₁ = 0?</summary>
+            <div class="answer"><strong>Yes.</strong> Load the example and look at step 4.
+              The left and right pulls have equal size. A symmetric pmf always has γ₁ = 0.
+              The reverse is false.</div>
+            <button data-predict="4">Set it up: x = 1, 5, 10 with p = 1/6, 1/2, 1/3</button>
+          </details>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Move, stretch, flip</div>
+          <div class="body">Replace X by Y = aX + b. Watch the bars and γ₁.</div>
+          <div id="transformHost" style="display: grid; gap: 8px;"></div>
+          <label class="checkbox"><input id="mirrorBox" type="checkbox"> Flip: X → −X</label>
+          <div id="transformLine" class="live-line"></div>
+          <button id="transformReset">Reset to Y = X</button>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">The formula</div>
+          <div class="formula">γ₁ = E[(X − μ)³] / σ³
+   = Σₓ (x − μ)³ p(x) / σ³
+   = Σₓ z³ p(x),     z = (x − μ) / σ
+
+shortcut, like Var(X) = E[X²] − μ²:
+E[(X − μ)³] = E[X³] − 3μ E[X²] + 2μ³</div>
+          <div class="body">The last line of the definition is the picture.
+            Turn each outcome into a z-score. Cube it. Average with the pmf weights.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Live worked table</div>
+          <div id="tableTitle" class="body"></div>
+          <div class="table-wrap"><table id="calcTable" class="calc"></table></div>
+          <div id="tableResult" class="kv"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Shortcut route</div>
+          <div id="shortcut" class="kv"></div>
+          <div class="body">The shortcut subtracts large numbers. Shift X far from 0 and rounding errors grow.
+            The table route stays accurate.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Lecture closed forms</div>
+          <table id="formsTable" class="forms"></table>
+          <div class="formula">Bernoulli, by hand:
+E[(X − p)³] = (1 − p)(0 − p)³ + p(1 − p)³
+            = p(1 − p)[(1 − p)² − p²]
+            = p(1 − p)(1 − 2p)
+σ³          = [p(1 − p)]^(3/2)
+γ₁          = (1 − 2p) / √(p(1 − p))</div>
+          <div class="body"><strong>Why Binomial divides by √n.</strong> Take independent X and Y.
+            Call their centred parts A and B.
+            Then E[(A + B)³] = E[A³] + 3E[A²]E[B] + 3E[A]E[B²] + E[B³].
+            E[A] and E[B] are 0. So third central moments add, just as variances do.
+            n Bernoullis give n·p(1 − p)(1 − 2p) on top and [np(1 − p)]^(3/2) below.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Two hand checks</div>
+          <div class="formula">Bernoulli(0.1):  μ = 0.1
+ x    p     x − μ   (x − μ)²p   (x − μ)³p
+ 0   0.9    −0.1     0.009     −0.0009
+ 1   0.1    +0.9     0.081     +0.0729
+                 Σ = 0.090  Σ = +0.0720
+σ = 0.3,  σ³ = 0.027,  γ₁ = 0.072 / 0.027 = +2.667</div>
+          <button data-hand="0">Load Bernoulli(0.1)</button>
+          <div class="formula">Lopsided:  μ = (1 + 15 + 20)/6 = 6
+ x    p     x − μ   (x − μ)²p   (x − μ)³p
+ 1   1/6     −5       25/6      −125/6
+ 5   1/2     −1        1/2        −1/2
+10   1/3     +4       16/3       +64/3
+                  Σ = 10      Σ = 0
+σ² = 10,  γ₁ = 0 / 10^(3/2) = 0</div>
+          <button data-hand="1">Load the lopsided example</button>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L03 Discrete Random Variables.
+            The skewness definition is on the Skewness slide. The Binomial, Geometric and Poisson formulas are on their slides.
+            The Bernoulli formula is the Binomial formula with n = 1.
+            Every number on this page comes from one maths block. A Node test checks it against these closed forms.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Same recipe, third power.</strong> The mean makes Σ(x − μ)p(x) vanish.
+            The variance averages (x − μ)². Skewness averages z³.</div>
+          <div class="essence"><strong>Cubing keeps the side.</strong> Bars left of μ pull negative.
+            Bars right of μ pull positive.</div>
+          <div class="essence"><strong>Cubing rewards distance.</strong> Twice as far pulls 8 times as hard per unit of probability.
+            Rare far values often decide γ₁.</div>
+          <div class="essence"><strong>The tail wins, not the hump.</strong> γ₁ points toward the longer tail.
+            The tall bars often sit on the other side.</div>
+          <div class="essence"><strong>σ³ makes it a pure number.</strong> Shifting or stretching X leaves γ₁ unchanged.
+            Flipping X flips its sign.</div>
+          <div class="essence"><strong>The lecture families.</strong> Bernoulli and Binomial take the sign of 1 − 2p.
+            Binomial shrinks like 1/√n. Poisson gives 1/√λ. Geometric never drops below 2. Uniform gives 0.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I can point to μ as the balance point of the bars.</label>
+            <label><input type="checkbox"> I can predict which side wins the cubed tug-of-war before I compute.</label>
+            <label><input type="checkbox"> I can explain why Bernoulli(0.1) skews right.</label>
+            <label><input type="checkbox"> I can fill in the five-column table and get γ₁.</label>
+            <label><input type="checkbox"> I know why stretching X leaves γ₁ unchanged.</label>
+            <label><input type="checkbox"> I know that γ₁ = 0 does not prove symmetry.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Zero skewness does not mean symmetry.</strong> Tour stop 15 shows a lopsided pmf with γ₁ = 0.</div>
+          <div class="body"><strong>"Mean above median means right skew" is only a rule of thumb.</strong>
+            It often fails for discrete pmfs.</div>
+          <div class="body"><strong>Data sets use sample skewness.</strong> Software often adds a small-sample correction.
+            This page uses the population definition from the lecture.</div>
+          <div class="body"><strong>The Geometric here counts trials, as in the lecture.</strong>
+            Some books count the failures before the first success. That shifts X by 1. So γ₁ stays the same.</div>
+          <div class="body"><strong>The words slightly, moderately and strongly follow a common rule of thumb.</strong>
+            The cut points are |γ₁| = 0.5 and |γ₁| = 1.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by test_kit.js) =====================
+    // KIT START
+    const TAIL_EPS = 1e-13;
+
+    // Probability mass function as parallel arrays, x ascending.
+    // Infinite supports stop once the remaining mass is below TAIL_EPS.
+    function pmf(kind, P, weights) {
+      const xs = [];
+      const ps = [];
+      if (kind === 'bernoulli') {
+        xs.push(0, 1);
+        ps.push(1 - P.p, P.p);
+      } else if (kind === 'binomial') {
+        const ratio = P.p / (1 - P.p);
+        let pr = Math.pow(1 - P.p, P.n);
+        for (let x = 0; x <= P.n; x += 1) {
+          xs.push(x);
+          ps.push(pr);
+          pr *= ((P.n - x) / (x + 1)) * ratio;
+        }
+      } else if (kind === 'geometric') {
+        // Lecture convention: trials up to and including the first success.
+        for (let x = 1; Math.pow(1 - P.p, x - 1) > TAIL_EPS; x += 1) {
+          xs.push(x);
+          ps.push(P.p * Math.pow(1 - P.p, x - 1));
+        }
+      } else if (kind === 'poisson') {
+        let pr = Math.exp(-P.lambda);
+        for (let x = 0; x <= P.lambda || pr > TAIL_EPS * 1e-3; x += 1) {
+          xs.push(x);
+          ps.push(pr);
+          pr *= P.lambda / (x + 1);
+        }
+      } else if (kind === 'uniform') {
+        for (let x = 1; x <= P.n; x += 1) {
+          xs.push(x);
+          ps.push(1 / P.n);
+        }
+      } else {
+        const total = weights.reduce((s, w) => s + w, 0);
+        weights.forEach((w, x) => {
+          xs.push(x);
+          ps.push(w / total);
+        });
+      }
+      return { xs, ps };
+    }
+
+    // Two-pass moments: the mean first, then sums of centred powers.
+    function moments(xs, ps) {
+      let mu = 0;
+      xs.forEach((x, i) => { mu += x * ps[i]; });
+      let variance = 0;
+      let m3 = 0;
+      let abs3 = 0;
+      let e2 = 0;
+      let e3 = 0;
+      xs.forEach((x, i) => {
+        const d = x - mu;
+        variance += d * d * ps[i];
+        m3 += d * d * d * ps[i];
+        abs3 += Math.abs(d * d * d) * ps[i];
+        e2 += x * x * ps[i];
+        e3 += x * x * x * ps[i];
+      });
+      // Left and right cubes that cancel leave rounding noise, not skew.
+      if (Math.abs(m3) < 1e-12 * abs3) m3 = 0;
+      const sd = Math.sqrt(variance);
+      const skew = sd > 1e-12 ? m3 / (sd * sd * sd) : NaN;
+      return { mu, variance, sd, m3, e2, e3, skew };
+    }
+
+    // Skewness formulas from the L03 slides (Bernoulli is Binomial with n = 1).
+    function closedForm(kind, P) {
+      if (kind === 'bernoulli') {
+        return { formula: '(1 − 2p) / √(p(1 − p))', value: (1 - 2 * P.p) / Math.sqrt(P.p * (1 - P.p)) };
+      }
+      if (kind === 'binomial') {
+        return { formula: '(1 − 2p) / √(np(1 − p))', value: (1 - 2 * P.p) / Math.sqrt(P.n * P.p * (1 - P.p)) };
+      }
+      if (kind === 'geometric') return { formula: '(2 − p) / √(1 − p)', value: (2 - P.p) / Math.sqrt(1 - P.p) };
+      if (kind === 'poisson') return { formula: '1 / √λ', value: 1 / Math.sqrt(P.lambda) };
+      if (kind === 'uniform') return { formula: '0, a mirror image about (n + 1)/2', value: 0 };
+      return null;
+    }
+
+    // μ, σ² and E[(X − μ)³] in closed form. The slides give μ and σ².
+    // The third central moments are standard results; test_kit.js checks them.
+    function closedMoments(kind, P) {
+      if (kind === 'bernoulli') {
+        return { mu: P.p, variance: P.p * (1 - P.p), m3: P.p * (1 - P.p) * (1 - 2 * P.p) };
+      }
+      if (kind === 'binomial') {
+        const v = P.n * P.p * (1 - P.p);
+        return { mu: P.n * P.p, variance: v, m3: v * (1 - 2 * P.p) };
+      }
+      if (kind === 'geometric') {
+        return { mu: 1 / P.p, variance: (1 - P.p) / P.p ** 2, m3: ((1 - P.p) * (2 - P.p)) / P.p ** 3 };
+      }
+      if (kind === 'poisson') return { mu: P.lambda, variance: P.lambda, m3: P.lambda };
+      if (kind === 'uniform') return { mu: (P.n + 1) / 2, variance: (P.n ** 2 - 1) / 12, m3: 0 };
+      return null;
+    }
+
+    // The five steps from Σ(x − μ)p(x) to γ₁. d = x − μ.
+    const LENSES = [
+      { key: 'balance', weighted: true, f: (d, p) => d * p },
+      { key: 'square', weighted: true, f: (d, p) => d * d * p },
+      { key: 'cube', weighted: false, f: (d) => d * d * d },
+      { key: 'weight', weighted: true, f: (d, p) => d * d * d * p },
+      { key: 'skew', weighted: true, f: (d, p, sd) => ((d / sd) ** 3) * p },
+    ];
+
+    // Index range [lo, hi] worth a column: visible mass or a visible share of γ₁.
+    // At most `cap` columns; the cut falls on the side away from the mode.
+    function displayWindow(xs, ps, mu, sd, cap = 60) {
+      const keep = (i) => ps[i] >= 1e-4 || Math.abs(((xs[i] - mu) / sd) ** 3 * ps[i]) >= 1e-3;
+      let lo = 0;
+      let hi = xs.length - 1;
+      while (lo < hi && !keep(lo)) lo += 1;
+      while (hi > lo && !keep(hi)) hi -= 1;
+      if (hi - lo + 1 > cap) {
+        let mode = lo;
+        for (let i = lo; i <= hi; i += 1) if (ps[i] > ps[mode]) mode = i;
+        if (mode - lo < hi - mode) hi = lo + cap - 1;
+        else lo = hi - cap + 1;
+      }
+      return [lo, hi];
+    }
+
+    // One column per x in [lo, hi], plus one summed column per cut-off tail.
+    function columns(xs, ps, m, lo, hi, f) {
+      const col = (i) => {
+        const d = xs[i] - m.mu;
+        return { i, x: xs[i], p: ps[i], d, sq: d * d * ps[i], cu: d * d * d * ps[i], v: f(d, ps[i], m.sd) };
+      };
+      const tail = (from, to, side) => {
+        const c = { tail: side, x: side === 'left' ? xs[to + 1] : xs[from - 1], p: 0, sq: 0, cu: 0, v: 0 };
+        for (let i = from; i <= to; i += 1) {
+          const r = col(i);
+          c.p += r.p;
+          c.sq += r.sq;
+          c.cu += r.cu;
+          c.v += r.v;
+        }
+        return c;
+      };
+      const out = [];
+      if (lo > 0) out.push(tail(0, lo - 1, 'left'));
+      for (let i = lo; i <= hi; i += 1) out.push(col(i));
+      if (hi < xs.length - 1) out.push(tail(hi + 1, xs.length - 1, 'right'));
+      return out;
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmt = (v, d = 3) => {
+      if (!Number.isFinite(v)) return '—';
+      return minus((Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d));
+    };
+    const fmtS = (v, d = 3) => (Number.isFinite(v) && v >= 0.5 * 10 ** -d ? '+' : '') + fmt(v, d);
+    const fmtT = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      return minus(Math.abs(v) >= 1e-3 ? v.toFixed(4) : v.toExponential(1));
+    };
+    const fmtX = (v) => minus(String(+v.toFixed(2)));
+    const fmtAffine = (a, b) => `${a === 1 ? '' : a === -1 ? '−' : fmtX(a)}X`
+      + (b ? ` ${b < 0 ? '−' : '+'} ${fmtX(Math.abs(b))}` : '');
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      if (step >= 1000) return minus(`${+(v / 1000).toFixed(1)}k`);
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step)))));
+    };
+    function verdict(g) {
+      if (!Number.isFinite(g)) return 'undefined: σ = 0';
+      if (Math.abs(g) < 0.005) return 'zero: the cubed pulls cancel';
+      const side = g > 0 ? 'right' : 'left';
+      const size = Math.abs(g) < 0.5 ? 'slightly' : Math.abs(g) < 1 ? 'moderately' : 'strongly';
+      return `${size} ${side}-skewed: the ${side} tail wins`;
+    }
+
+    // ===================== STATE =====================
+    const KINDS = {
+      bernoulli: {
+        label: 'Bernoulli', windowed: false, name: (P) => `Bernoulli(${P.p.toFixed(2)})`,
+        params: [{ key: 'p', label: 'p = P(X = 1)', min: 0.01, max: 0.99, step: 0.01 }],
+      },
+      binomial: {
+        label: 'Binomial', windowed: true, name: (P) => `Binomial(${P.n}, ${P.p.toFixed(2)})`,
+        params: [
+          { key: 'n', label: 'n, the number of trials', min: 1, max: 40, step: 1 },
+          { key: 'p', label: 'p, the success chance', min: 0.01, max: 0.99, step: 0.01 },
+        ],
+      },
+      geometric: {
+        label: 'Geometric', windowed: true, name: (P) => `Geometric(${P.p.toFixed(2)})`,
+        params: [{ key: 'p', label: 'p, the success chance', min: 0.1, max: 0.95, step: 0.01 }],
+      },
+      poisson: {
+        label: 'Poisson', windowed: true, name: (P) => `Poisson(${P.lambda.toFixed(1)})`,
+        params: [{ key: 'lambda', label: 'λ, the mean count', min: 0.2, max: 30, step: 0.1 }],
+      },
+      uniform: {
+        label: 'Uniform', windowed: false, name: (P) => `U({1, …, ${P.n}})`,
+        params: [{ key: 'n', label: 'n, the number of faces', min: 2, max: 30, step: 1 }],
+      },
+      custom: { label: 'Paint', windowed: false, name: () => 'Your painted pmf', params: [] },
+    };
+    const params = {
+      bernoulli: { p: 0.1 }, binomial: { n: 20, p: 0.25 }, geometric: { p: 0.25 },
+      poisson: { lambda: 5 }, uniform: { n: 6 }, custom: {},
+    };
+    const RIGHT_TAIL = [0.12, 0.55, 1, 0.9, 0.68, 0.48, 0.33, 0.22, 0.14, 0.09, 0.05, 0.03, 0.02];
+    const SHAPES = {
+      right: { label: 'Long right tail', w: RIGHT_TAIL },
+      left: { label: 'Long left tail', w: RIGHT_TAIL.slice().reverse() },
+      outlier: { label: 'One far outlier', w: [0, 0.45, 0.9, 1, 0.7, 0.35, 0, 0, 0, 0, 0, 0, 0.12] },
+      zero: { label: 'Lopsided, γ₁ = 0', w: [0, 1 / 3, 0, 0, 0, 1, 0, 0, 0, 0, 2 / 3, 0, 0] },
+      flat: { label: 'Flat', w: Array(13).fill(0.6) },
+    };
+    const LENS_UI = [
+      { n: 1, word: 'Balance', chart: '(x − μ) · p(x)', total: 'Σ (x − μ) p(x)' },
+      { n: 2, word: 'Square', chart: '(x − μ)² · p(x)', total: 'Σ (x − μ)² p(x) = σ²' },
+      { n: 3, word: 'Cube', chart: '(x − μ)³, no probability yet', total: null },
+      { n: 4, word: 'Weight', chart: '(x − μ)³ · p(x)', total: 'Σ (x − μ)³ p(x) = E[(X − μ)³]' },
+      { n: 5, word: '÷ σ³', chart: 'z³ · p(x), with z = (x − μ)/σ', total: 'Σ z³ p(x) = γ₁' },
+    ];
+    const TOUR = [
+      { title: 'A fair die', kind: 'uniform', P: { n: 6 },
+        note: 'Each deviation from μ = 3.5 has a mirror twin on the other side. Cubes keep the sign. So each pair cancels and γ₁ = 0. This answers the question on the lecture\'s Uniform slide.' },
+      { title: 'A fair coin flip', kind: 'bernoulli', P: { p: 0.5 },
+        note: 'Two equal bars sit 0.5 from the mean. Their cubed pulls are equal and opposite. γ₁ = 0.' },
+      { title: 'A rare success', kind: 'bernoulli', P: { p: 0.1 },
+        note: 'The tall bar is on the left. Yet γ₁ = +2.67. The tall bar sits only 0.1 from μ. The rare 1 sits 0.9 away. Cubed, that distance is 729 times larger. Probability gives the left only a 9 times edge.' },
+      { title: 'A rare failure', kind: 'bernoulli', P: { p: 0.9 },
+        note: 'This is the mirror image of the last stop. Same size, opposite sign: γ₁ = −2.67.' },
+      { title: 'The lecture\'s Binomial', kind: 'binomial', P: { n: 20, p: 0.25 },
+        note: 'Binomial(20, ¼) from the slides. The right tail is a little longer than the left. γ₁ = 0.5 / √3.75 ≈ +0.26.' },
+      { title: 'A fair-coin Binomial', kind: 'binomial', P: { n: 20, p: 0.5 },
+        note: 'The pmf is a perfect mirror image about x = 10. γ₁ = 0.' },
+      { title: 'The tail swaps sides', kind: 'binomial', P: { n: 20, p: 0.9 },
+        note: 'Now the long tail is on the left. γ₁ ≈ −0.60. The sign of 1 − 2p picks the side.' },
+      { title: 'More trials, less skew', kind: 'binomial', P: { n: 40, p: 0.1 },
+        note: 'The same p as Bernoulli(0.1) but 40 trials. γ₁ falls from 2.67 to 0.42. Skewness shrinks like 1/√n. Sums of many trials look more symmetric.' },
+      { title: 'The lecture\'s Geometric', kind: 'geometric', P: { p: 0.25 },
+        note: 'Geometric(¼) from the slides. There is a wall at x = 1 and an endless tail to the right. γ₁ = 1.75 / √0.75 ≈ 2.02. The far bars are tiny on top. They still pull hard below.' },
+      { title: 'Almost always 1', kind: 'geometric', P: { p: 0.7 },
+        note: 'Most mass sits at x = 1. The rare long waits sit several σ to the right. γ₁ ≈ 2.37. A Geometric never drops below 2.' },
+      { title: 'Poisson, λ = 1', kind: 'poisson', P: { lambda: 1 },
+        note: 'The wall at 0 is only one σ below μ. The right tail runs free. γ₁ = 1/√1 = 1.' },
+      { title: 'The lecture\'s Poisson', kind: 'poisson', P: { lambda: 5 },
+        note: 'Poisson(5) from the slides. γ₁ = 1/√5 ≈ 0.45.' },
+      { title: 'Poisson, λ = 25', kind: 'poisson', P: { lambda: 25 },
+        note: 'It looks almost bell-shaped. The right tail is still a little longer. γ₁ = 1/√25 = 0.2.' },
+      { title: 'One far outlier', kind: 'custom', shape: 'outlier',
+        note: 'Most mass sits at 1 to 5. One rare value sits at 12. In the bottom chart that single bar carries most of γ₁. Paint it lower and watch γ₁ drop.' },
+      { title: 'Lopsided, yet γ₁ = 0', kind: 'custom', shape: 'zero', lens: 3,
+        note: 'This shape is clearly lopsided. Yet γ₁ = 0 exactly. Step 4 is on. The left pulls are −125/6 and −1/2. The right pull is +64/3. They cancel. Zero skewness means a draw, not a mirror image.' },
+      { title: 'Stretched and shifted', kind: 'geometric', P: { p: 0.25 }, scale: 3, shift: 5,
+        note: 'Stop 9 again, now as Y = 3X + 5. The bars look identical and γ₁ is still 2.02. E[(X − μ)³] grew 27 times. σ³ grew 27 times too.' },
+      { title: 'Flipped', kind: 'poisson', P: { lambda: 2 }, mirror: true,
+        note: 'Poisson(2) flipped: X → −X. Every cube changes sign. So γ₁ = −1/√2 ≈ −0.71.' },
+    ];
+    const PREDICT = [
+      { kind: 'uniform', P: { n: 6 } },
+      { kind: 'bernoulli', P: { p: 0.1 } },
+      { kind: 'poisson', P: { lambda: 1 } },
+      { kind: 'geometric', P: { p: 0.25 } },
+      { kind: 'custom', shape: 'zero', lens: 3 },
+    ];
+    const HAND = [
+      { kind: 'bernoulli', P: { p: 0.1 }, lens: 3 },
+      { kind: 'custom', shape: 'zero', lens: 3 },
+    ];
+
+    const state = {
+      kind: 'uniform', lens: 4, scale: 1, shift: 0, mirror: false,
+      custom: SHAPES.right.w.slice(), tour: 0, hover: -1,
+    };
+    let model = null;
+    let shown = null;
+    let dirty = true;
+    let painting = null;
+
+    // ===================== MODEL =====================
+    function buildModel() {
+      const P = params[state.kind];
+      const base = pmf(state.kind, P, state.custom);
+      const a = (state.mirror ? -1 : 1) * state.scale;
+      const b = state.shift;
+      const idx = base.xs.map((_, i) => i);
+      if (a < 0) idx.reverse();
+      const xs = idx.map((i) => a * base.xs[i] + b);
+      const ps = idx.map((i) => base.ps[i]);
+      const m = moments(xs, ps);
+      const degenerate = !(m.sd > 1e-12);
+      const [lo, hi] = KINDS[state.kind].windowed ? displayWindow(xs, ps, m.mu, m.sd) : [0, xs.length - 1];
+      const lens = LENSES[state.lens];
+      const cols = columns(xs, ps, m, lo, hi, lens.f);
+      cols.forEach((c) => {
+        if (!c.tail) c.src = idx[c.i];
+        if (c.tail && !lens.weighted) c.v = NaN;
+      });
+      let neg = 0;
+      let pos = 0;
+      xs.forEach((x, i) => {
+        const v = lens.f(x - m.mu, ps[i], m.sd);
+        if (v < 0) neg += v;
+        else if (v > 0) pos += v;
+      });
+      const transformed = a !== 1 || b !== 0;
+      const baseName = KINDS[state.kind].name(P);
+      const name = transformed
+        ? `Y = ${fmtAffine(a, b)}, X ~ ${baseName}`
+        : baseName;
+      const real = cols.filter((c) => !c.tail);
+      const finite = cols.map((c) => c.v).filter(Number.isFinite);
+      const topMax = state.kind === 'custom'
+        ? 1 / state.custom.reduce((s, w) => s + w, 0)
+        : Math.max(...real.map((c) => c.p)) * 1.15;
+      const botMax = Math.max(1e-12, ...finite.map(Math.abs)) * 1.12;
+      const tugFloor = state.lens === 4 ? 3 : 1e-12;
+      const tugMax = Math.max(tugFloor, 1.15 * Math.max(-neg, pos));
+      const key = `${state.kind}|${cols.length}|${cols.map((c) => c.tail || '').join('')}|${cols[0].x}|${state.lens === 2}`;
+      return {
+        xs, ps, m, a, b, lo, hi, cols, neg, pos, net: neg + pos, degenerate, name,
+        step: Math.abs(a), topMax, botMax, tugMax, key,
+      };
+    }
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mid: '#8aa1c0', mean: '#a0e7a0',
+      ink: '#ebf2ff', muted: '#8aa1c0', grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)',
+    };
+    const sideColor = (d) => (d < -1e-9 ? C.left : d > 1e-9 ? C.right : C.mid);
+    const hatches = {};
+    function hatch(color) {
+      if (!hatches[color]) {
+        const c = document.createElement('canvas');
+        c.width = 6;
+        c.height = 6;
+        const k = c.getContext('2d');
+        k.strokeStyle = color;
+        k.lineWidth = 1.6;
+        k.beginPath();
+        k.moveTo(0, 6);
+        k.lineTo(6, 0);
+        k.stroke();
+        hatches[color] = ctx.createPattern(c, 'repeat');
+      }
+      return hatches[color];
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const titleH = 18;
+      const labelsH = 28;
+      const tugH = 84;
+      const avail = Math.max(140, H - titleH - labelsH - titleH - 12 - tugH);
+      const top = { y: titleH, h: avail * 0.5 };
+      const bot = { y: top.y + top.h + labelsH + titleH, h: avail * 0.5 };
+      const tug = { y: bot.y + bot.h + 12, h: tugH };
+      return { x: 62, w: W - 62 - 16, top, bot, tug };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || '12px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function hline(x0, x1, y, color, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function vline(x, y0, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A bar from baseline y0 to end y1 with a rounded data end.
+    function bar(cx, w, y0, y1, fill, alpha = 1) {
+      const h = y1 - y0;
+      if (Math.abs(h) < 0.4) return;
+      const r = Math.min(4, w / 2, Math.abs(h));
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      if (h < 0) ctx.roundRect(cx - w / 2, y1, w, -h, [r, r, 0, 0]);
+      else ctx.roundRect(cx - w / 2, y0, w, h, [0, 0, r, r]);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!shown || W < 50) return;
+      const g = geom();
+      const s = shown;
+      const n = s.cols.length;
+      const colW = g.w / n;
+      const barW = Math.max(2, Math.min(42, colW - 2));
+      const cx = (j) => g.x + (j + 0.5) * colW;
+      const first = s.cols.findIndex((c) => !c.tail);
+      const pxOf = (v) => cx(first) + ((v - s.cols[first].x) / model.step) * colW;
+      const inPlot = (px) => px >= g.x && px <= g.x + g.w;
+
+      // Hover band across both charts.
+      if (state.hover >= 0 && state.hover < n) {
+        ctx.fillStyle = 'rgba(134, 212, 255, 0.07)';
+        ctx.fillRect(g.x + state.hover * colW, g.top.y, colW, g.bot.y + g.bot.h - g.top.y);
+      }
+
+      // ---- top chart: p(x) ----
+      const base = g.top.y + g.top.h;
+      text(state.kind === 'custom' ? 'p(x) · drag up or down here to paint' : 'p(x), the pmf', g.x, g.top.y - 6, { color: C.ink, font: '600 12px Inter, sans-serif' });
+      const tStep = niceStep(s.topMax, 3);
+      for (let t = tStep; t <= s.topMax * 0.999; t += tStep) {
+        const y = base - (t / s.topMax) * g.top.h;
+        hline(g.x, g.x + g.w, y, C.grid);
+        text(fmtTick(t, tStep), g.x - 8, y + 4, { align: 'right' });
+      }
+      s.cols.forEach((c, j) => {
+        const y1 = base - (c.p / s.topMax) * g.top.h;
+        if (c.tail) {
+          const color = c.tail === 'left' ? C.left : C.right;
+          bar(cx(j), barW, base, Math.min(y1, base - 3), hatch(color));
+        } else {
+          bar(cx(j), barW, base, y1, sideColor(c.d), state.hover === j ? 1 : 0.9);
+        }
+      });
+      hline(g.x, g.x + g.w, base, C.axis);
+
+      // μ ± σ and μ, with the fulcrum under the axis.
+      const muX = pxOf(s.mu);
+      [-1, 1].forEach((k) => {
+        const px = pxOf(s.mu + k * s.sd);
+        if (!inPlot(px) || model.degenerate) return;
+        vline(px, g.top.y, base, 'rgba(138, 161, 192, 0.7)', 1, [4, 4]);
+        text(k < 0 ? 'μ − σ' : 'μ + σ', px, g.top.y + 10, { align: 'center' });
+      });
+      if (inPlot(muX)) {
+        vline(muX, g.top.y, base, C.mean, 2);
+        vline(muX, g.bot.y, g.bot.y + g.bot.h, 'rgba(160, 231, 160, 0.45)', 1, [3, 4]);
+        ctx.fillStyle = C.mean;
+        ctx.beginPath();
+        ctx.moveTo(muX, base + 1);
+        ctx.lineTo(muX - 7, base + 10);
+        ctx.lineTo(muX + 7, base + 10);
+        ctx.closePath();
+        ctx.fill();
+        text(`μ = ${fmt(s.mu, 2)}`, muX + 6, g.top.y + 24, { color: C.mean, font: '600 12px Inter, sans-serif' });
+      }
+
+      // x labels between the charts.
+      ctx.font = '11px Inter, sans-serif';
+      const labelW = Math.max(...s.cols.filter((c) => !c.tail).map((c) => ctx.measureText(fmtX(c.x)).width)) + 8;
+      const every = Math.max(1, Math.ceil(labelW / colW));
+      s.cols.forEach((c, j) => {
+        const y = base + 22;
+        if (c.tail) {
+          text(`${c.tail === 'left' ? '<' : '>'}${fmtX(c.x)}`, cx(j), y, { align: 'center', color: C.ink, font: '11px Inter, sans-serif' });
+        } else if ((j - first) % every === 0) {
+          const nearTail = every > 1 && ((j > 0 && s.cols[j - 1].tail) || (j < n - 1 && s.cols[j + 1].tail));
+          if (!nearTail) text(fmtX(c.x), cx(j), y, { align: 'center', font: '11px Inter, sans-serif' });
+        }
+      });
+
+      // ---- bottom chart: this step's bars ----
+      const ui = LENS_UI[state.lens];
+      text(`Step ${ui.n} · ${ui.chart}`, g.x, g.bot.y - 6, { color: C.ink, font: '600 12px Inter, sans-serif' });
+      const signed = state.lens !== 1;
+      const zeroY = signed ? g.bot.y + g.bot.h / 2 : g.bot.y + g.bot.h;
+      const span = signed ? g.bot.h / 2 : g.bot.h;
+      const bStep = niceStep(s.botMax, signed ? 2 : 3);
+      for (let t = bStep; t <= s.botMax * 0.999; t += bStep) {
+        [1, signed ? -1 : 0].forEach((k) => {
+          if (!k) return;
+          const y = zeroY - ((k * t) / s.botMax) * span;
+          hline(g.x, g.x + g.w, y, C.grid);
+          text(fmtTick(k * t, bStep), g.x - 8, y + 4, { align: 'right' });
+        });
+      }
+      if (state.lens === 4 && model.degenerate) {
+        text('σ = 0: every outcome equals μ, so each z is 0/0. γ₁ is undefined.', g.x + g.w / 2, zeroY - 8, { align: 'center', color: C.ink });
+      }
+      s.cols.forEach((c, j) => {
+        if (!Number.isFinite(c.v)) return;
+        const y1 = zeroY - (c.v / s.botMax) * span;
+        if (c.tail) {
+          const color = c.tail === 'left' ? C.left : C.right;
+          const end = Math.abs(y1 - zeroY) < 3 ? zeroY + (c.v < 0 ? 3 : -3) : y1;
+          bar(cx(j), barW, zeroY, end, hatch(color));
+        } else {
+          bar(cx(j), barW, zeroY, y1, sideColor(c.d), state.hover === j ? 1 : 0.9);
+        }
+      });
+      hline(g.x, g.x + g.w, zeroY, C.axis);
+      text('0', g.x - 8, zeroY + 4, { align: 'right' });
+
+      // Direct labels on the largest pull on each side.
+      const real = model.cols.map((c, j) => ({ c, j })).filter(({ c }) => Number.isFinite(c.v) && c.v !== 0);
+      const maxPos = real.filter(({ c }) => c.v > 0).sort((u, w) => w.c.v - u.c.v)[0];
+      const maxNeg = real.filter(({ c }) => c.v < 0).sort((u, w) => u.c.v - w.c.v)[0];
+      [maxPos, maxNeg].forEach((hit) => {
+        if (!hit || hit.j >= n) return;
+        const v = s.cols[hit.j].v;
+        const y = zeroY - (v / s.botMax) * span + (v > 0 ? -6 : 15);
+        const x = clamp(cx(hit.j), g.x + 24, g.x + g.w - 24);
+        text(fmtS(hit.c.v, Math.abs(hit.c.v) >= 100 ? 0 : 3), x, y, { align: 'center', color: C.ink, font: '600 11px Inter, sans-serif' });
+      });
+
+      drawTug(g, s);
+      drawTooltip(g, colW, cx);
+    }
+
+    function drawTug(g, s) {
+      const { y } = g.tug;
+      const ui = LENS_UI[state.lens];
+      if (state.lens === 2) {
+        text('No tug-of-war total yet. The raw cubes carry no probability. Step 4 adds it.', g.x, y + 14, { color: C.ink });
+        return;
+      }
+      if (state.lens === 4 && model.degenerate) return;
+      // Row 1: title on the left, both pulls on the right. Row 2: the net label alone.
+      const bold = '600 12px Inter, sans-serif';
+      const rightText = `right pull ${fmtS(model.pos)}`;
+      const leftText = `left pull ${fmtS(model.neg)}`;
+      ctx.font = bold;
+      const rw = ctx.measureText(rightText).width;
+      const lw = ctx.measureText(leftText).width;
+      text(rightText, g.x + g.w, y + 14, { color: C.right, font: bold, align: 'right' });
+      text(leftText, g.x + g.w - rw - 16, y + 14, { color: C.left, font: bold, align: 'right' });
+      const title = `Tug of war · ${ui.total}`;
+      const fits = ctx.measureText(title).width + lw + rw + 40 < g.w;
+      text(fits ? title : 'Tug of war', g.x, y + 14, { color: C.ink, font: bold });
+      const mid = g.x + g.w / 2;
+      const half = g.w / 2 - 4;
+      const by = y + 50;
+      const S = s.tugMax;
+      const st = niceStep(S, 2);
+      for (let t = -Math.floor(S / st) * st; t <= S + 1e-12; t += st) {
+        const px = mid + (t / S) * half;
+        vline(px, by + 10, by + 14, C.axis);
+        text(fmtTick(t, st), px, by + 26, { align: 'center', font: '10px Inter, sans-serif' });
+      }
+      hline(g.x, g.x + g.w, by + 10, C.grid);
+      const wl = (-s.neg / S) * half;
+      const wr = (s.pos / S) * half;
+      if (wl > 0.4) bar(mid - wl / 2, wl, by - 8, by + 8, C.left);
+      if (wr > 0.4) bar(mid + wr / 2, wr, by - 8, by + 8, C.right);
+      vline(mid, by - 13, by + 13, C.ink, 1);
+      const nx = mid + clamp(s.net / S, -1, 1) * half;
+      ctx.save();
+      ctx.fillStyle = C.ink;
+      ctx.strokeStyle = '#07111f';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(nx, by - 9);
+      ctx.lineTo(nx + 7, by);
+      ctx.lineTo(nx, by + 9);
+      ctx.lineTo(nx - 7, by);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      text(`net ${fmtS(model.net)}`, clamp(nx, g.x + 60, g.x + g.w - 60), by - 18, { align: 'center', color: C.ink, font: '700 13px Inter, sans-serif' });
+    }
+
+    function drawTooltip(g, colW, cx) {
+      const j = state.hover;
+      if (j < 0 || j >= model.cols.length) return;
+      const c = model.cols[j];
+      const ui = LENS_UI[state.lens];
+      const lines = c.tail
+        ? [`${c.tail} tail: x ${c.tail === 'left' ? '<' : '>'} ${fmtX(c.x)}`, `total p = ${fmtT(c.p)}`,
+          Number.isFinite(c.v) ? `summed bar = ${fmtT(c.v)}` : 'raw cubes are not summed']
+        : [`x = ${fmtX(c.x)}`, `p(x) = ${fmtT(c.p)}`,
+          `x − μ = ${fmtS(c.d)}   z = ${model.degenerate ? '—' : fmtS(c.d / model.m.sd, 2)}`,
+          `${ui.chart.split(',')[0]} = ${fmtT(c.v)}`];
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let x = cx(j) + colW / 2 + 8;
+      if (x + w > g.x + g.w) x = cx(j) - colW / 2 - 8 - w;
+      x = Math.max(4, x);
+      const y = g.top.y + 30;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 10, y + 20 + i * 17, { color: i === lines.length - 1 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    // Ease the drawn values toward the model. A new column layout snaps.
+    function snapshot(mdl) {
+      return {
+        key: mdl.key, cols: mdl.cols.map((c) => ({ ...c })), mu: mdl.m.mu, sd: mdl.m.sd,
+        topMax: mdl.topMax, botMax: mdl.botMax, tugMax: mdl.tugMax, neg: mdl.neg, pos: mdl.pos, net: mdl.net,
+      };
+    }
+    function frame() {
+      if (model) {
+        if (!shown || shown.key !== model.key || painting) {
+          shown = snapshot(model);
+          dirty = true;
+        } else {
+          let moving = false;
+          const ease = (a, b) => {
+            if (!Number.isFinite(a) || !Number.isFinite(b)) return b;
+            if (Math.abs(b - a) <= 1e-4 * (Math.abs(b) + 1e-9)) return b;
+            moving = true;
+            return a + (b - a) * 0.22;
+          };
+          ['mu', 'sd', 'topMax', 'botMax', 'tugMax', 'neg', 'pos', 'net'].forEach((k) => { shown[k] = ease(shown[k], model[k] ?? model.m[k]); });
+          shown.cols.forEach((c, j) => {
+            const t = model.cols[j];
+            c.p = ease(c.p, t.p);
+            c.v = ease(c.v, t.v);
+            c.d = t.d;
+            c.x = t.x;
+          });
+          if (moving) dirty = true;
+        }
+      }
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function colAt(x) {
+      const g = geom();
+      const n = model.cols.length;
+      const j = Math.floor(((x - g.x) / g.w) * n);
+      return j >= 0 && j < n ? j : -1;
+    }
+    function paintAt(x, y) {
+      const g = geom();
+      const j = colAt(clamp(x, g.x, g.x + g.w - 1));
+      if (j < 0) return;
+      const w = clamp((g.top.y + g.top.h - y) / g.top.h, 0, 1);
+      const from = painting.j ?? j;
+      const wFrom = painting.w ?? w;
+      for (let k = Math.min(from, j); k <= Math.max(from, j); k += 1) {
+        const t = j === from ? 1 : (k - from) / (j - from);
+        state.custom[model.cols[k].src] = Math.round(lerp(wFrom, w, t) * 100) / 100;
+      }
+      if (state.custom.every((v) => v === 0)) state.custom[model.cols[j].src] = 0.01;
+      painting = { j, w };
+      update();
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.kind !== 'custom') return;
+      const { x, y } = local(e);
+      const g = geom();
+      if (y < g.top.y - 10 || y > g.top.y + g.top.h + 12) return;
+      canvas.setPointerCapture(e.pointerId);
+      painting = {};
+      paintAt(x, y);
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const { x, y } = local(e);
+      if (painting) paintAt(x, y);
+      const g = geom();
+      const hover = y >= g.top.y && y <= g.bot.y + g.bot.h ? colAt(x) : -1;
+      if (hover !== state.hover) {
+        state.hover = hover;
+        dirty = true;
+      }
+    });
+    const stopPaint = () => { painting = null; };
+    canvas.addEventListener('pointerup', stopPaint);
+    canvas.addEventListener('pointercancel', stopPaint);
+    canvas.addEventListener('pointerleave', () => {
+      state.hover = -1;
+      dirty = true;
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = (spec.prefix || '') + v.toFixed(decimals); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      return row;
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('active', b.dataset.kind === state.kind));
+      document.querySelectorAll('[data-lens]').forEach((b) => b.classList.toggle('active', +b.dataset.lens === state.lens));
+      const host = $('paramHost');
+      host.innerHTML = '';
+      KINDS[state.kind].params.forEach((spec) => {
+        host.append(makeSlider(spec, params[state.kind][spec.key], (v) => {
+          params[state.kind][spec.key] = v;
+          update();
+        }));
+      });
+      $('shapeHost').hidden = state.kind !== 'custom';
+      canvas.style.touchAction = state.kind === 'custom' ? 'none' : 'auto';
+      const th = $('transformHost');
+      th.innerHTML = '';
+      th.append(
+        makeSlider({ label: 'a, the stretch', min: 0.25, max: 4, step: 0.05, prefix: '×' }, state.scale, (v) => { state.scale = v; update(); }),
+        makeSlider({ label: 'b, the shift', min: -20, max: 20, step: 0.5, prefix: '+' }, state.shift, (v) => { state.shift = v; update(); }),
+      );
+      $('mirrorBox').checked = state.mirror;
+    }
+
+    function apply(s) {
+      state.kind = s.kind;
+      if (s.P) Object.assign(params[s.kind], s.P);
+      if (s.shape) state.custom = SHAPES[s.shape].w.slice();
+      state.scale = s.scale ?? 1;
+      state.shift = s.shift ?? 0;
+      state.mirror = !!s.mirror;
+      state.lens = s.lens ?? 4;
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      apply(TOUR[state.tour]);
+      const t = TOUR[state.tour];
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setLens(i) {
+      state.lens = i;
+      renderControls();
+      update();
+    }
+
+    function caption() {
+      const m = model.m;
+      const s3 = m.sd ** 3;
+      const lines = [
+        `<strong>Step 1 · Balance.</strong> Each bar is a pull (x − μ)·p(x). Left pulls total ${fmtS(model.neg)}. Right pulls total ${fmtS(model.pos)}. They cancel exactly. That is what makes μ the balance point.`,
+        `<strong>Step 2 · Square.</strong> Every bar now points up. So the side is lost. The total is σ² = ${fmt(m.variance)}. It measures spread but not direction.`,
+        `<strong>Step 3 · Cube the distance.</strong> (x − μ)³ keeps the sign and punishes distance: 2 becomes 8, 3 becomes 27. There are no probabilities yet. So the far bars look huge.`,
+        `<strong>Step 4 · Weight by p(x).</strong> Rare far bars shrink. Often they do not shrink enough. The total is E[(X − μ)³] = ${fmtS(m.m3)}.`,
+        `<strong>Step 5 · Divide by σ³ = ${fmt(s3)}.</strong> Each bar is now z³·p(x). Units cancel. The total is γ₁ = ${fmtS(m.skew)}: ${verdict(m.skew)}.`,
+      ];
+      return lines[state.lens];
+    }
+
+    function renderTable() {
+      const m = model.m;
+      const head = '<tr><th>x</th><th>p(x)</th><th>x − μ</th><th>(x − μ)²p</th><th>(x − μ)³p</th></tr>';
+      const rows = model.cols.map((c) => {
+        if (c.tail) {
+          const label = `${c.tail === 'left' ? '<' : '>'} ${fmtX(c.x)}`;
+          return `<tr class="tail ${c.tail === 'left' ? 'l' : 'r'}"><td>${label}</td><td>${fmtT(c.p)}</td><td>tail</td><td>${fmtT(c.sq)}</td><td>${fmtT(c.cu)}</td></tr>`;
+        }
+        const side = c.d < -1e-9 ? 'l' : c.d > 1e-9 ? 'r' : '';
+        return `<tr class="${side}"><td>${fmtX(c.x)}</td><td>${fmtT(c.p)}</td><td>${fmtT(c.d)}</td><td>${fmtT(c.sq)}</td><td>${fmtT(c.cu)}</td></tr>`;
+      });
+      const total = model.ps.reduce((s, p) => s + p, 0);
+      rows.push(`<tr class="sum"><td>Σ</td><td>${fmtT(total)}</td><td></td><td>${fmtT(m.variance)}</td><td>${fmtT(m.m3)}</td></tr>`);
+      $('calcTable').innerHTML = head + rows.join('');
+      $('tableTitle').innerHTML = `<strong>${model.name}.</strong> μ = Σ x p(x) = ${fmt(m.mu, 4)}. One row per bar. Tail rows sum the bars that the chart folds together.`;
+      $('tableResult').innerHTML = `
+        <span>σ = √σ²</span><strong>${fmt(m.sd, 4)}</strong>
+        <span>σ³</span><strong>${fmt(m.sd ** 3, 4)}</strong>
+        <span>γ₁ = Σ(x − μ)³p / σ³</span><strong>${fmtS(m.skew, 4)}</strong>`;
+      const viaShortcut = m.e3 - 3 * m.mu * m.e2 + 2 * m.mu ** 3;
+      $('shortcut').innerHTML = `
+        <span>E[X]</span><strong>${fmt(m.mu, 4)}</strong>
+        <span>E[X²]</span><strong>${fmt(m.e2, 4)}</strong>
+        <span>E[X³]</span><strong>${fmt(m.e3, 4)}</strong>
+        <span>E[X³] − 3μE[X²] + 2μ³</span><strong>${fmtS(viaShortcut, 4)}</strong>
+        <span>table total</span><strong>${fmtS(m.m3, 4)}</strong>`;
+      const P = params[state.kind];
+      const forms = [
+        ['bernoulli', 'Bernoulli(p)', '(1 − 2p)/√(p(1 − p))', 'Binomial with n = 1.'],
+        ['binomial', 'Binomial(n, p)', '(1 − 2p)/√(np(1 − p))', 'Sign of 1 − 2p. Shrinks like 1/√n.'],
+        ['geometric', 'Geometric(p)', '(2 − p)/√(1 − p)', 'Always 2 or more.'],
+        ['poisson', 'Poisson(λ)', '1/√λ', 'E[(X − λ)³] = λ.'],
+        ['uniform', 'U({1, …, n})', '0', 'Mirror image about (n + 1)/2.'],
+      ];
+      const cf = closedForm(state.kind, P);
+      $('formsTable').innerHTML = '<tr><th>Distribution</th><th>γ₁</th><th>Note</th></tr>' + forms.map(([k, name, f, note]) => {
+        const live = k === state.kind && cf ? ` = ${fmtS(cf.value)}` : '';
+        return `<tr class="${k === state.kind ? 'current' : ''}"><td>${name}</td><td class="f">${f}${live}</td><td>${note}</td></tr>`;
+      }).join('');
+    }
+
+    function renderReadouts() {
+      const m = model.m;
+      const cf = closedForm(state.kind, params[state.kind]);
+      let check = 'A painted pmf has no closed form. The table in the Math tab is the formula.';
+      if (cf) {
+        const v = Math.sign(model.a) * cf.value;
+        const ok = Math.abs(v - m.skew) < 1e-6 * Math.max(1, Math.abs(v));
+        check = `Lecture formula: ${cf.formula}${model.a < 0 ? ', times −1 for the flip,' : ''} gives ${fmtS(v)} `
+          + (ok ? '<span class="ok">✓ same as the sum</span>' : '<span class="bad">✗ differs from the sum</span>');
+      }
+      $('receipt').innerHTML = `
+        <div>${model.name} · μ = ${fmt(m.mu)} · σ = ${fmt(m.sd)} · σ³ = ${fmt(m.sd ** 3)}</div>
+        <div class="big">γ₁ = E[(X − μ)³] / σ³ = ${fmt(m.m3)} / ${fmt(m.sd ** 3)} = <strong>${fmtS(m.skew)}</strong><span class="verdict">${verdict(m.skew)}</span></div>
+        <div>${check}</div>`;
+      $('caption').innerHTML = caption();
+      const a = model.a;
+      $('transformLine').textContent = `Y = ${fmtAffine(a, model.b)}  →  γ₁(Y) = ${a < 0 ? '−' : ''}γ₁(X)`;
+      renderTable();
+      renderArithmetic();
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of [label, working, value, class], padded into aligned columns.
+    function rowsHtml(rows) {
+      const wl = Math.max(...rows.map((r) => r[0].length));
+      const ww = Math.max(...rows.map((r) => r[1].length));
+      return rows.map(([label, work, value, cls]) => {
+        const line = `${label.padEnd(wl)}  ${work.padEnd(ww)}${value ? ` = ${value}` : ''}`;
+        return `<div class="${cls || ''}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+
+    // The lecture-formula route with the numbers substituted, for X before any Y = aX + b.
+    function formulaLines(kind, P) {
+      const L = (s) => s.padEnd(13);
+      const sd = Math.sqrt(closedMoments(kind, P).variance);
+      if (kind === 'bernoulli') {
+        const { p } = P;
+        const q = 1 - p;
+        const r = 1 - 2 * p;
+        return [
+          ...chain(L('μ'), ['p', num(p)]),
+          ...chain(L('σ²'), ['p(1 − p)', `${num(p)} × ${num(q)}`, num(p * q)]),
+          ...chain(L('E[(X − μ)³]'), ['p(1 − p)(1 − 2p)', `${num(p)} × ${num(q)} × ${paren(r)}`, numS(p * q * r)]),
+          ...chain(L('γ₁'), ['(1 − 2p) / √(p(1 − p))', `${num(r)} / √${num(p * q)}`, `${num(r)} / ${num(sd)}`, numS(r / sd)]),
+        ];
+      }
+      if (kind === 'binomial') {
+        const { n, p } = P;
+        const q = 1 - p;
+        const r = 1 - 2 * p;
+        const v = n * p * q;
+        return [
+          ...chain(L('μ'), ['np', `${n} × ${num(p)}`, num(n * p)]),
+          ...chain(L('σ²'), ['np(1 − p)', `${n} × ${num(p)} × ${num(q)}`, num(v)]),
+          ...chain(L('E[(X − μ)³]'), ['np(1 − p)(1 − 2p)', `${num(v)} × ${paren(r)}`, numS(v * r)]),
+          ...chain(L('γ₁'), ['(1 − 2p) / √(np(1 − p))', `${num(r)} / √${num(v)}`, `${num(r)} / ${num(sd)}`, numS(r / sd)]),
+        ];
+      }
+      if (kind === 'geometric') {
+        const { p } = P;
+        const q = 1 - p;
+        return [
+          ...chain(L('μ'), ['1 / p', `1 / ${num(p)}`, num(1 / p)]),
+          ...chain(L('σ²'), ['(1 − p) / p²', `${num(q)} / ${num(p * p)}`, num(q / p ** 2)]),
+          ...chain(L('E[(X − μ)³]'), ['(1 − p)(2 − p) / p³', `${num(q)} × ${num(2 - p)} / ${num(p ** 3)}`, numS((q * (2 - p)) / p ** 3)]),
+          ...chain(L('γ₁'), ['(2 − p) / √(1 − p)', `${num(2 - p)} / √${num(q)}`, `${num(2 - p)} / ${num(Math.sqrt(q))}`, numS((2 - p) / Math.sqrt(q))]),
+        ];
+      }
+      if (kind === 'poisson') {
+        const { lambda } = P;
+        return [
+          ...chain(L('μ'), ['λ', num(lambda)]),
+          ...chain(L('σ²'), ['λ', num(lambda)]),
+          ...chain(L('E[(X − μ)³]'), ['λ', numS(lambda)]),
+          ...chain(L('γ₁'), ['1 / √λ', `1 / √${num(lambda)}`, `1 / ${num(sd)}`, numS(1 / sd)]),
+        ];
+      }
+      const { n } = P;
+      return [
+        ...chain(L('μ'), ['(n + 1) / 2', `${n + 1} / 2`, num((n + 1) / 2)]),
+        ...chain(L('σ²'), ['(n² − 1) / 12', `${n * n - 1} / 12`, num((n * n - 1) / 12)]),
+        ...chain(L('E[(X − μ)³]'), ['0, since every term has a mirror twin']),
+        ...chain(L('γ₁'), ['E[(X − μ)³] / σ³', `0 / ${num(sd ** 3)}`, '0']),
+      ];
+    }
+
+    function renderArithmetic() {
+      const { xs, ps, m, lo, hi } = model;
+      // Show float noise such as 5 − 5.0000000000000018 as an exact 0.
+      const d = (i) => {
+        const raw = xs[i] - m.mu;
+        return Math.abs(raw) < 1e-9 * Math.max(1, Math.abs(m.mu)) ? 0 : raw;
+      };
+      const side = (i) => (d(i) < -1e-9 ? 'l' : d(i) > 1e-9 ? 'r' : '');
+      const label = (i) => `x = ${fmtX(xs[i])}`;
+      const idx = [];
+      for (let i = lo; i <= hi; i += 1) idx.push(i);
+      const tails = [];
+      if (lo > 0) tails.push({ from: 0, to: lo - 1, label: `x < ${fmtX(xs[lo])}`, cls: 'tail l' });
+      if (hi < xs.length - 1) tails.push({ from: hi + 1, to: xs.length - 1, label: `x > ${fmtX(xs[hi])}`, cls: 'tail r' });
+      const tailRows = (f, signed) => tails.map((t) => {
+        let s = 0;
+        for (let i = t.from; i <= t.to; i += 1) s += f(i);
+        return [t.label, `${t.to - t.from + 1} more terms, summed`, signed ? numS(s) : num(s), t.cls];
+      });
+      const sd3 = m.sd ** 3;
+      let neg = 0;
+      let pos = 0;
+      xs.forEach((_, i) => {
+        const v = d(i) ** 3 * ps[i];
+        if (v < 0) neg += v;
+        else pos += v;
+      });
+
+      $('arithHead').innerHTML = `<strong>${esc(model.name)}.</strong> Six components lead to γ₁.
+        Each row is one term of a sum. Blue rows sit left of μ. Orange rows sit right of μ.`;
+      const parts = [
+        block('1 · The mean <span class="nocase">μ</span>', 'μ = Σ x · p(x)',
+          rowsHtml(idx.map((i) => [label(i), `${paren(xs[i])} × ${num(ps[i])}`, num(xs[i] * ps[i]), side(i)])
+            .concat(tailRows((i) => xs[i] * ps[i]))),
+          `μ = sum of the last column = <strong>${num(m.mu)}</strong>`),
+        block('2 · Each distance <span class="nocase">x − μ</span>', 'd = x − μ',
+          rowsHtml(idx.map((i) => [label(i), `${paren(xs[i])} − ${paren(m.mu)}`, numS(d(i)), side(i)])
+            .concat(tails.map((t) => [t.label, 'further out', '', t.cls]))),
+          'A negative d sits left of μ. A positive d sits right of μ.'),
+        block('3 · The variance <span class="nocase">σ²</span>', 'σ² = Σ (x − μ)² · p(x)',
+          rowsHtml(idx.map((i) => [label(i), `(${numS(d(i))})² × ${num(ps[i])} = ${num(d(i) ** 2)} × ${num(ps[i])}`,
+            num(d(i) ** 2 * ps[i]), side(i)]).concat(tailRows((i) => d(i) ** 2 * ps[i]))),
+          `σ² = sum of the last column = <strong>${num(m.variance)}</strong>`),
+        block('4 · <span class="nocase">σ</span> and <span class="nocase">σ³</span>', 'σ = √σ² and σ³ = σ² × σ',
+          linesHtml([...chain('σ ', [`√${num(m.variance)}`, num(m.sd)]), ...chain('σ³', [`${num(m.variance)} × ${num(m.sd)}`, num(sd3)])]),
+          `σ³ = <strong>${num(sd3)}</strong>`),
+        block('5 · The third central moment', 'E[(X − μ)³] = Σ (x − μ)³ · p(x)',
+          rowsHtml(idx.map((i) => [label(i), `(${numS(d(i))})³ × ${num(ps[i])} = ${paren(d(i) ** 3)} × ${num(ps[i])}`,
+            numS(d(i) ** 3 * ps[i]), side(i)]).concat(tailRows((i) => d(i) ** 3 * ps[i], true))),
+          `Left of μ sums to ${num(neg)}. Right of μ sums to ${num(pos)}.<br>`
+            + `E[(X − μ)³] = ${num(neg)} + ${num(pos)} = <strong>${numS(m.m3)}</strong>`),
+        block('6 · The skewness <span class="nocase">γ₁</span>', 'γ₁ = E[(X − μ)³] / σ³',
+          linesHtml(chain('γ₁', ['E[(X − μ)³] / σ³', `${paren(m.m3)} / ${num(sd3)}`, numS(m.skew)])),
+          `γ₁ = <strong>${numS(m.skew)}</strong>: ${verdict(m.skew)}`),
+      ];
+
+      const P = params[state.kind];
+      const cm = closedMoments(state.kind, P);
+      const title = '7 · Check with the lecture formulas';
+      if (!cm) {
+        parts.push(block(title, 'A painted pmf has no closed form.', '', 'The sums above are the whole calculation.'));
+      } else {
+        let lines = formulaLines(state.kind, P);
+        let want = cm;
+        const { a, b } = model;
+        if (a !== 1 || b !== 0) {
+          const L = (s) => s.padEnd(13);
+          const gx = cm.m3 / cm.variance ** 1.5;
+          lines = lines.concat(['', `Now turn X into Y = ${fmtAffine(a, b)}:`],
+            chain(L('μ_Y'), ['aμ + b', `${paren(a)} × ${paren(cm.mu)} + ${paren(b)}`, num(a * cm.mu + b)]),
+            chain(L('σ²_Y'), ['a²σ²', `${num(a * a)} × ${num(cm.variance)}`, num(a * a * cm.variance)]),
+            chain(L('E[(Y − μ_Y)³]'), ['a³ E[(X − μ)³]', `${paren(a ** 3)} × ${paren(cm.m3)}`, numS(a ** 3 * cm.m3)]),
+            chain(L('γ₁(Y)'), ['sign(a) × γ₁(X)', `${a < 0 ? '−1' : '+1'} × ${paren(gx)}`, numS(Math.sign(a) * gx)]));
+          want = { mu: a * cm.mu + b, variance: a * a * cm.variance, m3: a ** 3 * cm.m3 };
+        }
+        const same = (u, v) => Math.abs(u - v) <= 1e-6 * Math.max(1, Math.abs(v));
+        const ok = same(want.mu, m.mu) && same(want.variance, m.variance) && same(want.m3, m.m3);
+        parts.push(block(title, `${KINDS[state.kind].name(P)}: closed forms, numbers substituted`, linesHtml(lines),
+          ok ? '<span class="ok">✓ μ, σ², E[(X − μ)³] and γ₁ all match the sums above.</span>'
+            : '<span class="bad">✗ The formulas and the sums disagree.</span>'));
+      }
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    Object.entries(KINDS).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.kind = k;
+      b.addEventListener('click', () => {
+        state.kind = k;
+        renderControls();
+        update();
+      });
+      $('kindGrid').append(b);
+    });
+    LENS_UI.forEach((l, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${l.n}</b><span>${l.word}</span>`;
+      b.dataset.lens = i;
+      b.addEventListener('click', () => setLens(i));
+      $('lensGrid').append(b);
+    });
+    Object.entries(SHAPES).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.addEventListener('click', () => {
+        state.custom = spec.w.slice();
+        update();
+      });
+      $('shapeGrid').append(b);
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    document.querySelectorAll('[data-hand]').forEach((b) => b.addEventListener('click', () => apply(HAND[+b.dataset.hand])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    $('mirrorBox').addEventListener('change', (e) => {
+      state.mirror = e.target.checked;
+      update();
+    });
+    $('transformReset').addEventListener('click', () => {
+      state.scale = 1;
+      state.shift = 0;
+      state.mirror = false;
+      renderControls();
+      update();
+    });
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-5]$/.test(e.key)) setLens(+e.key - 1);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>

@@ -1,0 +1,1727 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ch2 · Mean, Variance and Quantiles</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --bg-2: #0a1627;
+      --ink: #ebf2ff;
+      --muted: #8aa1c0;
+      --line: rgba(132, 160, 202, 0.24);
+      --blue-1: #86d4ff;
+      --blue-2: #5aa6ff;
+      --left: #3d95ec;
+      --right: #dd7425;
+      --mean: #a0e7a0;
+      --warm-2: #f08f3c;
+      --green: #a0e7a0;
+      --danger: #ff8a8a;
+      --panel: rgba(8, 18, 32, 0.92);
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; height: 100%; overflow: hidden;
+      background:
+        radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .app { height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) 460px; }
+    .app.wide { grid-template-columns: minmax(0, 1fr) 540px; }
+    .stage {
+      min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
+    }
+    .eyebrow {
+      color: var(--blue-1); font-size: 12px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
+    .lead { margin: 8px 0 0; max-width: 48rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
+    .lead strong { color: var(--ink); font-weight: 600; }
+    .canvas-wrap { position: relative; min-height: 0; }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .receipt {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+      padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+      overflow-wrap: anywhere;
+    }
+    .receipt .big { color: var(--ink); font-size: 14px; }
+    .receipt strong { color: var(--ink); }
+    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
+    .caption strong { color: var(--ink); font-weight: 600; }
+    .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
+    .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
+    .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .swatch.curve { width: 14px; height: 0; border-top: 2px solid var(--left); border-radius: 0; }
+    .swatch.xcurve { width: 14px; height: 0; border-top: 2px solid var(--right); border-radius: 0; }
+    .swatch.strip { background: rgba(61, 149, 236, 0.35); border: 1px solid var(--left); }
+    .swatch.left { background: var(--left); }
+    .swatch.right { background: var(--right); }
+    .swatch.sample { background: rgba(221, 116, 37, 0.15); border: 1.5px solid var(--right); }
+    .swatch.mean { background: var(--mean); width: 3px; height: 12px; border-radius: 1px; }
+    .swatch.sigma { width: 12px; height: 0; border-top: 2px dashed var(--muted); border-radius: 0; }
+    .swatch.tail {
+      background: repeating-linear-gradient(135deg, var(--muted) 0 2px, transparent 2px 4px);
+      border: 1px solid var(--muted);
+    }
+
+    .panel {
+      border-left: 1px solid var(--line); background: var(--panel); backdrop-filter: blur(16px);
+      padding: 12px 12px 14px; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+      gap: 10px; overflow: hidden; min-height: 0;
+    }
+    .nav { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .nav a { color: var(--blue-1); text-decoration: none; font-weight: 600; }
+    .nav a:hover { text-decoration: underline; }
+    .chip { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+    .panel-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .panel-tab { text-align: center; font-size: 13px; padding: 9px 10px; }
+    .tab-pane { display: none; min-height: 0; overflow-y: auto; padding-right: 4px; }
+    .tab-pane.active { display: grid; align-content: start; gap: 12px; }
+    .section { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+    .section:last-child { border-bottom: 0; padding-bottom: 0; }
+    .section-title {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--blue-1);
+    }
+    .nocase { text-transform: none; }
+    .preset-grid { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .preset-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .preset-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .view-grid { display: grid; gap: 6px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .view-grid button { display: grid; gap: 2px; padding: 7px 4px; text-align: center; font-size: 12px; }
+    .view-grid button b { font-size: 13px; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button, input { font: inherit; }
+    button {
+      border: 1px solid rgba(132, 160, 202, 0.34); background: rgba(8, 23, 40, 0.84);
+      color: var(--ink); border-radius: 8px; padding: 9px 10px; cursor: pointer; font-size: 13px;
+      transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+    button:hover { transform: translateY(-1px); border-color: rgba(134, 212, 255, 0.8); background: rgba(9, 27, 48, 0.96); }
+    button.active { border-color: rgba(134, 212, 255, 0.92); background: rgba(19, 52, 92, 0.96); }
+    input[type="range"] { width: 100%; margin: 0; accent-color: var(--blue-2); }
+    .slider-row { display: grid; gap: 4px; }
+    .slider-label { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; }
+    .slider-label strong { color: var(--ink); font-family: var(--mono); font-weight: 600; }
+    .checkbox { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px; }
+    .checkbox input { width: 18px; height: 18px; accent-color: var(--blue-2); }
+    .body { color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .body strong { color: var(--ink); font-weight: 600; }
+    .body a, .src a { color: var(--blue-1); }
+    .tour-head { font-size: 15px; font-weight: 600; color: var(--ink); }
+    .tour-head span { color: var(--muted); font-weight: 400; font-size: 12px; margin-right: 6px; }
+    .live-line { font-family: var(--mono); font-size: 12px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
+    .formula {
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--ink); white-space: pre;
+      overflow-x: auto; padding: 10px 12px; border-radius: 8px; background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith {
+      font-family: var(--mono); font-size: 11px; line-height: 1.6; color: var(--muted); white-space: pre;
+      overflow: auto; max-height: 300px; padding: 8px 10px 8px 4px; border-radius: 8px;
+      background: rgba(8, 23, 40, 0.7); border: 1px solid var(--line);
+    }
+    .arith div { padding-left: 8px; }
+    .arith div.l { box-shadow: inset 3px 0 0 var(--left); }
+    .arith div.r { box-shadow: inset 3px 0 0 var(--right); }
+    .arith div.tail { font-style: italic; }
+    .arith div.eq { color: var(--ink); }
+    .arith-result { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted); }
+    .arith-result strong { color: var(--ink); }
+    .formula.current { border-color: rgba(134, 212, 255, 0.8); background: rgba(19, 52, 92, 0.45); }
+    .ok { color: var(--green); }
+    .bad { color: var(--danger); }
+    .essence {
+      padding: 10px 12px; border-left: 3px solid var(--blue-2); border-radius: 6px;
+      background: rgba(19, 52, 92, 0.35); color: var(--ink); font-size: 13px; line-height: 1.5;
+    }
+    .checklist { display: grid; gap: 6px; }
+    .checklist label { display: flex; gap: 10px; align-items: flex-start; color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .checklist input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--green); flex: none; }
+    .src { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .src ul { margin: 4px 0; padding-left: 18px; }
+    .predict { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; background: rgba(8, 23, 40, 0.6); }
+    .predict summary { cursor: pointer; color: var(--ink); font-size: 13px; font-weight: 600; line-height: 1.4; }
+    .predict .answer { margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .predict .answer strong { color: var(--ink); font-weight: 600; }
+    .predict button { margin-top: 8px; width: 100%; text-align: left; }
+    [hidden] { display: none !important; }
+
+    @media (max-width: 900px) {
+      html, body { overflow: auto; height: auto; }
+      .app, .app.wide { height: auto; grid-template-columns: minmax(0, 1fr); }
+      .stage { height: 96dvh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+      .tab-pane { overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="stage">
+      <header>
+        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 2</div>
+        <h1>Mean, variance and quantiles</h1>
+        <p class="lead">
+          Slice a pdf into thin strips.
+          Each strip holds probability <strong>f(x)·h</strong>, just like one pmf bar.
+          So <strong>Σ x p(x)</strong> becomes <strong>∫ x f(x) dx</strong>.
+          A <strong>quantile</strong> runs the cdf backwards.
+        </p>
+      </header>
+      <div class="canvas-wrap"><canvas id="scene"></canvas></div>
+      <div>
+        <div id="receipt" class="receipt"></div>
+        <div id="caption" class="caption" style="margin-top: 8px;"></div>
+        <div class="hint">
+          <span class="legend" data-legend="curve"><span class="swatch curve"></span>f(x), the pdf</span>
+          <span class="legend" data-legend="strip"><span class="swatch strip"></span>strip, p ≈ f(xᵢ)·h</span>
+          <span class="legend" data-legend="side"><span class="swatch left"></span>left of μ</span>
+          <span class="legend" data-legend="side"><span class="swatch right"></span>right of μ</span>
+          <span class="legend" data-legend="xcurve"><span class="swatch xcurve"></span>X, before the map</span>
+          <span class="legend" data-legend="ycurve"><span class="swatch curve"></span>Y = aX + b</span>
+          <span class="legend" data-legend="sample"><span class="swatch sample"></span>sample histogram</span>
+          <span class="legend" data-legend="mean"><span class="swatch mean"></span>μ, the balance point</span>
+          <span class="legend" data-legend="sigma"><span class="swatch sigma"></span>μ ± σ</span>
+          <span class="legend" data-legend="tail"><span class="swatch tail"></span>tail past the last strip</span>
+          <span id="hoverHint">Hover the chart for exact numbers.</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <nav class="nav">
+        <a href="index.html">← Index</a>
+        <span>Chapter 2 of 5</span>
+        <a href="Ch3-Uniform-And-Exponential.html">Ch 3 →</a>
+      </nav>
+      <div class="chip">μ = ∫ x f(x) dx · σ² = E(X²) − μ² · Q(p) = F⁻¹(p)</div>
+      <div class="panel-tabs">
+        <button class="panel-tab active" data-tab-button="explore">Explore</button>
+        <button class="panel-tab" data-tab-button="arithmetic">Arithmetic</button>
+        <button class="panel-tab" data-tab-button="math">Math</button>
+        <button class="panel-tab" data-tab-button="takeaways">Takeaways</button>
+      </div>
+
+      <div class="tab-pane active" data-tab-pane="explore">
+        <section class="section">
+          <div class="section-title">Tour · strips, balance, quantiles</div>
+          <div id="tourHead" class="tour-head"></div>
+          <div id="tourNote" class="body"></div>
+          <div class="pair">
+            <button id="tourPrev">← Previous</button>
+            <button id="tourNext">Next stop →</button>
+          </div>
+          <div class="src">Keys: ← and → move through the tour. 1 to 6 pick a view.
+            The Arithmetic tab writes out every sum for the state on screen.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a view</div>
+          <div id="viewGrid" class="view-grid"></div>
+          <div id="stripHost" style="display: grid; gap: 8px;"></div>
+          <div id="gHost" style="display: grid; gap: 8px;" hidden>
+            <div class="body">Pick g. The bottom chart shows g(x)·f(x). Its area is E(g(X)).</div>
+            <div id="gGrid" class="preset-grid three"></div>
+          </div>
+          <div id="linearHost" style="display: grid; gap: 8px;" hidden>
+            <div class="body">Replace X by Y = aX + b. The top chart keeps X. The bottom chart shows Y on the same axes.</div>
+            <div id="transformHost" style="display: grid; gap: 8px;"></div>
+            <label class="checkbox"><input id="mirrorBox" type="checkbox"> Flip: use −a instead of a</label>
+            <button id="transformReset">Reset to Y = X</button>
+          </div>
+          <div id="quantileHost" style="display: grid; gap: 8px;" hidden>
+            <div class="body">Drag on either chart. Or use the slider and the quick buttons.</div>
+            <div id="pHost"></div>
+            <div id="pGrid" class="preset-grid five"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Pick a shape</div>
+          <div id="kindGrid" class="preset-grid"></div>
+          <div id="paramHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Sample from X</div>
+          <div class="body">Each draw is Q(U) for a uniform U on (0, 1). The orange histogram shows in the Σ → ∫, E(g(X)) and Quantiles views.</div>
+          <div class="preset-grid three">
+            <button id="sample100">Sample ×100</button>
+            <button id="sample1000">Sample ×1000</button>
+            <button id="sampleClear">Clear</button>
+          </div>
+          <div id="sampleLine" class="live-line"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Predict first</div>
+          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
+          <details class="predict">
+            <summary>1 · Exp(1) has mean 1. Is its median above or below 1?</summary>
+            <div class="answer"><strong>Below, at ln 2 ≈ 0.693.</strong> Half the area sits left of 0.693.
+              The long right tail pulls the mean up. It cannot pull the median.</div>
+            <button data-predict="0">Set it up: Exp(1), Quantiles view</button>
+          </details>
+          <details class="predict">
+            <summary>2 · Six strips turn U(0, 6) into a fair die. Is the die's σ² bigger or smaller than 3?</summary>
+            <div class="answer"><strong>Smaller: 35/12 ≈ 2.917.</strong> The die puts each strip's mass at the strip's centre.
+              That removes the spread inside each strip. More strips close the gap.</div>
+            <button data-predict="1">Set it up: U(0, 6) with 6 strips</button>
+          </details>
+          <details class="predict">
+            <summary>3 · Y = 3X + 5. Does the peak of the pdf grow or shrink?</summary>
+            <div class="answer"><strong>It shrinks to one third.</strong> The curve gets 3 times wider.
+              The area must stay 1. So f<sub>Y</sub>(y) = f<sub>X</sub>((y − 5)/3) / 3.</div>
+            <button data-predict="2">Set it up: a triangle and Y = 3X + 5</button>
+          </details>
+          <details class="predict">
+            <summary>4 · U(0, 1) has σ² = 1/12. What is σ² for U(0, 2)?</summary>
+            <div class="answer"><strong>4/12 = 1/3.</strong> U(0, 2) is 2X with X ~ U(0, 1).
+              Var(aX + b) = a²Var(X). So σ² grows by 2² = 4.</div>
+            <button data-predict="3">Set it up: U(0, 1) and Y = 2X</button>
+          </details>
+          <details class="predict">
+            <summary>5 · What is the 90th percentile of Exp(1)?</summary>
+            <div class="answer"><strong>ln 10 ≈ 2.303.</strong> Solve 1 − e<sup>−x</sup> = 0.9.
+              So e<sup>−x</sup> = 0.1 and x = ln 10.</div>
+            <button data-predict="4">Set it up: Exp(1) with p = 0.9</button>
+          </details>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="arithmetic">
+        <section class="section">
+          <div id="arithHead" class="body"></div>
+          <div class="src">Each number is rounded to 4 significant figures. The sums use full precision.
+            So a last digit can differ by 1.</div>
+        </section>
+        <div id="arithBody" style="display: grid; gap: 12px;"></div>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="math">
+        <section class="section">
+          <div class="section-title">Σ becomes ∫</div>
+          <div class="formula">discrete          continuous
+p(x)              f(x) dx
+Σ p(x) = 1        ∫ f(x) dx = 1
+μ = Σ x p(x)      μ = ∫ x f(x) dx
+E(g(X)) = Σ g p   E(g(X)) = ∫ g(x) f(x) dx
+σ² = Σ (x−μ)² p   σ² = ∫ (x − μ)² f(x) dx</div>
+          <div class="body">The slide "Contrast with discrete random variable cdfs" gives the bridge.
+            For small h the strip [x, x + h) holds probability about f(x)h.
+            So each strip acts like one pmf bar. Thin strips turn each sum into an integral.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Linearity in one line</div>
+          <div class="formula">E(aX + b) = ∫ (ax + b) f(x) dx
+          = a ∫ x f(x) dx + b ∫ f(x) dx
+          = aμ + b · 1</div>
+          <div class="body">The integral splits because integrals are linear. The second integral is the total area 1.
+            The slide "Linearity of Expectation" states this result.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The variance shortcut</div>
+          <div class="formula">σ² = ∫ (x − μ)² f(x) dx
+   = ∫ x² f dx − 2μ ∫ x f dx + μ² ∫ f dx
+   = E(X²) − 2μ·μ + μ²·1
+   = E(X²) − μ²</div>
+          <div class="body">Expand the square. Then use linearity three times.</div>
+          <div class="formula">(aX + b) − (aμ + b) = a(X − μ)
+Var(aX + b) = E(a²(X − μ)²) = a² Var(X)</div>
+          <div class="body">The shift b cancels. So only the stretch a matters. It enters squared.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The pdf of Y = aX + b</div>
+          <div class="formula">a &gt; 0:  F_Y(y) = P(aX + b ≤ y) = F_X((y − b)/a)
+        f_Y(y) = f_X((y − b)/a) / a
+a &lt; 0:  the inequality flips, F_Y = 1 − F_X((y − b)/a)
+        f_Y(y) = f_X((y − b)/a) / |a|</div>
+          <div class="body">This is a standard result. It uses the cdf method from the slide
+            "Relationship between U(a, b) and U(0,1)". The factor 1/|a| keeps the area at 1.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Quantiles</div>
+          <div class="formula">Q(p) = F⁻¹(p), the least x with P(X ≤ x) = p
+median          = Q(0.5)   solves F(x) = 0.5
+lower quartile  = Q(0.25)  = 25th percentile
+upper quartile  = Q(0.75)  = 75th percentile
+kth percentile  = Q(k/100)</div>
+          <div class="body">F climbs from 0 to 1. So each height p meets the curve once for these shapes.
+            Read across from p and then down to x.</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The slide's U(a, b) derivation</div>
+          <div class="formula">E(X) = ∫ₐᵇ x/(b − a) dx = [x²/(2(b − a))]ₐᵇ
+     = (b² − a²)/(2(b − a))
+     = (b − a)(b + a)/(2(b − a)) = (a + b)/2
+E(X²) = (b³ − a³)/(3(b − a)) = (a² + ab + b²)/3
+Var(X) = (a² + ab + b²)/3 − (a + b)²/4 = (b − a)²/12</div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">The four shapes</div>
+          <div id="formsHost" style="display: grid; gap: 8px;"></div>
+        </section>
+
+        <section class="section">
+          <div class="src">Source: G. Casale, 50008 Probability and Statistics, L04 Continuous Random Variables.
+            The page uses these slides:
+            <ul>
+              <li>E(X). Linearity of Expectation. Var(X).</li>
+              <li>Quantiles and percentiles. Example: Quartiles, percentiles, quantiles.</li>
+              <li>Mean and Variance of X ∼ U(a, b). Exponential Distribution Exp(λ).</li>
+              <li>Contrast with discrete random variable cdfs, for f(x)h.</li>
+            </ul>
+            The pdf of aX + b and the triangle and power shapes are standard results. So are midpoint strips and sampling by Q(U).
+            One maths block computes every number. A Node test checks it against the closed forms.</div>
+        </section>
+      </div>
+
+      <div class="tab-pane" data-tab-pane="takeaways">
+        <section class="section">
+          <div class="section-title">The Essence</div>
+          <div class="essence"><strong>Σ becomes ∫.</strong> A strip of width h holds probability f(x)h.
+            So every pmf formula survives with p(x) replaced by f(x) dx.</div>
+          <div class="essence"><strong><span class="nocase">μ</span> is still the balance point.</strong>
+            The pulls (x − μ)f(x) dx on the two sides cancel to 0.</div>
+          <div class="essence"><strong><span class="nocase">σ²</span> still averages squared distance.</strong>
+            E((X − μ)²) and E(X²) − μ² always agree.</div>
+          <div class="essence"><strong>aX + b moves <span class="nocase">μ</span> and scales <span class="nocase">σ</span> by |a|.</strong>
+            The pdf gets |a| times wider and |a| times shorter. The area stays 1.</div>
+          <div class="essence"><strong>A quantile runs the cdf backwards.</strong> Q(p) is the x with area p to its left.</div>
+          <div class="essence"><strong>The mean follows the long tail.</strong> The median does not.
+            So they split apart on skewed shapes.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Mental-picture checklist</div>
+          <div class="checklist">
+            <label><input type="checkbox"> I see each strip as a pmf bar with p ≈ f(x)h.</label>
+            <label><input type="checkbox"> I can explain why Σ xᵢ f(xᵢ)h tends to ∫ x f(x) dx.</label>
+            <label><input type="checkbox"> I can point to μ as the balance point of the curve.</label>
+            <label><input type="checkbox"> I can get σ² two ways and see that they agree.</label>
+            <label><input type="checkbox"> I know why the pdf of 3X is three times shorter.</label>
+            <label><input type="checkbox"> I can read Q(p) off the cdf and shade area p on the pdf.</label>
+            <label><input type="checkbox"> I can say which side of the median the mean falls on.</label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title">Honest caveats</div>
+          <div class="body"><strong>Not every pdf has a mean.</strong> E(X) needs ∫ |x| f(x) dx to be finite.
+            A Pareto pdf with α ≤ 1 fails this test. <a href="Ch1-Density-Area-Is-Probability.html">Chapter 1</a> meets the Pareto pdf.</div>
+          <div class="body"><strong>The strips use midpoints.</strong> Other rules give slightly different sums.
+            The exponential tail past the last strip enters as one exact piece.</div>
+          <div class="body"><strong>The slide picks the least x with F(x) = p.</strong> This matters when F is flat over a gap.
+            The four shapes here have no gaps.</div>
+          <div class="body"><strong>"Mean right of median means right skew" is only a rule of thumb.</strong>
+            The <a href="../Essence-of-Skewness.html">skewness page</a> measures skew properly.</div>
+          <div class="body"><strong>Sample quartiles follow the slide's ordered-data rule.</strong>
+            Software packages interpolate in several different ways.</div>
+          <div class="body">Next: <a href="Ch3-Uniform-And-Exponential.html">Chapter 3</a> meets the Uniform and Exponential as distributions.</div>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    // ===================== MATHS KIT (tested by l04/test_ch2.js) =====================
+    // KIT START
+    const TRI_B = 4;
+    const STRIP_COVER = 0.999;
+
+    // Each shape carries its pdf, cdf and quantile plus closed-form moments.
+    // kinks mark corners of the pdf. Integrals split there.
+    function dist(kind, P) {
+      if (kind === 'uniform') {
+        const { a, b } = P;
+        const w = b - a;
+        return {
+          lo: a, hi: b, kinks: [], peak: 1 / w,
+          pdf: (x) => (x >= a && x <= b ? 1 / w : 0),
+          cdf: (x) => (x <= a ? 0 : x >= b ? 1 : (x - a) / w),
+          quantile: (p) => a + p * w,
+          mean: (a + b) / 2, ex2: (a * a + a * b + b * b) / 3, variance: (w * w) / 12,
+        };
+      }
+      if (kind === 'exponential') {
+        const l = P.lambda;
+        return {
+          lo: 0, hi: Infinity, kinks: [], peak: l,
+          pdf: (x) => (x >= 0 ? l * Math.exp(-l * x) : 0),
+          cdf: (x) => (x <= 0 ? 0 : 1 - Math.exp(-l * x)),
+          quantile: (p) => -Math.log(1 - p) / l,
+          mean: 1 / l, ex2: 2 / (l * l), variance: 1 / (l * l),
+        };
+      }
+      if (kind === 'triangle') {
+        // Lowest value 0, highest value TRI_B, peak at c.
+        const b = TRI_B;
+        const { c } = P;
+        const up = (x) => x <= c && c > 0;
+        return {
+          lo: 0, hi: b, kinks: [c], peak: 2 / b,
+          pdf: (x) => (x < 0 || x > b ? 0 : up(x) ? (2 * x) / (b * c) : (2 * (b - x)) / (b * (b - c))),
+          cdf: (x) => (x <= 0 ? 0 : x >= b ? 1 : up(x) ? (x * x) / (b * c) : 1 - (b - x) ** 2 / (b * (b - c))),
+          quantile: (p) => (p <= c / b && c > 0 ? Math.sqrt(p * b * c) : b - Math.sqrt((1 - p) * b * (b - c))),
+          mean: (b + c) / 3, ex2: (b * b + b * c + c * c) / 6, variance: (b * b + c * c - b * c) / 18,
+        };
+      }
+      // Power ramp: f(x) = k x^(k − 1) on (0, 1).
+      const { k } = P;
+      return {
+        lo: 0, hi: 1, kinks: [], peak: k,
+        pdf: (x) => (x >= 0 && x <= 1 ? k * x ** (k - 1) : 0),
+        cdf: (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x ** k),
+        quantile: (p) => p ** (1 / k),
+        mean: k / (k + 1), ex2: k / (k + 2), variance: k / ((k + 1) ** 2 * (k + 2)),
+      };
+    }
+
+    // Y = aX + b as a new shape. A negative a flips it.
+    function affine(d, a, b) {
+      const ends = [a * d.lo + b, a * d.hi + b];
+      return {
+        lo: Math.min(...ends), hi: Math.max(...ends), kinks: d.kinks.map((k) => a * k + b), peak: d.peak / Math.abs(a),
+        pdf: (y) => d.pdf((y - b) / a) / Math.abs(a),
+        cdf: (y) => (a > 0 ? d.cdf((y - b) / a) : 1 - d.cdf((y - b) / a)),
+        quantile: (p) => (a > 0 ? a * d.quantile(p) + b : a * d.quantile(1 - p) + b),
+        mean: a * d.mean + b, ex2: a * a * d.ex2 + 2 * a * b * d.mean + b * b, variance: a * a * d.variance,
+      };
+    }
+
+    function simpson(fn, a, b, n = 4000) {
+      if (!(b > a)) return 0;
+      const h = (b - a) / n;
+      let s = fn(a) + fn(b);
+      for (let i = 1; i < n; i += 1) s += fn(a + i * h) * (i % 2 ? 4 : 2);
+      return (s * h) / 3;
+    }
+
+    // An infinite end stops where the remaining probability is below 1e−15.
+    function support(d) {
+      return [Number.isFinite(d.lo) ? d.lo : d.quantile(1e-15), Number.isFinite(d.hi) ? d.hi : d.quantile(1 - 1e-15)];
+    }
+
+    // ∫ g(x) f(x) dx over the support, one Simpson run per smooth piece.
+    function integrate(d, g) {
+      const [lo, hi] = support(d);
+      const cuts = [lo, ...d.kinks.filter((k) => k > lo && k < hi).sort((u, v) => u - v), hi];
+      let s = 0;
+      for (let i = 0; i + 1 < cuts.length; i += 1) s += simpson((x) => g(x) * d.pdf(x), cuts[i], cuts[i + 1]);
+      return s;
+    }
+
+    function numericMoments(d) {
+      const total = integrate(d, () => 1);
+      const mean = integrate(d, (x) => x);
+      const ex2 = integrate(d, (x) => x * x);
+      const variance = integrate(d, (x) => (x - mean) ** 2);
+      return { total, mean, ex2, variance };
+    }
+
+    // Midpoint strips over [lo, end]. An infinite tail past end enters as one
+    // exactly integrated piece, so the sums still tend to the integrals.
+    function strips(d, N) {
+      const start = d.lo;
+      const end = Number.isFinite(d.hi) ? d.hi : d.quantile(STRIP_COVER);
+      const h = (end - start) / N;
+      const rows = [];
+      for (let i = 0; i < N; i += 1) {
+        const x = start + (i + 0.5) * h;
+        const f = d.pdf(x);
+        rows.push({ x, f, p: f * h });
+      }
+      const mu = d.mean;
+      let tail = null;
+      if (!Number.isFinite(d.hi)) {
+        const far = support(d)[1];
+        const piece = (g) => simpson((x) => g(x) * d.pdf(x), end, far);
+        tail = {
+          p: 1 - d.cdf(end), x1: piece((x) => x), x2: piece((x) => x * x),
+          c1: piece((x) => x - mu), c2: piece((x) => (x - mu) ** 2),
+        };
+      }
+      const sum = (g, key) => rows.reduce((s, r) => s + g(r), 0) + (tail ? tail[key] : 0);
+      let c1 = sum((r) => (r.x - mu) * r.p, 'c1');
+      // Left and right pulls that cancel leave rounding noise, not imbalance.
+      const pulls = rows.reduce((s, r) => s + Math.abs((r.x - mu) * r.p), 0) + (tail ? Math.abs(tail.c1) : 0);
+      if (Math.abs(c1) < 1e-12 * pulls) c1 = 0;
+      return {
+        start, end, h, N, rows, tail, c1,
+        s0: sum((r) => r.p, 'p'),
+        s1: sum((r) => r.x * r.p, 'x1'),
+        s2: sum((r) => r.x * r.x * r.p, 'x2'),
+        c2: sum((r) => (r.x - mu) ** 2 * r.p, 'c2'),
+      };
+    }
+
+    function mulberry32(seed) {
+      let t = seed >>> 0;
+      return () => {
+        t = (t + 0x6d2b79f5) >>> 0;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    // Inverse-cdf sampling: Q(U) has cdf F when U is uniform on (0, 1).
+    function sample(d, n, rng) {
+      const out = [];
+      for (let i = 0; i < n; i += 1) out.push(d.quantile(rng()));
+      return out;
+    }
+
+    // The slide's data rule: the point p of the way through the ordered data.
+    function sampleQuantile(sorted, p) {
+      return sorted[Math.max(0, Math.ceil(p * sorted.length) - 1)];
+    }
+
+    // Histogram heights on the density scale: count / (n · bin width).
+    function histogram(xs, lo, hi, bins) {
+      const w = (hi - lo) / bins;
+      const counts = Array(bins).fill(0);
+      xs.forEach((x) => {
+        const j = Math.floor((x - lo) / w);
+        if (j >= 0 && j < bins) counts[j] += 1;
+        else if (x === hi) counts[bins - 1] += 1;
+      });
+      return counts.map((c, j) => ({ x0: lo + j * w, x1: lo + (j + 1) * w, h: c / (xs.length * w) }));
+    }
+    // KIT END
+
+    // ===================== HELPERS =====================
+    const $ = (id) => document.getElementById(id);
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const minus = (s) => s.replaceAll('-', '−');
+    const fmt = (v, d = 3) => {
+      if (!Number.isFinite(v)) return '—';
+      return minus((Math.abs(v) < 0.5 * 10 ** -d ? 0 : v).toFixed(d));
+    };
+    const fmtX = (v) => minus(String(+v.toFixed(2)));
+    const fmtAffine = (a, b) => `${a === 1 ? '' : a === -1 ? '−' : fmtX(a)}X`
+      + (b ? ` ${b < 0 ? '−' : '+'} ${fmtX(Math.abs(b))}` : '');
+    function niceStep(max, count) {
+      const raw = max / count;
+      const mag = 10 ** Math.floor(Math.log10(raw));
+      const n = raw / mag;
+      return (n < 1.5 ? 1 : n < 3 ? 2 : n < 7 ? 5 : 10) * mag;
+    }
+    const fmtTick = (v, step) => {
+      if (Math.abs(v) < step * 1e-6) return '0';
+      return minus(v.toFixed(Math.max(0, -Math.floor(Math.log10(step) + 1e-9))));
+    };
+    const num = (v) => {
+      if (!Number.isFinite(v)) return '—';
+      if (v === 0) return '0';
+      const a = Math.abs(v);
+      return minus(a >= 1e-4 && a < 1e7 ? String(+v.toPrecision(4)) : v.toExponential(2));
+    };
+    const numS = (v) => (v > 0 ? '+' : '') + num(v);
+    const paren = (v) => (v < 0 ? `(${num(v)})` : num(v));
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const chain = (lhs, steps) => steps.map((s, k) => `${k ? ' '.repeat(lhs.length) : lhs} = ${s}`);
+    const linesHtml = (lines) => lines.map((l) => `<div class="eq">${esc(l || ' ')}</div>`).join('');
+    // Rows of [label, working, value, class], padded into aligned columns.
+    function rowsHtml(rows) {
+      const wl = Math.max(...rows.map((r) => r[0].length));
+      const ww = Math.max(...rows.map((r) => r[1].length));
+      return rows.map(([label, work, value, cls]) => {
+        const line = `${label.padEnd(wl)}  ${work.padEnd(ww)}${value ? ` = ${value}` : ''}`;
+        return `<div class="${cls || ''}">${esc(line)}</div>`;
+      }).join('');
+    }
+    function block(title, formula, body, result) {
+      return `<section class="section"><div class="section-title">${title}</div>`
+        + `<div class="live-line">${esc(formula)}</div>`
+        + (body ? `<div class="arith">${body}</div>` : '')
+        + `<div class="arith-result">${result}</div></section>`;
+    }
+    const same = (u, v, tol = 1e-7) => Math.abs(u - v) <= tol * Math.max(1, Math.abs(v));
+    const tick = (ok) => (ok ? '<span class="ok">✓</span>' : '<span class="bad">✗</span>');
+
+    // ===================== STATE =====================
+    const KINDS = {
+      uniform: {
+        label: 'Uniform', name: (P) => `U(${fmtX(P.a)}, ${fmtX(P.b)})`,
+        params: [
+          { key: 'a', label: 'a, the left end', min: -4, max: 8, step: 0.5 },
+          { key: 'b', label: 'b, the right end', min: -3.5, max: 12, step: 0.5 },
+        ],
+      },
+      exponential: {
+        label: 'Exponential', name: (P) => `Exp(${fmtX(P.lambda)})`,
+        params: [{ key: 'lambda', label: 'λ, the rate', min: 0.2, max: 3, step: 0.05 }],
+      },
+      triangle: {
+        label: 'Triangle', name: (P) => `Triangle(0, ${fmtX(P.c)}, 4)`,
+        params: [{ key: 'c', label: 'c, the peak between 0 and 4', min: 0, max: 4, step: 0.1 }],
+      },
+      power: {
+        label: 'Power ramp', name: (P) => `Power(${fmtX(P.k)})`,
+        params: [{ key: 'k', label: 'k in f(x) = k x^(k − 1)', min: 2, max: 6, step: 0.1 }],
+      },
+    };
+    const params = { uniform: { a: 0, b: 6 }, exponential: { lambda: 1 }, triangle: { c: 1.5 }, power: { k: 3 } };
+    const VIEWS = [
+      { word: 'Σ → ∫', sub: 'the mean', chart: 'xᵢ · f(xᵢ)h, each strip\'s share of μ' },
+      { word: 'Balance', sub: 'μ as pivot', chart: '(xᵢ − μ) · f(xᵢ)h, the pull of each strip' },
+      { word: 'Variance', sub: 'squared pulls', chart: '(xᵢ − μ)² · f(xᵢ)h, each strip\'s share of σ²' },
+      { word: 'E(g(X))', sub: 'any g', chart: 'g(x) · f(x), its area is E(g(X))' },
+      { word: 'aX + b', sub: 'shift, stretch', chart: 'Y = aX + b on the same axes' },
+      { word: 'Quantiles', sub: 'cdf backwards', chart: 'F(x), the cdf · drag up or down to pick p' },
+    ];
+    const NS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200];
+    const GS = {
+      x: { label: 'g(x) = x', name: 'x', expr: 'E(X)' },
+      x2: { label: 'g(x) = x²', name: 'x²', expr: 'E(X²)' },
+      c2: { label: '(x − μ)²', name: '(x − μ)²', expr: 'E((X − μ)²)' },
+    };
+    const PS = [[0.25, 'Q1'], [0.5, 'Median'], [0.75, 'Q3'], [0.9, '90th'], [0.95, '95th']];
+    const TOUR = [
+      { title: 'A pdf is a pmf with thin bars', kind: 'triangle', P: { c: 1.5 }, view: 0, N: 8,
+        note: 'Cut the area under f into 8 strips. Each strip holds probability f(xᵢ)·h. So each strip acts like one pmf bar. The mean becomes Σ xᵢ f(xᵢ)h.' },
+      { title: 'More strips, same idea', kind: 'triangle', P: { c: 1.5 }, view: 0, N: 100,
+        note: 'With 100 strips the sum gives 1.833. The exact integral gives μ = (0 + 4 + 1.5)/3 = 1.833. Thin strips turn Σ into ∫. The pmf rule μ = Σ x p(x) survives.' },
+      { title: 'The mean is the balance point', kind: 'triangle', P: { c: 0.5 }, view: 1, N: 40,
+        note: 'Each strip pulls with (xᵢ − μ)·f(xᵢ)h. Left pulls are negative. Right pulls are positive. At μ = 1.5 they cancel. So the curve balances on μ.' },
+      { title: 'A fair die hides in the uniform', kind: 'uniform', P: { a: 0, b: 6 }, view: 2, N: 6,
+        note: 'Six strips of U(0, 6) act like a fair die. Its faces sit at 0.5 to 5.5. Its variance is 35/12 ≈ 2.917. More strips push it up to the slide value (b − a)²/12 = 3.' },
+      { title: 'Variance weighs squared distance', kind: 'exponential', P: { lambda: 1 }, view: 2, N: 30,
+        note: 'Each strip now weighs (xᵢ − μ)²·f(xᵢ)h. The far right strips are thin. Yet their squared distance is large. For Exp(1) the total is σ² = 1.' },
+      { title: 'Two routes to σ²', kind: 'power', P: { k: 2 }, view: 3, g: 'x2',
+        note: 'Here f(x) = 2x. The bottom chart shows x²·f(x). Its area is E(X²) = 1/2. Subtract μ² = 4/9. You get σ² = 1/18 ≈ 0.0556. The squared-distance route gives the same number.' },
+      { title: 'Shift and stretch', kind: 'uniform', P: { a: 0, b: 1 }, view: 4, scale: 3, shift: 2,
+        note: 'Y = 3X + 2 with X ~ U(0, 1). Y lives on (2, 5). The pdf gets 3 times wider. So it gets 3 times shorter. μ moves to 3.5. σ grows from 0.289 to 0.866.' },
+      { title: 'Flip the tail', kind: 'exponential', P: { lambda: 1 }, view: 4, scale: 1, shift: 4, mirror: true,
+        note: 'Y = 4 − X with X ~ Exp(1). The long tail now points left. μ moves to 4 − 1 = 3. σ stays 1. A flip changes the sign of a. It cannot change |a|.' },
+      { title: 'A quantile runs the cdf backwards', kind: 'exponential', P: { lambda: 1 }, view: 5, p: 0.5,
+        note: 'Pick a probability p on the vertical axis. Go across to the cdf. Drop down to x. That x is Q(p) = F⁻¹(p). For Exp(1) the median is ln 2 ≈ 0.693.' },
+      { title: 'Quartiles and percentiles', kind: 'uniform', P: { a: 2, b: 10 }, view: 5, p: 0.75,
+        note: 'For U(2, 10) the quartiles sit at 4, 6 and 8. The 75th percentile is the 0.75-quantile. The shaded area to its left is 0.75.' },
+      { title: 'Mean right of the median', kind: 'exponential', P: { lambda: 0.5 }, view: 5, p: 0.5,
+        note: 'Exp(0.5) has μ = 2. Its median is ln 2/0.5 ≈ 1.386. Half the area sits left of 1.386. The long right tail drags the mean but not the median.' },
+      { title: 'Mean left of the median', kind: 'power', P: { k: 3 }, view: 5, p: 0.5,
+        note: 'Now f(x) = 3x² has its long tail on the left. μ = 3/4 = 0.75. The median is 0.5^(1/3) ≈ 0.794. Again the mean follows the long tail.' },
+    ];
+    const PREDICT = [
+      { kind: 'exponential', P: { lambda: 1 }, view: 5, p: 0.5 },
+      { kind: 'uniform', P: { a: 0, b: 6 }, view: 2, N: 6 },
+      { kind: 'triangle', P: { c: 1.5 }, view: 4, scale: 3, shift: 5 },
+      { kind: 'uniform', P: { a: 0, b: 1 }, view: 4, scale: 2, shift: 0 },
+      { kind: 'exponential', P: { lambda: 1 }, view: 5, p: 0.9 },
+    ];
+
+    const state = {
+      kind: 'triangle', view: 0, N: 8, g: 'x2', scale: 1, shift: 0, mirror: false,
+      p: 0.5, tour: 0, hoverX: null, samples: [],
+    };
+    let model = null;
+    let dirty = true;
+    let dragging = false;
+
+    // ===================== MODEL =====================
+    function buildModel() {
+      const P = params[state.kind];
+      const d = dist(state.kind, P);
+      const a = (state.mirror ? -1 : 1) * state.scale;
+      const b = state.shift;
+      const y = affine(d, a, b);
+      const st = strips(d, state.N);
+      const sd = Math.sqrt(d.variance);
+      let x0 = d.lo;
+      let x1 = st.end;
+      if (state.view === 4) {
+        x0 = Math.min(x0, a * d.lo + b, a * st.end + b);
+        x1 = Math.max(x1, a * d.lo + b, a * st.end + b);
+      }
+      const pad = (x1 - x0) * 0.07;
+      const sorted = state.samples.slice().sort((u, v) => u - v);
+      const hist = sorted.length ? histogram(sorted, d.lo, st.end, 30) : null;
+      const histOn = !!hist && [0, 3, 5].includes(state.view);
+      const histMax = histOn ? Math.max(...hist.map((h) => h.h)) : 0;
+      const pdfMax = state.view === 4 ? Math.max(d.peak, y.peak) : d.peak;
+      return {
+        P, d, y, a, b, st, sd, sdY: Math.abs(a) * sd, xr: [x0 - pad, x1 + pad], pad,
+        q: d.quantile(state.p), median: d.quantile(0.5),
+        numX: numericMoments(d), numY: numericMoments(y),
+        sorted, hist, histOn,
+        topMax: Math.max(pdfMax * 1.15, Math.min(histMax, pdfMax * 2) * 1.05),
+        name: KINDS[state.kind].name(P),
+      };
+    }
+
+    // Value of each strip in the bottom chart of views 0 to 2.
+    function stripValue(r) {
+      const mu = model.d.mean;
+      if (state.view === 0) return r.x * r.p;
+      if (state.view === 1) return (r.x - mu) * r.p;
+      return (r.x - mu) ** 2 * r.p;
+    }
+    function tailValue() {
+      const t = model.st.tail;
+      if (!t) return 0;
+      return [t.x1, t.c1, t.c2][state.view];
+    }
+    const gFn = (key, mu) => (key === 'x' ? (x) => x : key === 'x2' ? (x) => x * x : (x) => (x - mu) ** 2);
+
+    // ===================== CANVAS =====================
+    const canvas = $('scene');
+    const ctx = canvas.getContext('2d');
+    const C = {
+      left: '#3d95ec', right: '#dd7425', mean: '#a0e7a0', ink: '#ebf2ff', muted: '#8aa1c0',
+      grid: 'rgba(110, 156, 224, 0.14)', axis: 'rgba(182, 206, 245, 0.45)',
+    };
+    const alpha = (hex, a) => {
+      const n = parseInt(hex.slice(1), 16);
+      return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+    };
+    let hatchPattern = null;
+    function hatch() {
+      if (!hatchPattern) {
+        const c = document.createElement('canvas');
+        c.width = 6;
+        c.height = 6;
+        const k = c.getContext('2d');
+        k.strokeStyle = C.muted;
+        k.lineWidth = 1.6;
+        k.beginPath();
+        k.moveTo(0, 6);
+        k.lineTo(6, 0);
+        k.stroke();
+        hatchPattern = ctx.createPattern(c, 'repeat');
+      }
+      return hatchPattern;
+    }
+
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(canvas.clientWidth * dpr);
+      canvas.height = Math.round(canvas.clientHeight * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      dirty = true;
+    }
+    new ResizeObserver(resize).observe(canvas);
+
+    function geom() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      const titleH = 18;
+      const labelsH = 30;
+      const avail = Math.max(160, H - titleH - labelsH - titleH - labelsH);
+      const top = { y: titleH, h: avail * 0.54 };
+      const bot = { y: top.y + top.h + labelsH + titleH, h: avail * 0.46 };
+      return { x: 62, w: W - 62 - 16, top, bot };
+    }
+
+    function text(str, x, y, o = {}) {
+      ctx.save();
+      ctx.fillStyle = o.color || C.muted;
+      ctx.font = o.font || '12px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = o.align || 'left';
+      ctx.textBaseline = o.baseline || 'alphabetic';
+      ctx.fillText(str, x, y);
+      ctx.restore();
+    }
+    function hline(x0, x1, y, color, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x0, y);
+      ctx.lineTo(x1, y);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function vline(x, y0, y1, color, width = 1, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x, y0);
+      ctx.lineTo(x, y1);
+      ctx.stroke();
+      ctx.restore();
+    }
+    // A bar from baseline y0 to end y1 with a rounded data end.
+    function bar(cx, w, y0, y1, fill) {
+      const h = y1 - y0;
+      if (Math.abs(h) < 0.4) return;
+      const r = Math.min(4, w / 2, Math.abs(h));
+      ctx.save();
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      if (h < 0) ctx.roundRect(cx - w / 2, y1, w, -h, [r, r, 0, 0]);
+      else ctx.roundRect(cx - w / 2, y0, w, h, [0, 0, r, r]);
+      ctx.fill();
+      ctx.restore();
+    }
+    // Sample points across [x0, x1] plus both sides of every jump or corner.
+    function curvePts(fn, x0, x1, breaks) {
+      const xs = [];
+      for (let i = 0; i <= 600; i += 1) xs.push(x0 + ((x1 - x0) * i) / 600);
+      breaks.forEach((v) => { if (Number.isFinite(v) && v > x0 && v < x1) xs.push(v - 1e-9, v, v + 1e-9); });
+      return xs.sort((u, v) => u - v).map((x) => [x, fn(x)]);
+    }
+    function strokeCurve(pts, px, py, color, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      pts.forEach(([x, v], i) => (i ? ctx.lineTo(px(x), py(v)) : ctx.moveTo(px(x), py(v))));
+      ctx.stroke();
+      ctx.restore();
+    }
+    function fillCurve(pts, px, py, zeroY, color) {
+      if (!pts.length) return;
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(px(pts[0][0]), zeroY);
+      pts.forEach(([x, v]) => ctx.lineTo(px(x), py(v)));
+      ctx.lineTo(px(pts[pts.length - 1][0]), zeroY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    function fulcrum(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(x, y + 1);
+      ctx.lineTo(x - 7, y + 10);
+      ctx.lineTo(x + 7, y + 10);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    function draw() {
+      const W = canvas.clientWidth;
+      const H = canvas.clientHeight;
+      ctx.clearRect(0, 0, W, H);
+      if (!model || W < 50) return;
+      const g = geom();
+      const M = model;
+      const { d, st } = M;
+      const [x0, x1] = M.xr;
+      const px = (x) => g.x + ((x - x0) / (x1 - x0)) * g.w;
+      const v = state.view;
+      const breaks = [d.lo, d.hi, ...d.kinks];
+
+      // x grid and tick labels under each chart.
+      const xStep = niceStep(x1 - x0, Math.max(3, Math.floor(g.w / 90)));
+      for (let t = Math.ceil(x0 / xStep) * xStep; t <= x1 + 1e-9; t += xStep) {
+        const p = px(t);
+        vline(p, g.top.y, g.top.y + g.top.h, C.grid);
+        vline(p, g.bot.y, g.bot.y + g.bot.h, C.grid);
+        text(fmtTick(t, xStep), p, g.top.y + g.top.h + 22, { align: 'center', font: '11px Inter, sans-serif' });
+        text(fmtTick(t, xStep), p, g.bot.y + g.bot.h + 22, { align: 'center', font: '11px Inter, sans-serif' });
+      }
+
+      // ---- top chart: the pdf of X ----
+      const topBase = g.top.y + g.top.h;
+      const pyT = (val) => topBase - (val / M.topMax) * g.top.h;
+      const topTitle = v === 4 ? `f_X(x), the pdf of X ~ ${M.name}` : `f(x), the pdf of ${M.name}`;
+      text(topTitle, g.x, g.top.y - 6, { color: C.ink, font: '600 12px Inter, sans-serif' });
+      const yStep = niceStep(M.topMax, 3);
+      for (let t = yStep; t <= M.topMax * 0.999; t += yStep) {
+        hline(g.x, g.x + g.w, pyT(t), C.grid);
+        text(fmtTick(t, yStep), g.x - 8, pyT(t) + 4, { align: 'right' });
+      }
+      const xColor = v === 4 ? C.right : C.left;
+      const pdfPts = curvePts(d.pdf, x0, x1, breaks);
+
+      if (v <= 2) {
+        const w = (st.h / (x1 - x0)) * g.w;
+        const gap = w >= 5 ? 1 : 0;
+        st.rows.forEach((r) => {
+          const fill = v === 0 ? alpha(C.left, 0.32) : alpha(r.x < d.mean ? C.left : C.right, 0.45);
+          ctx.fillStyle = fill;
+          const top = pyT(r.f);
+          ctx.fillRect(px(r.x - st.h / 2) + gap / 2, top, Math.max(0.6, w - gap), topBase - top);
+        });
+      } else if (v === 5) {
+        fillCurve(pdfPts.filter(([x]) => x <= M.q), px, pyT, topBase, alpha(C.left, 0.35));
+      } else {
+        fillCurve(pdfPts, px, pyT, topBase, alpha(xColor, 0.14));
+      }
+      if (M.histOn) {
+        ctx.save();
+        ctx.strokeStyle = C.right;
+        ctx.lineWidth = 1.5;
+        ctx.fillStyle = alpha(C.right, 0.12);
+        M.hist.forEach((h) => {
+          const top = pyT(Math.min(h.h, M.topMax));
+          const l = px(h.x0) + 1;
+          const wpx = px(h.x1) - px(h.x0) - 2;
+          if (topBase - top < 0.5) return;
+          ctx.fillRect(l, top, wpx, topBase - top);
+          ctx.strokeRect(l, top, wpx, topBase - top);
+        });
+        ctx.restore();
+      }
+      strokeCurve(pdfPts, px, pyT, xColor);
+      hline(g.x, g.x + g.w, topBase, C.axis);
+
+      // μ with its fulcrum, and μ ± σ in the variance and aX + b views.
+      const muX = px(d.mean);
+      if (v === 2 || v === 4) {
+        [-1, 1].forEach((k) => {
+          const p = px(d.mean + k * M.sd);
+          if (p < g.x || p > g.x + g.w) return;
+          vline(p, g.top.y, topBase, 'rgba(138, 161, 192, 0.7)', 1, [4, 4]);
+          text(k < 0 ? 'μ − σ' : 'μ + σ', p + k * 4, g.top.y + 10, { align: k < 0 ? 'right' : 'left' });
+        });
+      }
+      vline(muX, g.top.y + 14, topBase, C.mean, 2);
+      fulcrum(muX, topBase, C.mean);
+      const muLabel = `μ = ${num(d.mean)}`;
+      ctx.font = '600 12px Inter, sans-serif';
+      const muW = ctx.measureText(muLabel).width;
+      const muRight = muX + 6 + muW < g.x + g.w;
+      text(muLabel, muRight ? muX + 6 : muX - 6, g.top.y + 26, { color: C.mean, font: '600 12px Inter, sans-serif', align: muRight ? 'left' : 'right' });
+
+      if (v === 5) {
+        const qx = px(M.q);
+        vline(qx, g.top.y + 30, g.bot.y + g.bot.h, C.ink, 1.5, [5, 4]);
+        const medX = px(M.median);
+        if (Math.abs(medX - muX) > 2) vline(medX, g.top.y + 40, topBase, C.muted, 1, [2, 3]);
+        [0.25, 0.5, 0.75].forEach((p) => {
+          const t = px(d.quantile(p));
+          ctx.fillStyle = C.ink;
+          ctx.beginPath();
+          ctx.moveTo(t, topBase - 1);
+          ctx.lineTo(t - 4, topBase - 8);
+          ctx.lineTo(t + 4, topBase - 8);
+          ctx.closePath();
+          ctx.fill();
+        });
+        const areaLabel = `area left of Q(p) = ${fmt(state.p, 2)}`;
+        ctx.font = '600 12px Inter, sans-serif';
+        const aw = ctx.measureText(areaLabel).width + 12;
+        const ax = qx - g.x > aw + 10 ? qx - 6 - aw : Math.min(qx + 6, g.x + g.w - aw);
+        const ay = topBase - 34;
+        ctx.save();
+        ctx.fillStyle = 'rgba(8, 18, 32, 0.88)';
+        ctx.beginPath();
+        ctx.roundRect(ax, ay, aw, 20, 6);
+        ctx.fill();
+        ctx.restore();
+        text(areaLabel, ax + 6, ay + 14, { color: C.ink, font: '600 12px Inter, sans-serif' });
+      }
+
+      // ---- bottom chart ----
+      const botTop = g.bot.y;
+      const botBase = g.bot.y + g.bot.h;
+      text(v === 3 ? `${GS[state.g].name} · f(x), its area is ${GS[state.g].expr}` : VIEWS[v].chart,
+        g.x, botTop - 6, { color: C.ink, font: '600 12px Inter, sans-serif' });
+
+      if (v <= 2) {
+        const vals = st.rows.map(stripValue);
+        const tv = tailValue();
+        const all = vals.concat(st.tail ? [tv] : []);
+        const hi = Math.max(0, ...all);
+        const lo = Math.min(0, ...all);
+        const span = Math.max(1e-12, hi - lo) * 1.12;
+        const top = hi > 0 ? hi + (span - (hi - lo)) * (lo < 0 ? 0.5 : 1) : 0;
+        const bottom = top - span;
+        const pyB = (val) => botTop + ((top - val) / span) * g.bot.h;
+        const yb = niceStep(span, 3);
+        for (let t = Math.ceil(bottom / yb) * yb; t <= top + 1e-12; t += yb) {
+          hline(g.x, g.x + g.w, pyB(t), C.grid);
+          text(fmtTick(t, yb), g.x - 8, pyB(t) + 4, { align: 'right' });
+        }
+        const w = (st.h / (x1 - x0)) * g.w;
+        const bw = Math.max(1, w - (w >= 5 ? 2 : 0));
+        st.rows.forEach((r, i) => {
+          const fill = v === 0 ? C.left : r.x < d.mean ? C.left : C.right;
+          bar(px(r.x), bw, pyB(0), pyB(vals[i]), alpha(fill, 0.9));
+        });
+        if (st.tail) {
+          const cx = px(st.end + M.pad / 2);
+          const end = Math.abs(pyB(tv) - pyB(0)) < 3 ? pyB(0) - 3 : pyB(tv);
+          bar(cx, Math.max(6, px(st.end + M.pad * 0.8) - px(st.end + M.pad * 0.2)), pyB(0), end, hatch());
+        }
+        hline(g.x, g.x + g.w, pyB(0), C.axis);
+        if (v === 1) {
+          vline(muX, botTop, botBase, 'rgba(160, 231, 160, 0.45)', 1, [3, 4]);
+          const neg = st.rows.reduce((s, r, i) => s + Math.min(0, vals[i]), 0);
+          const pos = st.rows.reduce((s, r, i) => s + Math.max(0, vals[i]), 0) + tv;
+          text(`left ${numS(neg)}`, muX - 8, botTop + 14, { align: 'right', color: C.ink, font: '600 12px Inter, sans-serif' });
+          text(`right ${numS(pos)}`, muX + 8, botTop + 14, { color: C.ink, font: '600 12px Inter, sans-serif' });
+        }
+      } else if (v === 3) {
+        const fn = gFn(state.g, d.mean);
+        const pts = curvePts((x) => fn(x) * d.pdf(x), x0, x1, breaks);
+        const hi = Math.max(0, ...pts.map((p) => p[1]));
+        const lo = Math.min(0, ...pts.map((p) => p[1]));
+        const span = Math.max(1e-12, hi - lo) * 1.15;
+        const top = hi + (span - (hi - lo)) * (lo < 0 ? 0.5 : 1);
+        const pyB = (val) => botTop + ((top - val) / span) * g.bot.h;
+        const yb = niceStep(span, 3);
+        for (let t = Math.ceil((top - span) / yb) * yb; t <= top + 1e-12; t += yb) {
+          hline(g.x, g.x + g.w, pyB(t), C.grid);
+          text(fmtTick(t, yb), g.x - 8, pyB(t) + 4, { align: 'right' });
+        }
+        fillCurve(pts, px, pyB, pyB(0), alpha(C.left, 0.3));
+        strokeCurve(pts, px, pyB, C.left);
+        hline(g.x, g.x + g.w, pyB(0), C.axis);
+      } else if (v === 4) {
+        const { y } = M;
+        const pyB = (val) => botBase - (val / M.topMax) * g.bot.h;
+        for (let t = yStep; t <= M.topMax * 0.999; t += yStep) {
+          hline(g.x, g.x + g.w, pyB(t), C.grid);
+          text(fmtTick(t, yStep), g.x - 8, pyB(t) + 4, { align: 'right' });
+        }
+        const yPts = curvePts(y.pdf, x0, x1, [y.lo, y.hi, ...y.kinks]);
+        fillCurve(yPts, px, pyB, botBase, alpha(C.left, 0.2));
+        strokeCurve(pdfPts, px, pyB, alpha(C.right, 0.75), [5, 4]);
+        strokeCurve(yPts, px, pyB, C.left);
+        hline(g.x, g.x + g.w, botBase, C.axis);
+        const muY = px(y.mean);
+        [-1, 1].forEach((k) => {
+          const p = px(y.mean + k * M.sdY);
+          if (p < g.x || p > g.x + g.w) return;
+          vline(p, botTop, botBase, 'rgba(138, 161, 192, 0.7)', 1, [4, 4]);
+        });
+        vline(muY, botTop + 14, botBase, C.mean, 2);
+        fulcrum(muY, botBase, C.mean);
+        const lab = `μ_Y = ${num(y.mean)}`;
+        ctx.font = '600 12px Inter, sans-serif';
+        const right = muY + 6 + ctx.measureText(lab).width < g.x + g.w;
+        text(lab, right ? muY + 6 : muY - 6, botTop + 26, { color: C.mean, font: '600 12px Inter, sans-serif', align: right ? 'left' : 'right' });
+      } else {
+        const pyB = (val) => botBase - val * g.bot.h;
+        [0.25, 0.5, 0.75, 1].forEach((t) => {
+          hline(g.x, g.x + g.w, pyB(t), C.grid);
+          text(fmt(t, 2), g.x - 8, pyB(t) + 4, { align: 'right' });
+        });
+        text('0', g.x - 8, botBase + 4, { align: 'right' });
+        const cdfPts = curvePts(d.cdf, x0, x1, breaks);
+        strokeCurve(cdfPts, px, pyB, C.left);
+        hline(g.x, g.x + g.w, botBase, C.axis);
+        const qx = px(M.q);
+        const qy = pyB(state.p);
+        hline(g.x, qx, qy, C.ink, [5, 4]);
+        [0.25, 0.5, 0.75].forEach((p) => {
+          ctx.fillStyle = C.ink;
+          ctx.beginPath();
+          ctx.arc(px(d.quantile(p)), pyB(p), 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.save();
+        ctx.fillStyle = C.ink;
+        ctx.strokeStyle = '#07111f';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(qx, qy, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        text(`p = ${fmt(state.p, 2)}`, g.x + 6, qy - 6, { color: C.ink, font: '600 12px Inter, sans-serif' });
+        const qLabel = `Q(p) = ${num(M.q)}`;
+        const toLeft = qx > g.x + g.w - 110;
+        text(qLabel, toLeft ? qx - 8 : qx + 8, botBase - 8, { color: C.ink, font: '600 12px Inter, sans-serif', align: toLeft ? 'right' : 'left' });
+      }
+
+      drawTooltip(g, px, pyT);
+    }
+
+    function tooltipLines() {
+      const x = state.hoverX;
+      const { d, st, y } = model;
+      const v = state.view;
+      if (v <= 2 && x >= st.start && x <= st.end) {
+        const i = clamp(Math.floor((x - st.start) / st.h), 0, st.N - 1);
+        const r = st.rows[i];
+        const what = ['xᵢ · pᵢ', '(xᵢ − μ) · pᵢ', '(xᵢ − μ)² · pᵢ'][v];
+        return [`strip ${i + 1} of ${st.N}`, `xᵢ = ${num(r.x)}`, `f(xᵢ) = ${num(r.f)}`,
+          `pᵢ = f(xᵢ)·h = ${num(r.p)}`, `${what} = ${num(stripValue(r))}`];
+      }
+      if (v <= 2 && st.tail && x > st.end) {
+        return [`tail: x > ${num(st.end)}`, `P(X > ${num(st.end)}) = ${num(st.tail.p)}`, `exact piece = ${num(tailValue())}`];
+      }
+      const lines = [`x = ${num(x)}`];
+      if (v === 4) {
+        lines.push(`f_X(x) = ${num(d.pdf(x))}`, `f_Y(x) = ${num(y.pdf(x))}`, `F_Y(x) = ${num(y.cdf(x))}`);
+      } else {
+        lines.push(`f(x) = ${num(d.pdf(x))}`, `F(x) = ${num(d.cdf(x))}`);
+        if (v === 3) lines.push(`${GS[state.g].name} · f(x) = ${num(gFn(state.g, d.mean)(x) * d.pdf(x))}`);
+      }
+      return lines;
+    }
+
+    function drawTooltip(g, px) {
+      if (state.hoverX === null || dragging) return;
+      const hx = px(state.hoverX);
+      vline(hx, g.top.y, g.bot.y + g.bot.h, 'rgba(134, 212, 255, 0.35)');
+      const lines = tooltipLines();
+      ctx.font = '12px ui-monospace, Menlo, monospace';
+      const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 20;
+      const h = lines.length * 17 + 12;
+      let x = hx + 12;
+      if (x + w > g.x + g.w) x = hx - 12 - w;
+      x = Math.max(4, x);
+      const y = g.top.y + 34;
+      ctx.save();
+      ctx.fillStyle = 'rgba(8, 18, 32, 0.94)';
+      ctx.strokeStyle = 'rgba(134, 212, 255, 0.5)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      lines.forEach((l, i) => text(l, x + 10, y + 20 + i * 17, { color: i === lines.length - 1 ? C.ink : C.muted, font: '12px ui-monospace, Menlo, monospace' }));
+    }
+
+    function frame() {
+      if (dirty) {
+        draw();
+        dirty = false;
+      }
+      requestAnimationFrame(frame);
+    }
+
+    // ===================== POINTER =====================
+    function local(e) {
+      const r = canvas.getBoundingClientRect();
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    }
+    function dataX(px) {
+      const g = geom();
+      const [x0, x1] = model.xr;
+      return x0 + ((px - g.x) / g.w) * (x1 - x0);
+    }
+    function setPFromPointer(pt) {
+      const g = geom();
+      let p;
+      if (pt.y > g.top.y + g.top.h + 15) p = (g.bot.y + g.bot.h - pt.y) / g.bot.h;
+      else p = model.d.cdf(dataX(pt.x));
+      state.p = Math.round(clamp(p, 0.01, 0.99) * 100) / 100;
+      renderControls();
+      update();
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.view !== 5) return;
+      canvas.setPointerCapture(e.pointerId);
+      dragging = true;
+      setPFromPointer(local(e));
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      const pt = local(e);
+      if (dragging) {
+        setPFromPointer(pt);
+        return;
+      }
+      const g = geom();
+      const inside = pt.x >= g.x && pt.x <= g.x + g.w && pt.y >= g.top.y && pt.y <= g.bot.y + g.bot.h;
+      state.hoverX = inside ? dataX(pt.x) : null;
+      dirty = true;
+    });
+    const stopDrag = () => { dragging = false; };
+    canvas.addEventListener('pointerup', stopDrag);
+    canvas.addEventListener('pointercancel', stopDrag);
+    canvas.addEventListener('pointerleave', () => {
+      state.hoverX = null;
+      dirty = true;
+    });
+
+    // ===================== PANEL =====================
+    function makeSlider(spec, value, onInput) {
+      const row = document.createElement('div');
+      row.className = 'slider-row';
+      const label = document.createElement('div');
+      label.className = 'slider-label';
+      const name = document.createElement('span');
+      name.textContent = spec.label;
+      const out = document.createElement('strong');
+      const decimals = Math.max(0, -Math.floor(Math.log10(spec.step) + 1e-9));
+      const show = (v) => { out.textContent = spec.show ? spec.show(v) : (spec.prefix || '') + v.toFixed(decimals); };
+      label.append(name, out);
+      const input = document.createElement('input');
+      Object.assign(input, { type: 'range', min: spec.min, max: spec.max, step: spec.step, value });
+      input.addEventListener('input', () => {
+        show(+input.value);
+        onInput(+input.value);
+      });
+      show(value);
+      row.append(label, input);
+      row.set = (v) => {
+        input.value = v;
+        show(v);
+      };
+      return row;
+    }
+
+    function renderControls() {
+      document.querySelectorAll('[data-kind]').forEach((b) => b.classList.toggle('active', b.dataset.kind === state.kind));
+      document.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('active', +b.dataset.view === state.view));
+      document.querySelectorAll('[data-g]').forEach((b) => b.classList.toggle('active', b.dataset.g === state.g));
+      document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('active', +b.dataset.p === state.p));
+      const host = $('paramHost');
+      host.innerHTML = '';
+      const P = params[state.kind];
+      const rows = {};
+      KINDS[state.kind].params.forEach((spec) => {
+        rows[spec.key] = makeSlider(spec, P[spec.key], (v) => {
+          P[spec.key] = v;
+          // Keep a uniform's ends at least 0.5 apart.
+          if (state.kind === 'uniform' && P.b < P.a + 0.5) {
+            if (spec.key === 'a') {
+              P.b = P.a + 0.5;
+              rows.b.set(P.b);
+            } else {
+              P.a = P.b - 0.5;
+              rows.a.set(P.a);
+            }
+          }
+          state.samples = [];
+          update();
+        });
+        host.append(rows[spec.key]);
+      });
+      $('stripHost').innerHTML = '';
+      $('stripHost').hidden = state.view > 2;
+      if (state.view <= 2) {
+        $('stripHost').append(makeSlider(
+          { label: 'N, the number of strips', min: 0, max: NS.length - 1, step: 1, show: (i) => String(NS[i]) },
+          NS.indexOf(state.N),
+          (i) => { state.N = NS[i]; update(); },
+        ));
+      }
+      $('gHost').hidden = state.view !== 3;
+      $('linearHost').hidden = state.view !== 4;
+      $('quantileHost').hidden = state.view !== 5;
+      const th = $('transformHost');
+      th.innerHTML = '';
+      th.append(
+        makeSlider({ label: '|a|, the stretch', min: 0.25, max: 4, step: 0.25, prefix: '×' }, state.scale, (v) => { state.scale = v; update(); }),
+        makeSlider({ label: 'b, the shift', min: -6, max: 6, step: 0.5, prefix: '+' }, state.shift, (v) => { state.shift = v; update(); }),
+      );
+      $('mirrorBox').checked = state.mirror;
+      $('pHost').innerHTML = '';
+      $('pHost').append(makeSlider({ label: 'p, the area to the left', min: 0.01, max: 0.99, step: 0.01 }, state.p, (v) => {
+        state.p = v;
+        document.querySelectorAll('[data-p]').forEach((b) => b.classList.toggle('active', +b.dataset.p === v));
+        update();
+      }));
+      const v = state.view;
+      const show = {
+        curve: v !== 4, strip: v === 0, side: v === 1 || v === 2, xcurve: v === 4, ycurve: v === 4,
+        sample: state.samples.length > 0 && [0, 3, 5].includes(v), mean: true, sigma: v === 2 || v === 4,
+        tail: v <= 2 && state.kind === 'exponential',
+      };
+      document.querySelectorAll('[data-legend]').forEach((el) => { el.hidden = !show[el.dataset.legend]; });
+    }
+
+    function apply(s) {
+      state.kind = s.kind;
+      if (s.P) Object.assign(params[s.kind], s.P);
+      state.view = s.view ?? 0;
+      state.N = s.N ?? 20;
+      state.g = s.g ?? 'x2';
+      state.scale = s.scale ?? 1;
+      state.shift = s.shift ?? 0;
+      state.mirror = !!s.mirror;
+      state.p = s.p ?? 0.5;
+      state.samples = [];
+      renderControls();
+      update();
+    }
+    function goTour(i) {
+      state.tour = (i + TOUR.length) % TOUR.length;
+      apply(TOUR[state.tour]);
+      const t = TOUR[state.tour];
+      $('tourHead').innerHTML = `<span>Stop ${state.tour + 1} of ${TOUR.length}</span>${t.title}`;
+      $('tourNote').textContent = t.note;
+    }
+    function setView(i) {
+      state.view = i;
+      renderControls();
+      update();
+    }
+
+    function sideWord() {
+      const { d, median } = model;
+      if (Math.abs(d.mean - median) < 1e-9 * Math.max(1, Math.abs(d.mean))) return 'The mean equals the median. The shape is symmetric.';
+      return d.mean > median
+        ? 'The mean sits right of the median. The long tail is on the right.'
+        : 'The mean sits left of the median. The long tail is on the left.';
+    }
+
+    function caption() {
+      const { d, st, y, a, b, sd } = model;
+      const v = state.view;
+      if (v === 0) {
+        return `<strong>Σ → ∫.</strong> ${st.N} strips of width h = ${num(st.h)}. Each strip acts like a pmf bar with pᵢ ≈ f(xᵢ)h.
+          The strip sum gives ${num(st.s1)}. The exact mean is μ = ${num(d.mean)}. Raise N and watch the gap close.`;
+      }
+      if (v === 1) {
+        return `<strong>Balance.</strong> Left of μ each strip pulls with a negative (xᵢ − μ)pᵢ. Right of μ the pulls are positive.
+          The net pull is ${numS(st.c1)}. ${st.c1 === 0 ? 'These strips cancel exactly.' : 'With exact areas it is 0.'} That is what makes μ the balance point.`;
+      }
+      if (v === 2) {
+        return `<strong>Variance.</strong> Each strip weighs (xᵢ − μ)²pᵢ. Far strips count a lot. The strip sum gives ${num(st.c2)}.
+          The exact value is σ² = ${num(d.variance)}. So σ = ${num(sd)}.`;
+      }
+      if (v === 3) {
+        if (state.g === 'x') return `<strong>E(X).</strong> The area under x·f(x) is μ = ${num(d.mean)}. Area below the axis counts as negative.`;
+        if (state.g === 'x2') {
+          return `<strong>E(X²).</strong> The area under x²·f(x) is E(X²) = ${num(d.ex2)}. Subtract μ² = ${num(d.mean ** 2)}.
+            That leaves σ² = ${num(d.variance)}. Switch to (x − μ)² to see the same number.`;
+        }
+        return `<strong>E((X − μ)²).</strong> The area under (x − μ)²·f(x) is σ² = ${num(d.variance)}. The x² route gives the same number.`;
+      }
+      if (v === 4) {
+        return `<strong>Y = ${fmtAffine(a, b)}.</strong> μ moves to aμ + b = ${num(y.mean)}. σ scales by |a| = ${num(Math.abs(a))} to ${num(model.sdY)}.
+          The pdf gets |a| times wider. So its peak divides by |a|. The area stays 1.`;
+      }
+      return `<strong>Quantile.</strong> F(${num(model.q)}) = ${fmt(state.p, 2)}. So Q(${fmt(state.p, 2)}) = ${num(model.q)}.
+        The area left of it is ${fmt(state.p, 2)}. The median is ${num(model.median)} and μ = ${num(d.mean)}. ${sideWord()}`;
+    }
+
+    function renderReadouts() {
+      const { d, st, y, a, b, numX, numY, sd } = model;
+      const v = state.view;
+      const okX = same(numX.total, 1) && same(numX.mean, d.mean) && same(numX.ex2, d.ex2) && same(numX.variance, d.variance);
+      const okY = same(numY.mean, y.mean) && same(numY.variance, y.variance);
+      let big;
+      if (v === 0) big = `Σ xᵢ f(xᵢ)h = <strong>${num(st.s1)}</strong> with N = ${st.N} · exact ∫ x f(x) dx = μ = <strong>${num(d.mean)}</strong>`;
+      else if (v === 1) big = `Σ (xᵢ − μ) f(xᵢ)h = <strong>${numS(st.c1)}</strong> · exact ∫ (x − μ) f(x) dx = <strong>0</strong>`;
+      else if (v === 2) big = `Σ (xᵢ − μ)² f(xᵢ)h = <strong>${num(st.c2)}</strong> · exact σ² = <strong>${num(d.variance)}</strong>`;
+      else if (v === 3) {
+        big = state.g === 'x2'
+          ? `E(X²) − μ² = ${num(d.ex2)} − ${num(d.mean ** 2)} = <strong>${num(d.variance)}</strong> = σ²`
+          : state.g === 'x' ? `E(X) = ∫ x f(x) dx = <strong>${num(d.mean)}</strong>`
+            : `E((X − μ)²) = ∫ (x − μ)² f(x) dx = <strong>${num(d.variance)}</strong> = σ²`;
+      } else if (v === 4) {
+        big = `μ_Y = aμ + b = <strong>${num(y.mean)}</strong> · σ_Y = |a|σ = <strong>${num(model.sdY)}</strong> · peak ÷ |a|`;
+      } else big = `Q(${fmt(state.p, 2)}) = F⁻¹(${fmt(state.p, 2)}) = <strong>${num(model.q)}</strong> · median = ${num(model.median)}`;
+      const check = v === 4
+        ? `Simpson integral of y·f_Y and (y − μ_Y)²·f_Y matches aμ + b and a²σ² ${tick(okY)}`
+        : `Simpson integrals of f, x·f and x²·f match the closed forms ${tick(okX)}`;
+      $('receipt').innerHTML = `
+        <div>${model.name} · μ = ${num(d.mean)} · σ² = ${num(d.variance)} · σ = ${num(sd)} · median = ${num(model.median)}</div>
+        <div class="big">${big}</div>
+        <div>${check}</div>`;
+      $('caption').innerHTML = caption();
+      const n = model.sorted.length;
+      $('sampleLine').textContent = n
+        ? `n = ${n} · sample mean ${num(model.sorted.reduce((s, x) => s + x, 0) / n)} (μ = ${num(d.mean)}) · sample median ${num(sampleQuantile(model.sorted, 0.5))} (Q(0.5) = ${num(model.median)})`
+        : 'No samples yet.';
+      renderForms();
+      renderArithmetic();
+    }
+
+    function renderForms() {
+      const cards = {
+        uniform: ['U(a, b)', 'f(x) = 1/(b − a) on (a, b)', 'F(x) = (x − a)/(b − a)', 'μ = (a + b)/2,  σ² = (b − a)²/12', 'Q(p) = a + p(b − a)'],
+        exponential: ['Exp(λ)', 'f(x) = λe^(−λx) for x ≥ 0', 'F(x) = 1 − e^(−λx)', 'μ = 1/λ,  σ² = 1/λ²', 'Q(p) = −ln(1 − p)/λ'],
+        triangle: ['Triangle(0, c, b) with b = 4', 'x ≤ c:  f(x) = 2x/(bc),  F(x) = x²/(bc)', 'x > c:  f(x) = 2(b − x)/(b(b − c))',
+          '        F(x) = 1 − (b − x)²/(b(b − c))', 'μ = (b + c)/3,  σ² = (b² + c² − bc)/18',
+          'Q(p) = √(pbc) when p ≤ c/b', '     = b − √((1 − p)b(b − c)) otherwise'],
+        power: ['Power(k)', 'f(x) = kx^(k − 1) on (0, 1)', 'F(x) = x^k', 'μ = k/(k + 1),  σ² = k/((k + 1)²(k + 2))', 'Q(p) = p^(1/k)'],
+      };
+      $('formsHost').innerHTML = Object.entries(cards).map(([k, [head, ...lines]]) => `<div class="formula${k === state.kind ? ' current' : ''}">`
+        + `${esc(head)}${k === state.kind ? '   ← on screen' : ''}\n${lines.map((l) => `  ${esc(l)}`).join('\n')}</div>`).join('');
+    }
+
+    // ===================== ARITHMETIC TAB =====================
+    const L = (s) => s.padEnd(6);
+
+    function meanLines(kind, P, d) {
+      if (kind === 'uniform') {
+        const { a, b } = P;
+        return chain(L('μ'), ['∫ x · 1/(b − a) dx, from a to b', '[x² / (2(b − a))] from a to b', '(b² − a²) / (2(b − a))',
+          `(${num(b * b)} − ${num(a * a)}) / (2 × ${num(b - a)})`, `${num(b * b - a * a)} / ${num(2 * (b - a))}`, num(d.mean)]);
+      }
+      if (kind === 'exponential') {
+        const l = P.lambda;
+        return chain(L('μ'), ['∫ x · λe^(−λx) dx, from 0 to ∞', '[−(x + 1/λ) e^(−λx)] from 0 to ∞',
+          '0 − (−(0 + 1/λ) × e⁰)', '1/λ', `1 / ${num(l)}`, num(d.mean)]);
+      }
+      if (kind === 'triangle') {
+        const b = TRI_B;
+        const { c } = P;
+        const p1 = (2 * c * c) / (3 * b);
+        const p2 = ((b - c) * (b + 2 * c)) / (3 * b);
+        return chain(L('μ'), ['∫ x f(x) dx, split at the peak c', '∫₀ᶜ x·2x/(bc) dx + ∫ᶜᵇ x·2(b − x)/(b(b − c)) dx',
+          '2c²/(3b) + (b − c)(b + 2c)/(3b)', `${num(2 * c * c)}/${num(3 * b)} + ${num(b - c)} × ${num(b + 2 * c)}/${num(3 * b)}`,
+          `${num(p1)} + ${num(p2)}`, num(d.mean)]).concat(chain(L('check'), ['(0 + b + c)/3', `(${num(b)} + ${num(c)})/3`, num((b + c) / 3)]));
+      }
+      const { k } = P;
+      return chain(L('μ'), ['∫ x · kx^(k − 1) dx, from 0 to 1', '[k x^(k + 1) / (k + 1)] from 0 to 1', 'k / (k + 1)',
+        `${num(k)} / ${num(k + 1)}`, num(d.mean)]);
+    }
+
+    function ex2Lines(kind, P, d) {
+      const E = 'E(X²)';
+      if (kind === 'uniform') {
+        const { a, b } = P;
+        return chain(E, ['∫ x² · 1/(b − a) dx, from a to b', '(b³ − a³) / (3(b − a))',
+          `(${num(b ** 3)} − ${paren(a ** 3)}) / (3 × ${num(b - a)})`, `${num(b ** 3 - a ** 3)} / ${num(3 * (b - a))}`, num(d.ex2)]);
+      }
+      if (kind === 'exponential') {
+        const l = P.lambda;
+        return chain(E, ['∫ x² · λe^(−λx) dx, from 0 to ∞', '[−(x² + 2x/λ + 2/λ²) e^(−λx)] from 0 to ∞',
+          '2/λ²', `2 / ${num(l * l)}`, num(d.ex2)]);
+      }
+      if (kind === 'triangle') {
+        const b = TRI_B;
+        const { c } = P;
+        return chain(E, ['(b² + bc + c²) / 6, a standard result', `(${num(b * b)} + ${num(b * c)} + ${num(c * c)}) / 6`, num(d.ex2)]);
+      }
+      const { k } = P;
+      return chain(E, ['∫ x² · kx^(k − 1) dx, from 0 to 1', '[k x^(k + 2) / (k + 2)] from 0 to 1', 'k / (k + 2)',
+        `${num(k)} / ${num(k + 2)}`, num(d.ex2)]);
+    }
+
+    function quantileLines(kind, P, p, q) {
+      if (kind === 'uniform') {
+        const { a, b } = P;
+        return ['F(x) = (x − a)/(b − a) = p', ...chain('x', ['a + p(b − a)', `${paren(a)} + ${num(p)} × ${num(b - a)}`, num(q)])];
+      }
+      if (kind === 'exponential') {
+        const l = P.lambda;
+        return ['F(x) = 1 − e^(−λx) = p', `e^(−λx) = 1 − p = ${num(1 - p)}`,
+          ...chain('x', ['−ln(1 − p) / λ', `−ln(${num(1 - p)}) / ${num(l)}`, `${num(-Math.log(1 - p))} / ${num(l)}`, num(q)])];
+      }
+      if (kind === 'triangle') {
+        const b = TRI_B;
+        const { c } = P;
+        if (p <= c / b && c > 0) {
+          return [`p = ${num(p)} ≤ c/b = ${num(c / b)}, so x sits left of the peak`, 'F(x) = x²/(bc) = p',
+            ...chain('x', ['√(p · b · c)', `√(${num(p)} × ${num(b)} × ${num(c)})`, `√${num(p * b * c)}`, num(q)])];
+        }
+        return [`p = ${num(p)} > c/b = ${num(c / b)}, so x sits right of the peak`, 'F(x) = 1 − (b − x)²/(b(b − c)) = p',
+          ...chain('x', ['b − √((1 − p) · b · (b − c))', `${num(b)} − √(${num(1 - p)} × ${num(b)} × ${num(b - c)})`,
+            `${num(b)} − ${num(Math.sqrt((1 - p) * b * (b - c)))}`, num(q)])];
+      }
+      const { k } = P;
+      return ['F(x) = x^k = p', ...chain('x', ['p^(1/k)', `${num(p)}^(1/${num(k)})`, num(q)])];
+    }
+
+    // Strip rows: all of them up to 24, else the first 10, a summed middle and the last 10.
+    // tailKey names the exact tail piece that matches value: p, x1, c1 or c2.
+    function stripRows(work, value, tailKey, signed, sideOf) {
+      const { st } = model;
+      const N = st.rows.length;
+      const out = [];
+      const fmtV = (x) => (signed ? numS(x) : num(x));
+      st.rows.forEach((r, i) => {
+        if (N > 24 && i >= 10 && i < N - 10) {
+          if (i === 10) {
+            let s = 0;
+            for (let j = 10; j < N - 10; j += 1) s += value(st.rows[j]);
+            out.push([`${N - 20} strips`, 'in the middle, summed', fmtV(s), 'tail']);
+          }
+          return;
+        }
+        out.push([`x = ${num(r.x)}`, work(r), fmtV(value(r)), sideOf ? sideOf(r) : '']);
+      });
+      if (st.tail) out.push([`x > ${num(st.end)}`, 'the tail, integrated exactly', fmtV(st.tail[tailKey]), 'tail r']);
+      return rowsHtml(out);
+    }
+
+    function renderArithmetic() {
+      const { d, st, y, a, b, numX, numY, sd, q, median } = model;
+      const P = params[state.kind];
+      const mu = d.mean;
+      const side = (r) => (r.x < mu ? 'l' : 'r');
+      const N = st.N;
+      $('arithHead').innerHTML = `<strong>${esc(model.name)}.</strong> ${N} strip${N > 1 ? 's' : ''} of width h = ${num(st.h)}.
+        Each row is one term of a sum. Blue rows sit left of μ. Orange rows sit right of μ.`
+        + (st.tail ? ` The strips stop at x = ${num(st.end)}. One exact piece covers the tail past it.` : '');
+
+      const parts = [];
+      parts.push(block('1 · Strips become a pmf', 'pᵢ ≈ f(xᵢ) × h,  h = (end − start) / N',
+        stripRows((r) => `f(${num(r.x)}) × ${num(st.h)} = ${num(r.f)} × ${num(st.h)}`, (r) => r.p, 'p', false),
+        `Σ pᵢ = <strong>${num(st.s0)}</strong>. The exact area is 1. The gap shrinks as N grows.`));
+      parts.push(block('2 · <span class="nocase">μ</span> from the strips', 'μ ≈ Σ xᵢ · pᵢ',
+        stripRows((r) => `${paren(r.x)} × ${num(r.p)}`, (r) => r.x * r.p, 'x1', d.lo < 0),
+        `Σ xᵢ pᵢ = <strong>${num(st.s1)}</strong>`));
+      parts.push(block('3 · <span class="nocase">μ</span> exactly', 'μ = ∫ x f(x) dx',
+        linesHtml(meanLines(state.kind, P, d)),
+        `μ = <strong>${num(mu)}</strong>. The strips miss by ${num(st.s1 - mu)}.`));
+      const neg = st.rows.reduce((s, r) => s + Math.min(0, (r.x - mu) * r.p), 0);
+      const pos = st.rows.reduce((s, r) => s + Math.max(0, (r.x - mu) * r.p), 0) + (st.tail ? st.tail.c1 : 0);
+      parts.push(block('4 · The balance check', 'Σ (xᵢ − μ) · pᵢ ≈ 0',
+        stripRows((r) => `(${num(r.x)} − ${paren(mu)}) × ${num(r.p)}`, (r) => (r.x - mu) * r.p, 'c1', true, side),
+        `Left of μ: ${num(neg)}. Right of μ: ${numS(pos)}.<br>Net = ${num(neg)} + ${num(pos)} = <strong>${numS(st.c1)}</strong>. The exact integral gives 0.`));
+      parts.push(block('5 · <span class="nocase">σ²</span> from the strips', 'σ² ≈ Σ (xᵢ − μ)² · pᵢ',
+        stripRows((r) => `(${numS(r.x - mu)})² × ${num(r.p)}`, (r) => (r.x - mu) ** 2 * r.p, 'c2', false, side),
+        `Σ (xᵢ − μ)² pᵢ = <strong>${num(st.c2)}</strong>`));
+      const routeB = d.ex2 - mu * mu;
+      parts.push(block('6 · E(X²) and <span class="nocase">σ²</span> exactly', 'σ² = E((X − μ)²) = E(X²) − μ²',
+        linesHtml([...ex2Lines(state.kind, P, d), '',
+          ...chain('route A', ['E((X − μ)²), the closed form', num(d.variance)]),
+          ...chain('route B', ['E(X²) − μ²', `${num(d.ex2)} − ${paren(mu)}²`, `${num(d.ex2)} − ${num(mu * mu)}`, num(routeB)]),
+          ...chain('σ      ', [`√${num(d.variance)}`, num(sd)])]),
+        `Both routes give σ² = <strong>${num(d.variance)}</strong> ${tick(same(routeB, d.variance, 1e-9))}. The strips gave ${num(st.c2)}.`));
+      parts.push(block('7 · Y = aX + b', `Y = ${fmtAffine(a, b)}: a = ${num(a)}, b = ${num(b)}`,
+        linesHtml([
+          ...chain('μ_Y ', ['aμ + b', `${paren(a)} × ${paren(mu)} + ${paren(b)}`, num(y.mean)]),
+          ...chain('σ²_Y', ['a²σ²', `${num(a * a)} × ${num(d.variance)}`, num(y.variance)]),
+          ...chain('σ_Y ', ['|a|σ', `${num(Math.abs(a))} × ${num(sd)}`, num(model.sdY)]),
+          ...chain('peak', ['max f_X / |a|', `${num(d.peak)} / ${num(Math.abs(a))}`, num(y.peak)]),
+        ]),
+        `Simpson on f_Y gives μ_Y = ${num(numY.mean)} and σ²_Y = ${num(numY.variance)} ${tick(same(numY.mean, y.mean) && same(numY.variance, y.variance))}`));
+      const qLines = quantileLines(state.kind, P, state.p, q);
+      const quart = [0.25, 0.5, 0.75].map((p) => d.quantile(p));
+      parts.push(block('8 · The quantile Q(p)', `Solve F(x) = p for p = ${fmt(state.p, 2)}`,
+        linesHtml([...qLines, '', `F(${num(q)}) = ${num(d.cdf(q))}`, '',
+          `Q(0.25) = ${num(quart[0])}   lower quartile`, `Q(0.5)  = ${num(quart[1])}   median`, `Q(0.75) = ${num(quart[2])}   upper quartile`,
+          '', `μ − median = ${num(mu)} − ${num(median)} = ${numS(mu - median)}`]),
+        `Q(${fmt(state.p, 2)}) = <strong>${num(q)}</strong> ${tick(same(d.cdf(q), state.p, 1e-9))}. ${sideWord()}`));
+      if (state.kind === 'uniform') {
+        const { a: ua, b: ub } = P;
+        const w = ub - ua;
+        parts.push(block('9 · The slide\'s U(a, b) derivation', `a = ${num(ua)}, b = ${num(ub)}`,
+          linesHtml([
+            ...chain('E(X) ', ['(b² − a²) / (2(b − a))', '(b − a)(b + a) / (2(b − a))', '(a + b) / 2',
+              `(${num(ua)} + ${num(ub)}) / 2`, num(d.mean)]),
+            ...chain('E(X²)', ['(a² + ab + b²) / 3', `(${num(ua * ua)} + ${paren(ua * ub)} + ${num(ub * ub)}) / 3`, num(d.ex2)]),
+            ...chain('Var  ', ['E(X²) − E(X)²', `${num(d.ex2)} − ${num(d.mean ** 2)}`, num(routeB)]),
+            ...chain('     ', ['(b − a)² / 12', `${num(w * w)} / 12`, num(d.variance)]),
+          ]),
+          `Var(X) = <strong>${num(d.variance)}</strong> ${tick(same(routeB, d.variance, 1e-9))}`));
+      } else {
+        parts.push(block('9 · The slide\'s U(a, b) derivation', 'Pick Uniform to load it.', '',
+          'The slide derives (a + b)/2 and (b − a)²/12. Block 3 and block 6 do the same job for this shape.'));
+      }
+      if (model.sorted.length) {
+        const n = model.sorted.length;
+        const pos3 = [0.25, 0.5, 0.75].map((p) => Math.max(1, Math.ceil(p * n)));
+        parts.push(block('10 · Your sample', `${n} draws, sorted from smallest to largest`,
+          linesHtml([
+            ...chain('sample mean', ['Σ xⱼ / n', num(model.sorted.reduce((s, x) => s + x, 0) / n)]),
+            `lower quartile = draw ${pos3[0]} of ${n} = ${num(model.sorted[pos3[0] - 1])}   (Q(0.25) = ${num(quart[0])})`,
+            `median         = draw ${pos3[1]} of ${n} = ${num(model.sorted[pos3[1] - 1])}   (Q(0.5) = ${num(quart[1])})`,
+            `upper quartile = draw ${pos3[2]} of ${n} = ${num(model.sorted[pos3[2] - 1])}   (Q(0.75) = ${num(quart[2])})`,
+          ]),
+          'The slide defines sample quartiles as points ¼, ½ and ¾ of the way through the ordered data.'));
+      }
+      const rows = [
+        ['∫ f(x) dx', num(numX.total), 'want 1', same(numX.total, 1)],
+        ['∫ x f(x) dx', num(numX.mean), `want μ = ${num(mu)}`, same(numX.mean, mu)],
+        ['∫ x² f(x) dx', num(numX.ex2), `want E(X²) = ${num(d.ex2)}`, same(numX.ex2, d.ex2)],
+        ['∫ (x − μ)² f(x) dx', num(numX.variance), `want σ² = ${num(d.variance)}`, same(numX.variance, d.variance)],
+        ['∫ y f_Y(y) dy', num(numY.mean), `want aμ + b = ${num(y.mean)}`, same(numY.mean, y.mean)],
+        ['∫ (y − μ_Y)² f_Y dy', num(numY.variance), `want a²σ² = ${num(y.variance)}`, same(numY.variance, y.variance)],
+        ['F(Q(p))', num(d.cdf(q)), `want p = ${fmt(state.p, 2)}`, same(d.cdf(q), state.p, 1e-9)],
+      ];
+      const allOk = rows.every((r) => r[3]);
+      parts.push(block('Check · Simpson\'s rule against the closed forms', '4000 slices per smooth piece of the pdf',
+        rowsHtml(rows.map(([l, v, w, ok]) => [l, `${v}`, `${w} ${ok ? '✓' : '✗'}`, ''])).replaceAll(' = want', '   want'),
+        allOk ? '<span class="ok">✓ every integral matches its closed form.</span>'
+          : '<span class="bad">✗ an integral disagrees with its closed form.</span>'));
+      $('arithBody').innerHTML = parts.join('');
+    }
+
+    function update() {
+      model = buildModel();
+      renderReadouts();
+      dirty = true;
+    }
+
+    // ===================== WIRING =====================
+    Object.entries(KINDS).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.kind = k;
+      b.addEventListener('click', () => {
+        state.kind = k;
+        state.samples = [];
+        renderControls();
+        update();
+      });
+      $('kindGrid').append(b);
+    });
+    VIEWS.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.innerHTML = `<b>${i + 1} · ${v.word}</b><span>${v.sub}</span>`;
+      b.dataset.view = i;
+      b.addEventListener('click', () => setView(i));
+      $('viewGrid').append(b);
+    });
+    Object.entries(GS).forEach(([k, spec]) => {
+      const b = document.createElement('button');
+      b.textContent = spec.label;
+      b.dataset.g = k;
+      b.addEventListener('click', () => {
+        state.g = k;
+        renderControls();
+        update();
+      });
+      $('gGrid').append(b);
+    });
+    PS.forEach(([p, label]) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.dataset.p = p;
+      b.addEventListener('click', () => {
+        state.p = p;
+        renderControls();
+        update();
+      });
+      $('pGrid').append(b);
+    });
+    const addSamples = (n) => {
+      state.samples = state.samples.concat(sample(dist(state.kind, params[state.kind]), n, Math.random));
+      renderControls();
+      update();
+    };
+    $('sample100').addEventListener('click', () => addSamples(100));
+    $('sample1000').addEventListener('click', () => addSamples(1000));
+    $('sampleClear').addEventListener('click', () => {
+      state.samples = [];
+      renderControls();
+      update();
+    });
+    document.querySelectorAll('[data-predict]').forEach((b) => b.addEventListener('click', () => apply(PREDICT[+b.dataset.predict])));
+    $('tourPrev').addEventListener('click', () => goTour(state.tour - 1));
+    $('tourNext').addEventListener('click', () => goTour(state.tour + 1));
+    $('mirrorBox').addEventListener('change', (e) => {
+      state.mirror = e.target.checked;
+      update();
+    });
+    $('transformReset').addEventListener('click', () => {
+      state.scale = 1;
+      state.shift = 0;
+      state.mirror = false;
+      renderControls();
+      update();
+    });
+    document.querySelectorAll('[data-tab-button]').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('[data-tab-button]').forEach((x) => x.classList.toggle('active', x === b));
+      document.querySelectorAll('[data-tab-pane]').forEach((p) => p.classList.toggle('active', p.dataset.tabPane === b.dataset.tabButton));
+      // The written-out sums need a wider panel than the other tabs.
+      document.querySelector('.app').classList.toggle('wide', b.dataset.tabButton === 'arithmetic');
+    }));
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea')) return;
+      if (e.key === 'ArrowRight') goTour(state.tour + 1);
+      else if (e.key === 'ArrowLeft') goTour(state.tour - 1);
+      else if (/^[1-6]$/.test(e.key)) setView(+e.key - 1);
+    });
+
+    goTour(0);
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
