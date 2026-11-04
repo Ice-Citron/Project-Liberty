@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bernoulli &amp; Binomial Moments</title>
+<style>
+  :root {
+    --bg: #07111f; --card: #0b1828; --card2: #0f2035; --line: #1c3150;
+    --ink: #dce7f5; --muted: #8ea3bf; --faint: #5f7594;
+    --blue: #86d4ff; --warm: #f08f3c; --bar: #3d95ec; --good: #5ad19a; --bad: #ff6b6b;
+    --math: "STIX Two Math", "Cambria Math", "Latin Modern Math", "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 80px; }
+  header { padding: 40px 0 18px; }
+  .eyebrow { color: var(--blue); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: clamp(26px, 4vw, 40px); line-height: 1.2; margin: 8px 0 12px; font-weight: 650; }
+  .lead { color: var(--muted); max-width: 720px; margin: 0; }
+  .controls { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+    margin: 0 -16px; padding: 10px 16px; background: rgba(7, 17, 31, .94); border-bottom: 1px solid var(--line); }
+  .ctl { display: flex; align-items: center; gap: 10px; }
+  .ctl label { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .ctl output { font-family: var(--mono); font-size: 15px; min-width: 2.6em; color: var(--blue); }
+  input[type=range] { width: 160px; margin: 0; accent-color: var(--bar); }
+  .presets { display: flex; flex-wrap: wrap; gap: 6px; }
+  button { background: var(--card2); color: var(--ink); border: 1px solid var(--line); border-radius: 999px;
+    padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  button:hover { border-color: var(--bar); }
+  nav.toc { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 18px 0 4px; font-size: 13px; }
+  nav.toc a { color: var(--muted); text-decoration: none; border-bottom: 1px dotted var(--faint); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 22px 18px;
+    margin-top: 22px; scroll-margin-top: 110px; }
+  h2 { margin: 0 0 2px; font-size: 22px; }
+  h3 { margin: 24px 0 6px; font-size: 16px; color: var(--blue); font-weight: 600; }
+  .src { color: var(--faint); font-size: 12.5px; margin-bottom: 10px; }
+  p { margin: 8px 0; max-width: 760px; }
+  .m { font-family: var(--math); font-size: 1.08em; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .two { grid-template-columns: minmax(0, 1fr); } }
+
+  /* Inline maths: stacked binomials, sums, fractions. */
+  .bi { display: inline-flex; align-items: center; vertical-align: middle; }
+  .bi .bp { font-size: 1.9em; line-height: 1; font-weight: 300; }
+  .bi .bs { display: inline-flex; flex-direction: column; line-height: 1.1; font-size: .74em; text-align: center; }
+  .sg { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; line-height: 1; margin: 0 2px; }
+  .sg .ss { font-size: 1.45em; line-height: 1.05; }
+  .sg .sh, .sg .sl { font-size: .6em; min-height: .6em; }
+  .sg .sh { margin-bottom: 2px; }
+  .fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.2; font-size: .9em; }
+  .fr > span:first-child { border-bottom: 1px solid currentColor; padding: 0 3px; }
+  sup, sub { font-size: .7em; }
+
+  /* Derivation rows: expression on the left, live value on the right. */
+  .deriv { display: grid; grid-template-columns: minmax(0, 1fr) auto; margin: 10px 0; border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; background: #091524; }
+  .deriv > div { padding: 9px 14px; border-top: 1px solid var(--line); }
+  .deriv > div:nth-child(-n+2) { border-top: 0; }
+  .deriv .ex { overflow-x: auto; }
+  .deriv .ex > .m { white-space: nowrap; font-size: 17px; }
+  .deriv .num { font-family: var(--mono); font-size: 12.5px; color: var(--blue); margin-top: 3px; }
+  .deriv .why { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+  .deriv .val { font-family: var(--mono); font-size: 13.5px; color: var(--warm); text-align: right; white-space: nowrap; }
+  @media (max-width: 560px) {
+    .deriv { grid-template-columns: minmax(0, 1fr); }
+    .deriv > div.val { border-top: 0; padding-top: 0; text-align: left; }
+    .deriv .ex > .m { white-space: normal; }
+  }
+  .ok { color: var(--good); font-weight: 700; }
+  .bad { color: var(--bad); font-weight: 700; }
+
+  .chartbox { position: relative; }
+  canvas { display: block; width: 100%; height: 250px; }
+  canvas.small { height: 180px; }
+  .cap { color: var(--muted); font-size: 12.5px; margin: 4px 0 14px; }
+  .tip { position: absolute; top: 6px; pointer-events: none; background: var(--card2); border: 1px solid var(--line);
+    border-radius: 8px; padding: 5px 9px; font-family: var(--mono); font-size: 12px; white-space: nowrap; display: none; }
+
+  .tblwrap { overflow: auto; max-height: 460px; border: 1px solid var(--line); border-radius: 10px; margin: 10px 0; }
+  table { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 12.5px; }
+  th, td { padding: 4px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid #13253d; }
+  th { position: sticky; top: 0; background: var(--card2); color: var(--muted); font-weight: 500; font-family: var(--math); font-size: 15px; }
+  tbody tr:hover td, tr.hi td { background: rgba(61, 149, 236, .18); }
+  tfoot td { position: sticky; bottom: 0; background: var(--card2); color: var(--warm); font-weight: 600; }
+
+  details.predict { border: 1px dashed var(--warm); border-radius: 10px; padding: 9px 14px; margin: 14px 0; background: rgba(240, 143, 60, .06); }
+  details.predict summary { cursor: pointer; color: var(--warm); font-weight: 600; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin: 4px 0; max-width: 780px; }
+  .caveat li { color: var(--muted); }
+  footer { margin-top: 28px; color: var(--faint); font-size: 13px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">50008 Probability · L03 slides 28–31</div>
+    <h1>Where <span class="m">μ = <i>np</i></span> and <span class="m">σ² = <i>np</i>(1 − <i>p</i>)</span> come from</h1>
+    <p class="lead">Slides 28 and 31 state the Bernoulli and Binomial moments. They skip every step. This page does each step with live numbers. Move <span class="m"><i>p</i></span> and <span class="m"><i>n</i></span> and watch every line stay equal.</p>
+  </header>
+
+  <div class="controls">
+    <div class="ctl"><label for="p">success chance <span class="m"><i>p</i></span></label><input id="p" type="range" min="0.01" max="0.99" step="0.01" value="0.25"><output id="pOut"></output></div>
+    <div class="ctl"><label for="n">trials <span class="m"><i>n</i></span></label><input id="n" type="range" min="1" max="30" step="1" value="20"><output id="nOut"></output></div>
+    <div class="presets">
+      <button data-p="0.25" data-n="20">Slides: ¼ and 20</button>
+      <button data-p="0.5" data-n="10">Fair coin, 10</button>
+      <button data-p="0.05" data-n="30">Rare: 0.05</button>
+      <button data-p="0.9" data-n="12">Likely: 0.9</button>
+      <button data-p="0.25" data-n="1">n = 1 is Bernoulli</button>
+    </div>
+  </div>
+
+  <nav class="toc">
+    <a href="#tools">0 · The four formulas</a>
+    <a href="#bern">1 · Bernoulli</a>
+    <a href="#bin">2 · Binomial pmf</a>
+    <a href="#r1">3 · Route 1: add the table</a>
+    <a href="#r2">4 · Route 2: algebra</a>
+    <a href="#r3">5 · Route 3: sum of Bernoullis</a>
+    <a href="#take">6 · Takeaways</a>
+  </nav>
+
+  <section id="tools">
+    <h2>0 · The four formulas</h2>
+    <div class="src">L03 slides 10, 12, 15 and 16</div>
+    <p>Everything below uses only these four formulas. The rest is algebra.</p>
+    <div class="deriv" id="dTools"></div>
+    <p>The mean is a weighted average. Each value <span class="m"><i>x</i></span> gets the weight <span class="m"><i>p</i>(<i>x</i>)</span>. Picture the pmf bars as weights on a ruler. The mean is the point where the ruler balances.</p>
+  </section>
+
+  <section id="bern">
+    <h2>1 · Bernoulli(<span class="m"><i>p</i></span>)</h2>
+    <div class="src">L03 slide 28 · claim: μ = p and σ² = p(1 − p)</div>
+    <p><span class="m"><i>X</i></span> is 1 with probability <span class="m"><i>p</i></span> and 0 otherwise. The slide packs both cases into one formula: <span class="m"><i>p</i>(<i>x</i>) = <i>p</i><sup><i>x</i></sup>(1 − <i>p</i>)<sup>1−<i>x</i></sup></span>. Put in <span class="m"><i>x</i> = 0</span> and <span class="m"><i>x</i> = 1</span> to unpack it.</p>
+    <div class="two">
+      <div>
+        <div class="chartbox"><canvas id="cvB"></canvas><div class="tip" id="tipB"></div></div>
+        <div class="cap" id="capB"></div>
+        <canvas id="cvPar" class="small"></canvas>
+        <div class="cap">The curve is <span class="m"><i>p</i>(1 − <i>p</i>)</span> for every <span class="m"><i>p</i></span>. The dot is your current <span class="m"><i>p</i></span>.</div>
+      </div>
+      <div>
+        <div class="deriv" id="dB"></div>
+        <details class="predict"><summary>Predict first: what is E(X²) for a Bernoulli?</summary>
+          <p>It equals <span class="m"><i>p</i></span>. <span class="m"><i>X</i></span> only takes the values 0 and 1. Squaring leaves both unchanged, so <span class="m"><i>X</i>² = <i>X</i></span>.</p></details>
+        <details class="predict"><summary>Predict first: which p gives the largest variance?</summary>
+          <p><span class="m"><i>p</i> = ½</span> gives <span class="m"><i>p</i>(1 − <i>p</i>) = ¼</span>. A fair coin is the hardest result to predict. Near 0 or 1 the result is almost certain. So the spread falls towards 0.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="bin">
+    <h2>2 · Binomial(<span class="m"><i>n</i>, <i>p</i></span>) pmf</h2>
+    <div class="src">L03 slide 30</div>
+    <p><span class="m"><i>X</i></span> counts the 1s in <span class="m"><i>n</i></span> independent Bernoulli(<span class="m"><i>p</i></span>) trials. Its pmf is <span class="m" id="pmfInline"></span>. The coefficient counts the orders with exactly <span class="m"><i>x</i></span> ones. The powers give the chance of one such order.</p>
+    <p>I write <span class="m"><i>q</i> = 1 − <i>p</i></span> below to keep lines short. The slides do not use <span class="m"><i>q</i></span>.</p>
+    <div class="chartbox"><canvas id="cvN"></canvas><div class="tip" id="tipN"></div></div>
+    <div class="cap" id="capN"></div>
+    <details class="predict"><summary>Predict first: double n and keep p fixed. What happens to the mean and the SD?</summary>
+      <p>The mean doubles and the variance doubles. The SD grows only by <span class="m">√2 ≈ 1.41</span>. Try <span class="m"><i>n</i> = 10</span> and then <span class="m"><i>n</i> = 20</span> at <span class="m"><i>p</i> = 0.25</span>.</p></details>
+  </section>
+
+  <section id="r1">
+    <h2>3 · Route 1: add up the table</h2>
+    <div class="src">Definitions on slides 10, 12, 15 and 16 · one row per value of x</div>
+    <p>This route applies the definitions directly. Each row is one value of <span class="m"><i>x</i></span>. Add each column and compare the totals with the closed forms. Hover a row to find its bar.</p>
+    <div class="tblwrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody><tfoot id="tfoot"></tfoot></table></div>
+    <div class="deriv" id="dR1"></div>
+    <p>This route checks one pair of <span class="m"><i>n</i></span> and <span class="m"><i>p</i></span> at a time. Route 2 proves the result for every pair.</p>
+  </section>
+
+  <section id="r2">
+    <h2>4 · Route 2: algebra from the pmf</h2>
+    <div class="src">L03 slide 31 says only “use simple combinatorial arguments”</div>
+    <p>Here are those arguments in full. Every line shows its own live value. All lines in a block must agree.</p>
+
+    <h3>The one identity</h3>
+    <p>Count teams of <span class="m"><i>x</i></span> people with one captain, from <span class="m"><i>n</i></span> people. One way: choose the team in <span class="m" id="cnx"></span> ways. Then choose its captain in <span class="m"><i>x</i></span> ways. Another way: choose the captain first in <span class="m"><i>n</i></span> ways. Then fill the other <span class="m"><i>x</i> − 1</span> places from the <span class="m"><i>n</i> − 1</span> people left.</p>
+    <p>Both ways count the same teams. The factorials agree too:</p>
+    <div class="deriv" id="dIdAlg"></div>
+    <div class="ctl"><label for="xid">check both at <span class="m"><i>x</i></span> =</label><input id="xid" type="range" min="0" max="20" step="1" value="3"><output id="xidOut"></output></div>
+    <div class="deriv" id="dId"></div>
+
+    <h3>The mean</h3>
+    <p>The <span class="m"><i>x</i></span> in front of each term blocks the Binomial Theorem. The identity swaps it for a factor <span class="m"><i>n</i></span> and a smaller coefficient. The leftover sum is the pmf of Binomial(<span class="m"><i>n</i> − 1, <i>p</i></span>). Any pmf adds to 1.</p>
+    <div class="deriv" id="dMean"></div>
+
+    <h3>The variance</h3>
+    <p><span class="m">E(<i>X</i>²)</span> puts <span class="m"><i>x</i>²</span> in front. The identity removes only one factor of <span class="m"><i>x</i></span>. So split <span class="m"><i>x</i>² = <i>x</i>(<i>x</i> − 1) + <i>x</i></span>. The product <span class="m"><i>x</i>(<i>x</i> − 1)</span> cancels the top two factors of <span class="m"><i>x</i>! = <i>x</i>(<i>x</i> − 1)(<i>x</i> − 2)!</span>. First find <span class="m">E[<i>X</i>(<i>X</i> − 1)]</span> the same way as the mean.</p>
+    <div class="deriv" id="dFact"></div>
+    <p>Then finish with the formula from slide 16.</p>
+    <div class="deriv" id="dVar"></div>
+  </section>
+
+  <section id="r3">
+    <h2>5 · Route 3: a sum of Bernoullis</h2>
+    <div class="src">L03 slides 24 and 26 · slide 31 says “from pmf or results on sums of r.vs.”</div>
+    <p>Write <span class="m"><i>X</i> = <i>X</i>₁ + <i>X</i>₂ + … + <i>X<sub>n</sub></i></span>. Each <span class="m"><i>X<sub>i</sub></i></span> is 1 if trial <span class="m"><i>i</i></span> succeeds and 0 otherwise. So each <span class="m"><i>X<sub>i</sub></i></span> is Bernoulli(<span class="m"><i>p</i></span>) from section 1. This is the shortest route.</p>
+    <div class="deriv" id="dR3"></div>
+  </section>
+
+  <section id="take">
+    <h2>6 · Takeaways</h2>
+    <ul>
+      <li>The mean is the balance point of the pmf bars.</li>
+      <li>For a Bernoulli, <span class="m"><i>X</i>² = <i>X</i></span>. So <span class="m">E(<i>X</i>²) = <i>p</i></span> and <span class="m">Var(<i>X</i>) = <i>p</i> − <i>p</i>² = <i>p</i>(1 − <i>p</i>)</span>.</li>
+      <li>In the Binomial sum, the identity <span class="m" id="idTake"></span> removes the <span class="m"><i>x</i></span> in front.</li>
+      <li>The leftover sum is a smaller Binomial pmf. It adds to 1.</li>
+      <li>For the variance, find <span class="m">E[<i>X</i>(<i>X</i> − 1)]</span> first. Then use <span class="m">E(<i>X</i>²) = E[<i>X</i>(<i>X</i> − 1)] + E(<i>X</i>)</span>.</li>
+      <li>Route 3 is the fastest. The mean rule needs no independence, but the variance rule does.</li>
+    </ul>
+    <h3>Honest caveats</h3>
+    <ul class="caveat">
+      <li>Slide 31 gives no steps. Route 2 is the standard textbook proof and not a copy of the slides.</li>
+      <li>The letter <span class="m"><i>q</i></span> is my shorthand for <span class="m">1 − <i>p</i></span>. The slides do not use it.</li>
+      <li>Each live value is a floating-point sum. A ✓ means it matches the closed form within one part in a billion.</li>
+    </ul>
+  </section>
+
+  <footer>More pages in this folder: <a href="Essence-of-Skewness.html">Skewness</a> · <a href="Essence-of-Geometric.html">Geometric</a> · <a href="Essence-of-Poisson.html">Poisson</a> · <a href="Essence-of-Continuous-Random-Variables/index.html">Continuous RVs</a></footer>
+</div>
+
+<script>
+// KIT START
+function choose(n, k) {
+  if (k < 0 || k > n) return 0;
+  let r = 1;
+  for (let i = 1; i <= k; i++) r = (r * (n - k + i)) / i;
+  return Math.round(r);
+}
+function sumOver(lo, hi, f) {
+  let s = 0;
+  for (let x = lo; x <= hi; x++) s += f(x);
+  return s;
+}
+function binomPmf(n, p) {
+  return Array.from({ length: n + 1 }, (_, x) => choose(n, x) * p ** x * (1 - p) ** (n - x));
+}
+function moments(ps) {
+  const top = ps.length - 1;
+  const mean = sumOver(0, top, (x) => x * ps[x]);
+  const e2 = sumOver(0, top, (x) => x * x * ps[x]);
+  const central = sumOver(0, top, (x) => (x - mean) ** 2 * ps[x]);
+  return { total: sumOver(0, top, (x) => ps[x]), mean, e2, variance: e2 - mean * mean, central };
+}
+// Each line of the Route 2 proofs, evaluated as its own sum.
+function meanSteps(n, p) {
+  const q = 1 - p;
+  const inner = sumOver(0, n - 1, (y) => choose(n - 1, y) * p ** y * q ** (n - 1 - y));
+  return {
+    inner,
+    lines: [
+      sumOver(0, n, (x) => x * choose(n, x) * p ** x * q ** (n - x)),
+      sumOver(1, n, (x) => x * choose(n, x) * p ** x * q ** (n - x)),
+      sumOver(1, n, (x) => n * choose(n - 1, x - 1) * p ** x * q ** (n - x)),
+      n * p * sumOver(1, n, (x) => choose(n - 1, x - 1) * p ** (x - 1) * q ** (n - x)),
+      n * p * inner,
+      n * p * (p + q) ** (n - 1),
+    ],
+  };
+}
+function factorialSteps(n, p) {
+  const q = 1 - p;
+  const inner = sumOver(0, n - 2, (y) => choose(n - 2, y) * p ** y * q ** (n - 2 - y));
+  return {
+    inner,
+    lines: [
+      sumOver(0, n, (x) => x * (x - 1) * choose(n, x) * p ** x * q ** (n - x)),
+      sumOver(2, n, (x) => x * (x - 1) * choose(n, x) * p ** x * q ** (n - x)),
+      sumOver(2, n, (x) => n * (n - 1) * choose(n - 2, x - 2) * p ** x * q ** (n - x)),
+      n * (n - 1) * p * p * inner,
+      n * (n - 1) * p * p,
+    ],
+  };
+}
+// KIT END
+
+const $ = (id) => document.getElementById(id);
+const css = getComputedStyle(document.documentElement);
+const C = Object.fromEntries(['ink', 'muted', 'faint', 'blue', 'warm', 'bar', 'bg'].map((k) => [k, css.getPropertyValue('--' + k).trim()]));
+C.grid = '#15273f';
+const state = { p: 0.25, n: 20, x: 3, hoverB: -1, hoverN: -1, geoB: null, geoN: null };
+
+// Number and maths formatting.
+const minus = (s) => String(s).replace(/-/g, '−');
+const fp = (v) => minus(+v.toFixed(6));
+const f6 = (v) => minus((Math.abs(v) < 5e-13 ? 0 : v).toFixed(6));
+const big = (v) => v.toLocaleString('en-GB');
+function fs(v) {
+  if (v === 0) return '0';
+  if (Math.abs(v) >= 1e-4) return v.toFixed(4);
+  const [m, e] = v.toExponential(2).split('e');
+  return `${m}×10<sup>${minus(e)}</sup>`;
+}
+const ok = (a, b) => (Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b)) ? ' <span class="ok">✓</span>' : ' <span class="bad">✗</span>');
+const I = (s) => minus(s).replace(/[A-Za-z]/g, (c) => `<i>${c}</i>`);
+const B = (a, b) => `<span class="bi"><span class="bp">(</span><span class="bs"><span>${I(a)}</span><span>${I(b)}</span></span><span class="bp">)</span></span>`;
+const S = (lo, hi) => `<span class="sg"><span class="sh">${I(hi)}</span><span class="ss">∑</span><span class="sl">${I(lo)}</span></span>`;
+const F = (a, b) => `<span class="fr"><span>${a}</span><span>${b}</span></span>`;
+const pw = (base, e) => `<i>${base}</i><sup>${I(e)}</sup>`;
+const term = (top, bot, pe, qe) => `${B(top, bot)} ${pw('p', pe)}${pw('q', qe)}`;
+
+function rows(el, list) {
+  el.innerHTML = list.map((r) =>
+    `<div class="ex"><div class="m">${r.ex}</div>${r.num ? `<div class="num">${r.num}</div>` : ''}${r.why ? `<div class="why">${r.why}</div>` : ''}</div><div class="val">${r.val ?? ''}</div>`
+  ).join('');
+}
+
+// Charts.
+function setupCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+  }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function roundTop(ctx, x, y, w, h, r) {
+  if (h <= 0) return;
+  ctx.beginPath();
+  ctx.moveTo(x, y + h);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+  ctx.fill();
+}
+function drawPmf(cv, ps, mean, sd, hover) {
+  const { ctx, w, h } = setupCanvas(cv);
+  const n = ps.length - 1;
+  const L = 46, R = 12, T = 26, Bm = 54;
+  const want = Math.max(...ps) * 1.08;
+  const tick = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25].find((s) => want / s <= 5) || 0.25;
+  const top = Math.min(1, Math.ceil(want / tick) * tick);
+  const step = (w - L - R) / (n + 1);
+  const X = (x) => Math.min(w - R, Math.max(L, L + (x + 0.5) * step));
+  const Y = (v) => T + (1 - v / top) * (h - T - Bm);
+  const base = Y(0);
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = C.grid;
+  ctx.fillStyle = C.faint;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (let k = 0; k <= Math.round(top / tick); k++) {
+    const v = k * tick, y = Math.round(Y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke();
+    ctx.fillText(String(+v.toFixed(3)), L - 6, y);
+  }
+  ctx.textAlign = 'left';
+  ctx.fillText('p(x)', 4, 8);
+  const bw = Math.max(2, Math.min(step - 2, 56));
+  ps.forEach((v, x) => {
+    ctx.fillStyle = x === hover ? C.blue : C.bar;
+    roundTop(ctx, X(x) - bw / 2, Y(v), bw, base - Y(v), Math.max(0, Math.min(4, bw / 2, base - Y(v))));
+  });
+  const every = Math.ceil((n + 1) / 12);
+  ctx.fillStyle = C.muted;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  for (let x = 0; x <= n; x += every) ctx.fillText(String(x), X(x), base + 6);
+  const yb = base + 34, a = X(mean - sd), b = X(mean + sd), xm = X(mean);
+  ctx.strokeStyle = C.warm;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(a, yb - 5); ctx.lineTo(a, yb + 5);
+  ctx.moveTo(a, yb); ctx.lineTo(b, yb);
+  ctx.moveTo(b, yb - 5); ctx.lineTo(b, yb + 5);
+  ctx.stroke();
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath(); ctx.moveTo(xm, T); ctx.lineTo(xm, yb); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = C.ink;
+  ctx.textBaseline = 'top';
+  const right = xm < w - 120;
+  ctx.textAlign = right ? 'left' : 'right';
+  ctx.fillText(`μ = ${fp(mean)}`, xm + (right ? 6 : -6), T);
+  ctx.textBaseline = 'middle';
+  const roomRight = b < w - 70;
+  ctx.textAlign = roomRight ? 'left' : 'right';
+  ctx.fillText('μ ± σ', roomRight ? b + 8 : a - 8, yb);
+  return { L, step, n };
+}
+function drawParabola(cv, p) {
+  const { ctx, w, h } = setupCanvas(cv);
+  const L = 46, R = 14, T = 14, Bm = 26;
+  const X = (u) => L + u * (w - L - R);
+  const Y = (v) => T + (1 - v / 0.25) * (h - T - Bm);
+  ctx.font = '11px ui-monospace, Menlo, monospace';
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = C.grid;
+  ctx.fillStyle = C.faint;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  [0, 0.125, 0.25].forEach((v) => {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke();
+    ctx.fillText(String(v), L - 6, y);
+  });
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = C.muted;
+  [0, 0.25, 0.5, 0.75, 1].forEach((u) => ctx.fillText(String(u), X(u), Y(0) + 6));
+  ctx.strokeStyle = C.faint;
+  ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(X(0.5), T); ctx.lineTo(X(0.5), Y(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = C.bar;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let k = 0; k <= 200; k++) {
+    const u = k / 200;
+    k ? ctx.lineTo(X(u), Y(u * (1 - u))) : ctx.moveTo(X(u), Y(u * (1 - u)));
+  }
+  ctx.stroke();
+  const px = X(p), py = Y(p * (1 - p));
+  ctx.fillStyle = C.bg;
+  ctx.beginPath(); ctx.arc(px, py, 7, 0, 2 * Math.PI); ctx.fill();
+  ctx.fillStyle = C.warm;
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, 2 * Math.PI); ctx.fill();
+  ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
+  ctx.fillStyle = C.ink;
+  ctx.textBaseline = 'bottom';
+  ctx.textAlign = p < 0.5 ? 'left' : 'right';
+  ctx.fillText(`p(1 − p) = ${fp(p * (1 - p))}`, px + (p < 0.5 ? 10 : -10), py + 22);
+}
+function hoverIndex(cv, geo, ev) {
+  if (!geo) return -1;
+  const i = Math.floor((ev.clientX - cv.getBoundingClientRect().left - geo.L) / geo.step);
+  return i >= 0 && i <= geo.n ? i : -1;
+}
+function showTip(tip, cv, geo, i, ps) {
+  if (i < 0) { tip.style.display = 'none'; return; }
+  tip.innerHTML = `x = ${i} · p(x) = ${ps[i].toFixed(4)} · x·p(x) = ${(i * ps[i]).toFixed(4)}`;
+  tip.style.display = 'block';
+  const cx = geo.L + (i + 0.5) * geo.step;
+  tip.style.left = `${Math.max(0, Math.min(cv.clientWidth - tip.offsetWidth, cx - tip.offsetWidth / 2))}px`;
+}
+
+// Sections.
+function renderTools() {
+  rows($('dTools'), [
+    { ex: `E(<i>X</i>) = ${S('x', '')} <i>x</i> · <i>p</i>(<i>x</i>)`, why: 'Expectation, slide 10.' },
+    { ex: `E(<i>g</i>(<i>X</i>)) = ${S('x', '')} <i>g</i>(<i>x</i>) · <i>p</i>(<i>x</i>)`, why: 'Expectation of a function, slide 12.' },
+    { ex: 'Var(<i>X</i>) = E[(<i>X</i> − E(<i>X</i>))²]', why: 'Variance by definition, slide 15.' },
+    { ex: 'Var(<i>X</i>) = E(<i>X</i>²) − (E(<i>X</i>))²', why: 'The alternative formula, slide 16.' },
+  ]);
+}
+function renderBern(p, q) {
+  const ps = [q, p];
+  state.geoB = drawPmf($('cvB'), ps, p, Math.sqrt(p * q), state.hoverB);
+  drawParabola($('cvPar'), p);
+  $('capB').innerHTML = `Bernoulli(${fp(p)}) pmf. The dashed line is the mean ${fp(p)}. The bracket spans μ ± σ.`;
+  rows($('dB'), [
+    { ex: '<i>p</i>(0) = <i>p</i><sup>0</sup>(1 − <i>p</i>)<sup>1</sup> = 1 − <i>p</i>',
+      num: `= ${fp(p)}<sup>0</sup> × ${fp(q)}<sup>1</sup>`, why: 'Put <i>x</i> = 0 into the slide 28 pmf. Any number to the power 0 is 1.', val: f6(q) },
+    { ex: '<i>p</i>(1) = <i>p</i><sup>1</sup>(1 − <i>p</i>)<sup>0</sup> = <i>p</i>',
+      num: `= ${fp(p)}<sup>1</sup> × ${fp(q)}<sup>0</sup>`, why: 'Put <i>x</i> = 1 into the same pmf.', val: f6(p) },
+    { ex: 'E(<i>X</i>) = 0 · <i>p</i>(0) + 1 · <i>p</i>(1) = <i>p</i>',
+      num: `= 0 × ${fp(q)} + 1 × ${fp(p)}`, why: 'Expectation on slide 10. The 0 term vanishes.', val: f6(0 * q + 1 * p) + ok(0 * q + 1 * p, p) },
+    { ex: 'E(<i>X</i>²) = 0² · <i>p</i>(0) + 1² · <i>p</i>(1) = <i>p</i>',
+      num: `= 0 × ${fp(q)} + 1 × ${fp(p)}`, why: 'Slide 12 with <i>g</i>(<i>x</i>) = <i>x</i>². Here <i>X</i>² = <i>X</i> because 0² = 0 and 1² = 1.', val: f6(p) },
+    { ex: 'Var(<i>X</i>) = E(<i>X</i>²) − (E(<i>X</i>))² = <i>p</i> − <i>p</i>² = <i>p</i>(1 − <i>p</i>)',
+      num: `= ${fp(p)} − ${fp(p * p)} · closed form ${fp(p)} × ${fp(q)} = ${fp(p * q)}`, why: 'The alternative formula on slide 16.', val: f6(p - p * p) + ok(p - p * p, p * q) },
+    { ex: 'Var(<i>X</i>) = E[(<i>X</i> − <i>p</i>)²] = (0 − <i>p</i>)²(1 − <i>p</i>) + (1 − <i>p</i>)²<i>p</i>',
+      num: `= ${fp(p * p)} × ${fp(q)} + ${fp(q * q)} × ${fp(p)} = ${fp(p * p * q)} + ${fp(q * q * p)}`,
+      why: 'The definition on slide 15. Measure each value from the mean <i>p</i>.', val: f6(p * p * q + q * q * p) + ok(p * p * q + q * q * p, p * q) },
+    { ex: '= <i>p</i>(1 − <i>p</i>)[<i>p</i> + (1 − <i>p</i>)] = <i>p</i>(1 − <i>p</i>)',
+      why: 'Take out the common factor <i>p</i>(1 − <i>p</i>). The bracket equals 1.', val: f6(p * q * (p + q)) + ok(p * q * (p + q), p * q) },
+  ]);
+}
+function renderBinChart(ps, n, p, q) {
+  state.geoN = drawPmf($('cvN'), ps, n * p, Math.sqrt(n * p * q), state.hoverN);
+  $('capN').innerHTML = `Binomial(${n}, ${fp(p)}) pmf. The dashed line is the mean ${fp(n * p)}. The bracket spans μ ± σ with σ = ${fp(Math.sqrt(n * p * q))}. Hover a bar to read its row.`;
+}
+function renderTable(ps, mo, n, p, q) {
+  $('tbody').innerHTML = ps.map((v, x) =>
+    `<tr data-x="${x}"${x === state.hoverN ? ' class="hi"' : ''}><td>${x}</td><td>${big(choose(n, x))}</td><td>${fs(p ** x * q ** (n - x))}</td><td>${fs(v)}</td><td>${fs(x * v)}</td><td>${fs(x * x * v)}</td><td>${fs((x - mo.mean) ** 2 * v)}</td></tr>`
+  ).join('');
+  $('tfoot').innerHTML = `<tr><td>Σ</td><td></td><td></td><td>${mo.total.toFixed(4)}</td><td>${mo.mean.toFixed(4)}</td><td>${mo.e2.toFixed(4)}</td><td>${mo.central.toFixed(4)}</td></tr>`;
+  rows($('dR1'), [
+    { ex: `${S('x', '')} <i>p</i>(<i>x</i>) = 1`, num: 'total of the <i>p</i>(<i>x</i>) column', why: 'Any pmf adds to 1. This line checks the table.', val: f6(mo.total) + ok(mo.total, 1) },
+    { ex: `E(<i>X</i>) = ${S('x', '')} <i>x</i> · <i>p</i>(<i>x</i>)`,
+      num: `total of the <i>x</i>·<i>p</i>(<i>x</i>) column · closed form <i>np</i> = ${n} × ${fp(p)} = ${fp(n * p)}`, why: 'Expectation on slide 10.', val: f6(mo.mean) + ok(mo.mean, n * p) },
+    { ex: `E(<i>X</i>²) = ${S('x', '')} <i>x</i>² · <i>p</i>(<i>x</i>)`, num: 'total of the <i>x</i>²·<i>p</i>(<i>x</i>) column', why: 'Slide 12 with <i>g</i>(<i>x</i>) = <i>x</i>².', val: f6(mo.e2) },
+    { ex: 'Var(<i>X</i>) = E(<i>X</i>²) − (E(<i>X</i>))²',
+      num: `= ${fp(mo.e2)} − ${fp(mo.mean)}² · closed form <i>np</i>(1 − <i>p</i>) = ${n} × ${fp(p)} × ${fp(q)} = ${fp(n * p * q)}`,
+      why: 'The alternative formula on slide 16.', val: f6(mo.variance) + ok(mo.variance, n * p * q) },
+    { ex: `Var(<i>X</i>) = ${S('x', '')} (<i>x</i> − μ)² · <i>p</i>(<i>x</i>)`, num: 'total of the last column', why: 'The definition on slide 15. Both variance formulas agree.', val: f6(mo.central) + ok(mo.central, n * p * q) },
+  ]);
+}
+function renderIdentity(n, x) {
+  const a = x * choose(n, x), b = n * choose(n - 1, x - 1);
+  const c = x * (x - 1) * choose(n, x), d = n * (n - 1) * choose(n - 2, x - 2);
+  const neg = x < 2 ? 'A coefficient with a negative bottom entry counts nothing. It is 0.' : '';
+  rows($('dId'), [
+    { ex: `<i>x</i> · ${B('n', 'x')} = ${x} × ${B(n, x)} = ${x} × ${big(choose(n, x))}`, val: big(a) },
+    { ex: `<i>n</i> · ${B('n−1', 'x−1')} = ${n} × ${B(n - 1, x - 1)} = ${n} × ${big(choose(n - 1, x - 1))}`, why: x < 1 ? neg : '', val: big(b) + ok(a, b) },
+    { ex: `<i>x</i>(<i>x</i> − 1) · ${B('n', 'x')} = ${x} × ${minus(x - 1)} × ${big(choose(n, x))}`, val: big(c) },
+    { ex: `<i>n</i>(<i>n</i> − 1) · ${B('n−2', 'x−2')} = ${n} × ${n - 1} × ${B(n - 2, x - 2)} = ${big(n * (n - 1))} × ${big(choose(n - 2, x - 2))}`, why: neg, val: big(d) + ok(c, d) },
+  ]);
+}
+function renderRoute2(n, p, q, mo) {
+  const ms = meanSteps(n, p), np = n * p;
+  const why = [
+    'Expectation on slide 10 with the pmf from slide 30.',
+    'The <i>x</i> = 0 term is 0 × <i>p</i>(0) = 0. Drop it.',
+    `Use the identity <i>x</i> · ${B('n', 'x')} = <i>n</i> · ${B('n−1', 'x−1')}.`,
+    'Take <i>n</i> and one factor of <i>p</i> outside the sum.',
+    'Rename <i>y</i> = <i>x</i> − 1. Then <i>n</i> − <i>x</i> = (<i>n</i> − 1) − <i>y</i>.',
+    'Binomial Theorem. The sum is the Binomial(<i>n</i> − 1, <i>p</i>) pmf, so it adds to 1.',
+  ];
+  const ex = [
+    `E(<i>X</i>) = ${S('x=0', 'n')} <i>x</i> · ${term('n', 'x', 'x', 'n−x')}`,
+    `= ${S('x=1', 'n')} <i>x</i> · ${term('n', 'x', 'x', 'n−x')}`,
+    `= ${S('x=1', 'n')} <i>n</i> · ${term('n−1', 'x−1', 'x', 'n−x')}`,
+    `= <i>np</i> · ${S('x=1', 'n')} ${term('n−1', 'x−1', 'x−1', 'n−x')}`,
+    `= <i>np</i> · ${S('y=0', 'n−1')} ${term('n−1', 'y', 'y', '(n−1)−y')}`,
+    `= <i>np</i> · (<i>p</i> + <i>q</i>)<sup>${I('n−1')}</sup> = <i>np</i>`,
+  ];
+  const num = ['', '', '', '', `the sum alone = ${f6(ms.inner)}`,
+    `(${fp(p)} + ${fp(q)})<sup>${n - 1}</sup> = 1 · closed form <i>np</i> = ${n} × ${fp(p)} = ${fp(np)}`];
+  rows($('dMean'), ex.map((e, k) => ({ ex: e, num: num[k], why: why[k], val: f6(ms.lines[k]) + ok(ms.lines[k], np) })));
+
+  const fx = factorialSteps(n, p), target = n * (n - 1) * p * p;
+  rows($('dFact'), [
+    { ex: `E[<i>X</i>(<i>X</i> − 1)] = ${S('x=0', 'n')} <i>x</i>(<i>x</i> − 1) · ${term('n', 'x', 'x', 'n−x')}`,
+      why: 'Slide 12 with <i>g</i>(<i>x</i>) = <i>x</i>(<i>x</i> − 1).', val: f6(fx.lines[0]) + ok(fx.lines[0], target) },
+    { ex: `= ${S('x=2', 'n')} <i>x</i>(<i>x</i> − 1) · ${term('n', 'x', 'x', 'n−x')}`,
+      why: 'The <i>x</i> = 0 and <i>x</i> = 1 terms are 0. Drop them.', val: f6(fx.lines[1]) + ok(fx.lines[1], target) },
+    { ex: `= ${S('x=2', 'n')} <i>n</i>(<i>n</i> − 1) · ${term('n−2', 'x−2', 'x', 'n−x')}`,
+      why: `Use the identity <i>x</i>(<i>x</i> − 1) · ${B('n', 'x')} = <i>n</i>(<i>n</i> − 1) · ${B('n−2', 'x−2')}.`, val: f6(fx.lines[2]) + ok(fx.lines[2], target) },
+    { ex: `= <i>n</i>(<i>n</i> − 1)<i>p</i>² · ${S('y=0', 'n−2')} ${term('n−2', 'y', 'y', '(n−2)−y')}`,
+      num: n >= 2 ? `the sum alone = ${f6(fx.inner)}` : 'for <i>n</i> = 1 the sum is empty, but <i>n</i>(<i>n</i> − 1) = 0 anyway',
+      why: 'Take out <i>n</i>(<i>n</i> − 1) and <i>p</i>². Then rename <i>y</i> = <i>x</i> − 2.', val: f6(fx.lines[3]) + ok(fx.lines[3], target) },
+    { ex: '= <i>n</i>(<i>n</i> − 1)<i>p</i>²', num: `= ${n} × ${n - 1} × ${fp(p)}² = ${fp(target)}`,
+      why: 'The sum is the Binomial(<i>n</i> − 2, <i>p</i>) pmf, so it adds to 1.', val: f6(fx.lines[4]) + ok(fx.lines[4], target) },
+  ]);
+
+  const e2 = target + np, v = e2 - np * np;
+  rows($('dVar'), [
+    { ex: 'E(<i>X</i>²) = E[<i>X</i>(<i>X</i> − 1)] + E(<i>X</i>) = <i>n</i>(<i>n</i> − 1)<i>p</i>² + <i>np</i>',
+      num: `= ${fp(target)} + ${fp(np)} · Route 1 table total = ${fp(mo.e2)}`,
+      why: 'Split <i>x</i>² = <i>x</i>(<i>x</i> − 1) + <i>x</i>. Then use linearity of expectation.', val: f6(e2) + ok(e2, mo.e2) },
+    { ex: 'Var(<i>X</i>) = E(<i>X</i>²) − (E(<i>X</i>))² = <i>n</i>(<i>n</i> − 1)<i>p</i>² + <i>np</i> − <i>n</i>²<i>p</i>²',
+      num: `= ${fp(e2)} − ${fp(np)}²`, why: 'The alternative formula on slide 16 with E(<i>X</i>) = <i>np</i>.', val: f6(v) },
+    { ex: '= <i>n</i>²<i>p</i>² − <i>np</i>² + <i>np</i> − <i>n</i>²<i>p</i>² = <i>np</i> − <i>np</i>²',
+      why: 'Expand <i>n</i>(<i>n</i> − 1)<i>p</i>². The two <i>n</i>²<i>p</i>² terms cancel.', val: f6(np - np * p) },
+    { ex: '= <i>np</i>(1 − <i>p</i>)', num: `closed form ${n} × ${fp(p)} × ${fp(q)} = ${fp(np * q)}`,
+      why: 'Take out the common factor <i>np</i>.', val: f6(np * q) + ok(v, np * q) },
+  ]);
+}
+function renderRoute3(n, p, q, mo) {
+  const count = `${n} term${n > 1 ? 's' : ''}`;
+  const terms = (t) => (n <= 5 ? Array(n).fill(t).join(' + ') : `${t} + ${t} + … + ${t}`);
+  rows($('dR3'), [
+    { ex: 'E(<i>X</i>) = E(<i>X</i>₁) + E(<i>X</i>₂) + … + E(<i>X<sub>n</sub></i>)', why: 'Expectation of a sum on slide 24. It needs no independence.' },
+    { ex: '= <i>p</i> + <i>p</i> + … + <i>p</i> = <i>np</i>', num: `= ${terms(fp(p))} (${count}) · Route 1 table total = ${fp(mo.mean)}`,
+      why: 'Each <i>X<sub>i</sub></i> is Bernoulli(<i>p</i>) with mean <i>p</i>.', val: f6(n * p) + ok(n * p, mo.mean) },
+    { ex: 'Var(<i>X</i>) = Var(<i>X</i>₁) + Var(<i>X</i>₂) + … + Var(<i>X<sub>n</sub></i>)',
+      why: 'Variance of a sum on slide 26. It needs independence. Slide 30 makes the trials independent.' },
+    { ex: '= <i>p</i>(1 − <i>p</i>) + … + <i>p</i>(1 − <i>p</i>) = <i>np</i>(1 − <i>p</i>)', num: `= ${terms(fp(p * q))} (${count}) · Route 1 table total = ${fp(mo.central)}`,
+      why: 'Each <i>X<sub>i</sub></i> has the Bernoulli variance from section 1.', val: f6(n * p * q) + ok(n * p * q, mo.central) },
+  ]);
+}
+
+function render() {
+  const { p, n } = state, q = 1 - p;
+  $('p').value = p;
+  $('n').value = n;
+  $('pOut').textContent = p.toFixed(2);
+  $('nOut').textContent = n;
+  state.x = Math.min(state.x, n);
+  $('xid').max = n;
+  $('xid').value = state.x;
+  $('xidOut').textContent = state.x;
+  renderBern(p, q);
+  const ps = binomPmf(n, p), mo = moments(ps);
+  state.ps = ps;
+  renderBinChart(ps, n, p, q);
+  renderTable(ps, mo, n, p, q);
+  renderIdentity(n, state.x);
+  renderRoute2(n, p, q, mo);
+  renderRoute3(n, p, q, mo);
+}
+function redrawBinHover() {
+  const { n, p } = state;
+  renderBinChart(state.ps, n, p, 1 - p);
+  document.querySelectorAll('#tbody tr').forEach((tr) => tr.classList.toggle('hi', +tr.dataset.x === state.hoverN));
+}
+
+// Static maths that never changes.
+$('pmfInline').innerHTML = `<i>p</i>(<i>x</i>) = ${B('n', 'x')} <i>p</i><sup><i>x</i></sup>(1 − <i>p</i>)<sup>${I('n−x')}</sup>`;
+$('cnx').innerHTML = B('n', 'x');
+$('idTake').innerHTML = `<i>x</i> · ${B('n', 'x')} = <i>n</i> · ${B('n−1', 'x−1')}`;
+$('thead').innerHTML = `<tr><th><i>x</i></th><th>${B('n', 'x')}</th><th><i>p</i><sup><i>x</i></sup><i>q</i><sup>${I('n−x')}</sup></th><th><i>p</i>(<i>x</i>)</th><th><i>x</i>·<i>p</i>(<i>x</i>)</th><th><i>x</i>²·<i>p</i>(<i>x</i>)</th><th>(<i>x</i> − μ)²·<i>p</i>(<i>x</i>)</th></tr>`;
+rows($('dIdAlg'), [
+  { ex: `<i>x</i> · ${F('<i>n</i>!', '<i>x</i>! (<i>n</i> − <i>x</i>)!')} = ${F('<i>n</i>!', '(<i>x</i> − 1)! (<i>n</i> − <i>x</i>)!')} = <i>n</i> · ${F('(<i>n</i> − 1)!', '(<i>x</i> − 1)! ((<i>n</i> − 1) − (<i>x</i> − 1))!')} = <i>n</i> · ${B('n−1', 'x−1')}`,
+    why: 'Use <i>x</i> / <i>x</i>! = 1 / (<i>x</i> − 1)! and <i>n</i>! = <i>n</i> · (<i>n</i> − 1)!. Note <i>n</i> − <i>x</i> = (<i>n</i> − 1) − (<i>x</i> − 1).' },
+  { ex: `<i>x</i>(<i>x</i> − 1) · ${B('n', 'x')} = <i>n</i>(<i>n</i> − 1) · ${B('n−2', 'x−2')}`,
+    why: 'Apply the same step twice. Each step removes one factor from the front.' },
+]);
+renderTools();
+
+$('p').addEventListener('input', (e) => { state.p = +e.target.value; render(); });
+$('n').addEventListener('input', (e) => { state.n = +e.target.value; render(); });
+$('xid').addEventListener('input', (e) => { state.x = +e.target.value; $('xidOut').textContent = state.x; renderIdentity(state.n, state.x); });
+document.querySelectorAll('.presets button').forEach((b) => b.addEventListener('click', () => {
+  state.p = +b.dataset.p;
+  state.n = +b.dataset.n;
+  render();
+}));
+$('cvB').addEventListener('mousemove', (e) => {
+  const i = hoverIndex($('cvB'), state.geoB, e);
+  if (i !== state.hoverB) { state.hoverB = i; renderBern(state.p, 1 - state.p); }
+  showTip($('tipB'), $('cvB'), state.geoB, i, [1 - state.p, state.p]);
+});
+$('cvB').addEventListener('mouseleave', () => { state.hoverB = -1; renderBern(state.p, 1 - state.p); $('tipB').style.display = 'none'; });
+$('cvN').addEventListener('mousemove', (e) => {
+  const i = hoverIndex($('cvN'), state.geoN, e);
+  if (i !== state.hoverN) { state.hoverN = i; redrawBinHover(); }
+  showTip($('tipN'), $('cvN'), state.geoN, i, state.ps);
+});
+$('cvN').addEventListener('mouseleave', () => { state.hoverN = -1; redrawBinHover(); $('tipN').style.display = 'none'; });
+$('tbody').addEventListener('mouseover', (e) => {
+  const tr = e.target.closest('tr');
+  if (tr && +tr.dataset.x !== state.hoverN) { state.hoverN = +tr.dataset.x; redrawBinHover(); }
+});
+$('tbody').addEventListener('mouseleave', () => { state.hoverN = -1; redrawBinHover(); });
+window.addEventListener('resize', render);
+render();
+</script>
+</body>
+</html>
