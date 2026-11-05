@@ -38,24 +38,18 @@
       min-height: 0; overflow: hidden; display: grid; grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto minmax(0, 1fr) auto; gap: 8px; padding: 16px 20px 12px;
     }
-    .eyebrow {
-      color: var(--blue-1); font-size: 12px; font-weight: 700;
-      letter-spacing: 0.08em; text-transform: uppercase;
-    }
-    h1 { margin: 8px 0 0; font-size: clamp(24px, 2.8vw, 38px); line-height: 1.05; }
-    .lead { margin: 8px 0 0; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.5; }
-    .lead strong { color: var(--ink); font-weight: 600; }
+    h1 { margin: 0; font-size: clamp(20px, 2vw, 26px); line-height: 1.15; }
     .canvas-wrap { position: relative; min-height: 0; }
     canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
     .receipt {
       font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
       padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
-      overflow-wrap: anywhere;
     }
+    /* One line each, always: a wrapping line would resize the canvas above it. */
+    .receipt div, #legend { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #legend { margin-top: 6px; height: 22px; line-height: 22px; }
     .receipt .big { color: var(--ink); font-size: 14px; }
     .receipt strong { color: var(--ink); }
-    .caption { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 60rem; }
-    .caption strong { color: var(--ink); font-weight: 600; }
     .hint { color: var(--muted); font-size: 12px; line-height: 1.7; }
     .legend { display: inline-flex; align-items: center; gap: 6px; margin-right: 12px; }
     .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
@@ -154,18 +148,11 @@
   <div class="app">
     <section class="stage">
       <header>
-        <div class="eyebrow">Essence of Continuous Random Variables · 50008 Lecture 4 · Chapter 3</div>
         <h1>Uniform and Exponential: flat, then memoryless</h1>
-        <p class="lead">
-          Two shapes do most of the work. The <strong>Uniform</strong> spreads probability flat across an interval.
-          The <strong>Exponential</strong> waits for an event with the same risk at every moment.
-          That constant risk gives it <strong>no memory</strong>.
-        </p>
       </header>
       <div class="canvas-wrap"><canvas id="scene"></canvas></div>
       <div>
         <div id="receipt" class="receipt"></div>
-        <div id="caption" class="caption" style="margin-top: 8px;"></div>
         <div id="legend" class="hint"></div>
       </div>
     </section>
@@ -196,8 +183,6 @@
             <button id="tourPrev">← Previous</button>
             <button id="tourNext">Next stop →</button>
           </div>
-          <div class="src">Keys: ← and → move through the tour. 1 to 7 pick a picture.
-            The Arithmetic tab writes out every step for the picture on screen.</div>
         </section>
 
         <section class="section">
@@ -208,11 +193,13 @@
         <section class="section">
           <div id="controlTitle" class="section-title"></div>
           <div id="controlHost" style="display: grid; gap: 8px;"></div>
+          <div id="caption" class="body"></div>
+          <div id="extra" class="live-line"></div>
+          <div class="src">Hover the charts for exact numbers. The Arithmetic tab writes out every step.</div>
         </section>
 
         <section class="section">
           <div class="section-title">Predict first</div>
-          <div class="body">Read the question. Commit to an answer. Then open the card and check.</div>
           <details class="predict">
             <summary>1 · U(0, 0.5) has height 2. Is a density above 1 a problem?</summary>
             <div class="answer"><strong>No.</strong> A density is not a probability. Only area is probability.
@@ -242,19 +229,6 @@
               So P(no call) = e^(−1) ≈ 0.368. This is also P(first wait &gt; 0.5).</div>
             <button data-predict="4">Set it up: rate 2, x = 0.5</button>
           </details>
-        </section>
-
-        <section class="section">
-          <div class="section-title">Exponential waits on the slides</div>
-          <div class="body">The Examples slide lists these waits:
-            <ul>
-              <li>the time until the next customer arrives at a cashpoint;</li>
-              <li>the time to failure of a component in a system;</li>
-              <li>the time until the next mistake on the slides;</li>
-              <li>the distance along a road between potholes;</li>
-              <li>the time until the next request at a web server.</li>
-            </ul>
-            Each one assumes a <strong>constant risk</strong> per unit of time or distance.</div>
         </section>
       </div>
 
@@ -424,6 +398,18 @@ So X ~ Exp(λ).</div>
           <div class="body"><strong>The slot model is a standard result.</strong> It is not on the slides.
             The same goes for the integration by parts and the median.</div>
           <div class="body"><strong>Simulations wobble.</strong> A histogram of a few thousand gaps never matches the curve exactly.</div>
+        </section>
+        <section class="section">
+          <div class="section-title">Exponential waits on the slides</div>
+          <div class="body">The Examples slide lists these waits:
+            <ul>
+              <li>the time until the next customer arrives at a cashpoint;</li>
+              <li>the time to failure of a component in a system;</li>
+              <li>the time until the next mistake on the slides;</li>
+              <li>the distance along a road between potholes;</li>
+              <li>the time until the next request at a web server.</li>
+            </ul>
+            Each one assumes a <strong>constant risk</strong> per unit of time or distance.</div>
         </section>
         <section class="section">
           <div class="section-title">Related pages</div>
@@ -790,8 +776,9 @@ So X ~ Exp(λ).</div>
       }
       ctx.restore();
     }
+    // Pass sd = null to draw the mean line alone.
     function markMean(ch, mu, sd, label = 'μ') {
-      [mu - sd, mu + sd].forEach((v) => {
+      (sd == null ? [] : [mu - sd, mu + sd]).forEach((v) => {
         if (v > ch.x0 && v < ch.x1) line(X(ch, v), ch.y, X(ch, v), ch.y + ch.h, C.muted, 1, [5, 4]);
       });
       if (mu > ch.x0 && mu < ch.x1) {
@@ -811,8 +798,14 @@ So X ~ Exp(λ).</div>
     };
 
     // ----- one draw function per picture -----
+    // Axes snap to a few fixed ranges. A range that tracks a and b on every
+    // step makes the whole chart rescale while you drag.
     function uniformRange() {
-      return [Math.min(-1, state.a - 1), Math.max(2, state.b + 1), Math.max(1.25, 1.2 / (state.b - state.a))];
+      const { a, b } = state;
+      const x0 = a >= -0.5 ? -1 : -6;
+      const x1 = [2, 5, 10, 13].find((v) => v >= b + 0.5);
+      const y1 = [0.25, 0.5, 1.25, 2.5].find((v) => v >= 1.15 / (b - a));
+      return [x0, x1, y1];
     }
     function drawUniform(g) {
       const { a, b, y } = state;
@@ -823,16 +816,12 @@ So X ~ Exp(λ).</div>
       const cdf = (v) => unif.cdf(v, a, b);
       axes(top, `pdf f(y) of U(${fmtP(a)}, ${fmtP(b)})`);
       axes(bot, 'cdf F(y) = P(Y ≤ y)');
-      if (a !== 0 || b !== 1) {
-        curve(top, (v) => unif.pdf(v, 0, 1), { color: C.muted, width: 1.5, dash: [4, 4], breaks: [0, 1] });
-        tag('U(0, 1)', X(top, 1) + 4, Y(top, 1) + 4, { color: C.muted });
-      }
       const yc = clamp(y, a, b);
       if (yc > a) curve(top, pdf, { from: a, to: yc, fill: C.left, alpha: 0.3 });
       curve(top, pdf, { color: C.left, breaks: [a, b] });
-      markMean(top, unif.mean(a, b), Math.sqrt(unif.variance(a, b)));
-      query(top, y, `area to y = ${num(cdf(y))}`);
-      tag(`height 1/(b − a) = ${num(1 / (b - a))}`, X(top, (a + b) / 2), Y(top, 1 / (b - a)) - 8, { align: 'center' });
+      markMean(top, unif.mean(a, b), null);
+      query(top, y);
+      tag(`1/(b − a) = ${num(1 / (b - a))}`, X(top, a) + 2, Y(top, 1 / (b - a)) - 8);
       curve(bot, cdf, { color: C.left });
       query(bot, y);
       if (y >= x0 && y <= x1) {
@@ -844,22 +833,24 @@ So X ~ Exp(λ).</div>
 
     function drawMap(g) {
       const { a, b, y } = state;
-      const [x0, x1, y1] = uniformRange();
+      const [x0, x1, yFit] = uniformRange();
+      // One shared height scale, so the drop in height from X to Y stays visible.
+      const y1 = Math.max(1.25, yFit);
       const top = chartOf(g, 'top', x0, x1, y1);
       const bot = chartOf(g, 'bot', x0, x1, y1);
       const u = (y - a) / (b - a);
       axes(top, 'X ~ U(0, 1)');
-      axes(bot, `Y = a + (b − a)X = ${fmtP(a)} + ${fmtP(b - a)}X ~ U(${fmtP(a)}, ${fmtP(b)})`);
+      axes(bot, `Y = ${fmtP(a)} + ${fmtP(b - a)}X ~ U(${fmtP(a)}, ${fmtP(b)})`);
       const uc = clamp(u, 0, 1);
       if (uc > 0) curve(top, (v) => unif.pdf(v, 0, 1), { from: 0, to: uc, fill: C.left, alpha: 0.3 });
       curve(top, (v) => unif.pdf(v, 0, 1), { color: C.left, breaks: [0, 1] });
       const yc = clamp(y, a, b);
       if (yc > a) curve(bot, (v) => unif.pdf(v, a, b), { from: a, to: yc, fill: C.left, alpha: 0.3 });
       curve(bot, (v) => unif.pdf(v, a, b), { color: C.left, breaks: [a, b] });
-      tag(`shaded area = ${num(uc)}`, X(top, 1) + 8, Y(top, 1) + 16);
-      tag(`shaded area = ${num(uc)}`, X(bot, yc > a ? (a + yc) / 2 : (a + b) / 2), Y(bot, 1 / (b - a)) - 8, { align: 'center' });
+      tag(`area = ${num(uc)}`, X(top, 1) + 8, Y(top, 1) + 16);
+      tag(`area = ${num(uc)}`, X(bot, yc > a ? (a + yc) / 2 : (a + b) / 2), Y(bot, 1 / (b - a)) - 8, { align: 'center' });
       const yTop = top.y + top.h + 22;
-      const yBot = bot.y - 22;
+      const yBot = bot.y - 30;
       mapPts.forEach((p) => {
         line(X(top, p), yTop, X(bot, a + (b - a) * p), yBot, 'rgba(221, 116, 37, 0.45)', 1);
         dot(X(top, p), yTop, 3.5, C.right);
@@ -868,7 +859,7 @@ So X ~ Exp(λ).</div>
       line(X(top, u), yTop, X(bot, y), yBot, C.ink, 1.5, [3, 3]);
       query(top, u);
       query(bot, y);
-      tag(`u = (y − a)/(b − a) = ${num(u)}  ↦  y = ${fmtP(y)}`, X(bot, y) + 6, bot.y + 16);
+      tag(`x = ${num(u)} ↦ y = ${fmtP(y)}`, X(bot, y) + 6, bot.y + 16);
     }
 
     function drawExp(g) {
@@ -881,7 +872,7 @@ So X ~ Exp(λ).</div>
       axes(bot, 'cdf F(x) = 1 − e^(−λx)');
       if (d > c) curve(top, pdf, { from: c, to: d, fill: C.left, alpha: 0.3 });
       curve(top, pdf, { color: C.left });
-      markMean(top, expo.mean(l), Math.sqrt(expo.variance(l)));
+      markMean(top, expo.mean(l), null);
       tag(`f(0) = λ = ${fmtP(l)}`, X(top, 0) + 8, Y(top, l) + 14);
       if (d > c) tag(`area = ${num(cdf(d) - cdf(c))}`, X(top, (c + d) / 2), Y(top, pdf((c + d) / 2) / 2) + 4, { align: 'center' });
       curve(bot, cdf, { color: C.left });
@@ -1261,7 +1252,7 @@ So X ~ Exp(λ).</div>
           const F = unif.cdf(y, a, b);
           const area = y > a ? simpson((v) => unif.pdf(v, a, b), a, Math.min(y, b)) : 0;
           return {
-            r: [`U(${fmtP(a)}, ${fmtP(b)}) · height 1/(b − a) = ${num(1 / w)} · μ = (a + b)/2 = ${num(unif.mean(a, b))} · σ² = (b − a)²/12 = ${num(unif.variance(a, b))}`,
+            r: [`U(${fmtP(a)}, ${fmtP(b)}) · height = ${num(1 / w)} · μ = ${num(unif.mean(a, b))} · σ² = ${num(unif.variance(a, b))}`,
               y <= a || y >= b
                 ? `P(Y ≤ ${fmtP(y)}) = <strong>${num(F)}</strong> because y ${y <= a ? '≤ a' : '≥ b'}`
                 : `P(Y ≤ ${fmtP(y)}) = (y − a)/(b − a) = ${num(y - a)}/${num(w)} = <strong>${num(F)}</strong>`,
@@ -1275,7 +1266,7 @@ So X ~ Exp(λ).</div>
           const F = clamp(u, 0, 1);
           const k = mapPts.filter((p) => a + w * p <= y).length;
           return {
-            r: [`X ~ U(0, 1) · Y = a + (b − a)X = ${fmtP(a)} + ${fmtP(w)}X ~ U(${fmtP(a)}, ${fmtP(b)})`,
+            r: [`X ~ U(0, 1) · Y = ${fmtP(a)} + ${fmtP(w)}X ~ U(${fmtP(a)}, ${fmtP(b)})`,
               `P(Y ≤ ${fmtP(y)}) = P(X ≤ (y − a)/(b − a)) = P(X ≤ ${num(u)}) = <strong>${num(F)}</strong>`,
               mapPts.length ? `${k} of ${mapPts.length} sampled points have Y ≤ ${fmtP(y)}, a share of ${num(k / mapPts.length)}.` : 'Press "Sample 20 points" to throw darts at U(0, 1).'],
             cap: `<strong>One event, two rulers.</strong> X ≤ ${num(u)} happens exactly when Y ≤ ${fmtP(y)}. So the two shaded areas are equal.
@@ -1286,8 +1277,8 @@ So X ~ Exp(λ).</div>
           const P = Math.exp(-l * c) - Math.exp(-l * d);
           const area = simpson((v) => expo.pdf(v, l), c, d);
           return {
-            r: [`Exp(${fmtP(l)}) · f(0) = λ = ${fmtP(l)} · μ = 1/λ = ${num(1 / l)} · σ² = 1/λ² = ${num(1 / l ** 2)}`,
-              `P(${fmtP(c)} < X ≤ ${fmtP(d)}) = e^(−λc) − e^(−λd) = ${num(Math.exp(-l * c))} − ${num(Math.exp(-l * d))} = <strong>${num(P)}</strong>`,
+            r: [`Exp(${fmtP(l)}) · f(0) = ${fmtP(l)} · μ = ${num(1 / l)} · σ² = ${num(1 / l ** 2)}`,
+              `P(${fmtP(c)} < X ≤ ${fmtP(d)}) = ${num(Math.exp(-l * c))} − ${num(Math.exp(-l * d))} = <strong>${num(P)}</strong>`,
               `Simpson area under f = ${num(area)} ${ok(same(area, P), 'same as the formula')}`],
             cap: `<strong>Short waits are the most likely.</strong> The density is highest at 0 and falls by the factor e^(−λ) = ${num(Math.exp(-l))} per unit of time.
               The cdf climbs from F(c) = ${num(expo.cdf(c, l))} to F(d) = ${num(expo.cdf(d, l))}. The climb equals the shaded area.`,
@@ -1301,7 +1292,7 @@ So X ~ Exp(λ).</div>
           const capped = h !== H_STEPS[state.hIdx] ? ` The chosen h = ${H_STEPS[state.hIdx]} makes λh ≥ 1. So the page uses h = ${h}.` : '';
           return {
             r: [`h = ${h} · p = λh = ${num(p)} · slot count K ~ Geometric(${num(p)}) · wait = Kh`,
-              `P(wait > ${fmtP(x)}) = (1 − p)^⌊x/h⌋ = ${num(1 - p)}^${Math.floor(x / h + 1e-9)} = <strong>${num(S)}</strong> · e^(−λx) = <strong>${num(E)}</strong>`,
+              `P(wait > ${fmtP(x)}) = ${num(1 - p)}^${Math.floor(x / h + 1e-9)} = <strong>${num(S)}</strong> · e^(−λx) = <strong>${num(E)}</strong>`,
               `gap = ${num(E - S)} · mean wait h/p = 1/λ = ${num(1 / l)} at every h`],
             cap: `<strong>Constant risk, one slot at a time.</strong> Each slot of width ${h} holds the event with chance ${num(p)}.
               So each orange step is ${num(1 - p)} times the step before. Drag h down. The steps shrink and the staircase melts into λe^(−λx).${capped}`,
@@ -1316,7 +1307,7 @@ So X ~ Exp(λ).</div>
           const capped = W.kind === 'unif' && W.s < state.s ? ` No wait lasts beyond ${num(W.w)}. So the page uses s = ${num(W.s)}.` : '';
           return {
             r: [`${W.name} · mean wait ${num(W.mean)} · already waited s = ${fmtP(W.s)}`,
-              `P(X > s + x | X > s) = <strong>${num(ratio)}</strong> · P(X > x) = <strong>${num(S)}</strong> · ${eq ? 'equal: no memory' : 'not equal: this wait remembers'}`,
+              `P(X > s + x | X > s) = <strong>${num(ratio)}</strong> ${eq ? '=' : '≠'} P(X > x) = <strong>${num(S)}</strong>`,
               `Mean wait still to come: ${num(resMean)}. At the start it was ${num(W.mean)}.`],
             cap: W.kind === 'exp'
               ? `<strong>The wait forgets.</strong> Use the step buttons. The cut tail has area P(X > s) = ${num(W.surv(W.s))}. Rescale it by ${num(1 / W.surv(W.s))}. Then shift it left by s. It lands on the original curve.`
@@ -1330,7 +1321,7 @@ So X ~ Exp(λ).</div>
             : 'Press "Sample ×1000" to play 1000 timelines.';
           return {
             r: [`rate λ = ${fmtP(l)} per unit time · N_x ~ Poi(λx) = Poi(${num(l * x)})`,
-              `P(first wait > ${fmtP(x)}) = P(N_x = 0) = e^(−λx) = e^(−${num(l * x)}) = <strong>${num(E)}</strong>`, sims],
+              `P(first wait > ${fmtP(x)}) = P(N_x = 0) = e^(−${num(l * x)}) = <strong>${num(E)}</strong>`, sims],
             cap: `<strong>Counts and gaps are two views of one process.</strong> Orange dots are events. The shaded window is [0, x].
               No dot in the window means the first wait is longer than x. Changing λ clears the samples.`,
           };
@@ -1341,8 +1332,8 @@ So X ~ Exp(λ).</div>
           const nm = numMoments((v) => expo.pdf(v, l), 0, 60 / l);
           const numeric = state.integrand === 1 ? nm.mean : nm.e2;
           return {
-            r: [`Exp(${fmtP(l)}) · μ = 1/λ = ${num(1 / l)} · median = ln 2/λ = ${num(m)} · σ = 1/λ = ${num(1 / l)}`,
-              state.integrand === 1 ? `E(X) = ∫ x λe^(−λx) dx = 1/λ = <strong>${num(val)}</strong>` : `E(X²) = ∫ x² λe^(−λx) dx = 2/λ² = <strong>${num(val)}</strong> · σ² = 2/λ² − 1/λ² = <strong>${num(1 / l ** 2)}</strong>`,
+            r: [`Exp(${fmtP(l)}) · μ = ${num(1 / l)} · median = ${num(m)} · σ = ${num(1 / l)}`,
+              state.integrand === 1 ? `E(X) = ∫ x λe^(−λx) dx = 1/λ = <strong>${num(val)}</strong>` : `E(X²) = 2/λ² = <strong>${num(val)}</strong> · σ² = 2/λ² − 1/λ² = <strong>${num(1 / l ** 2)}</strong>`,
               `Simpson on [0, ${num(60 / l)}] gives ${num(numeric)} ${ok(same(numeric, val), 'same as by parts')}`],
             cap: `<strong>The tail drags the mean.</strong> Half of the area lies left of the median ${num(m)}. The mean ${num(1 / l)} sits further right.
               The lower curve weights each x by its size. Its area is ${state.integrand === 1 ? 'the mean' : 'E(X²)'}.`,
@@ -1351,21 +1342,21 @@ So X ~ Exp(λ).</div>
       }
     }
     const LEGENDS = {
-      uniform: [['left', 'pdf and cdf of U(a, b)'], ['sigma', 'U(0, 1) for comparison, and μ ± σ'], ['mean', 'μ'], ['query', 'the query point y']],
-      map: [['left', 'densities of X and Y'], ['right', 'sampled points and their images'], ['query', 'the query point']],
-      exp: [['left', 'pdf and cdf of Exp(λ)'], ['mean', 'μ = 1/λ'], ['sigma', 'μ ± σ']],
-      slots: [['left', 'Exp(λ), the limit'], ['right', 'the Geometric staircase with slot width h'], ['query', 'the query time x']],
-      memory: [['left', 'the original wait'], ['right', 'the wait ahead after s'], ['query', 's and x']],
-      poisson: [['left', 'Exp(λ) theory'], ['right', 'simulated events, gaps and first waits'], ['query', 'the query time x']],
-      moments: [['left', 'pdf of Exp(λ)'], ['right', 'the integrand for the moment'], ['mean', 'μ'], ['sigma', 'μ ± σ'], ['query', 'median']],
+      uniform: [['left', 'U(a, b)'], ['mean', 'μ'], ['query', 'y']],
+      map: [['left', 'densities of X and Y'], ['right', 'sampled points'], ['query', 'query point']],
+      exp: [['left', 'Exp(λ)'], ['mean', 'μ = 1/λ']],
+      slots: [['left', 'Exp(λ)'], ['right', 'Geometric staircase'], ['query', 'x']],
+      memory: [['left', 'original wait'], ['right', 'wait ahead after s'], ['query', 's and x']],
+      poisson: [['left', 'Exp(λ)'], ['right', 'simulation'], ['query', 'x']],
+      moments: [['left', 'pdf'], ['right', 'integrand'], ['mean', 'μ'], ['sigma', 'μ ± σ'], ['query', 'median']],
     };
 
     function update() {
       const { r, cap } = readouts();
-      $('receipt').innerHTML = `<div>${r[0]}</div><div class="big">${r[1]}</div><div>${r[2]}</div>`;
+      $('receipt').innerHTML = `<div>${r[0]}</div><div class="big">${r[1]}</div>`;
       $('caption').innerHTML = cap;
-      $('legend').innerHTML = LEGENDS[state.view].map(([s, t]) => `<span class="legend"><span class="swatch ${s}"></span>${t}</span>`).join('')
-        + ' Hover the charts for exact numbers.';
+      $('extra').innerHTML = r[2];
+      $('legend').innerHTML = LEGENDS[state.view].map(([s, t]) => `<span class="legend"><span class="swatch ${s}"></span>${t}</span>`).join('');
       renderArithmetic();
       dirty = true;
     }
