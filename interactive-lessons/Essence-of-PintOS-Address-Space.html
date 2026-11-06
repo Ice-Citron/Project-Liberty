@@ -1,0 +1,389 @@
+<title>Essence of the PintOS Address Space</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: stage (two-column virtual/physical map) left, Explore/Code/Takeaways panel right; stacks on phones. */
+  :root {
+    color-scheme: dark;
+    --bg: #07111f;
+    --bg-2: #0a1627;
+    --ink: #ebf2ff;
+    --muted: #8aa1c0;
+    --line: rgba(132, 160, 202, 0.24);
+    --user: #86d4ff;
+    --kern: #f0a35c;
+    --frame: #a0e7a0;
+    --void: #2a3a52;
+    --danger: #ff8a8a;
+    --panel: rgba(8, 18, 32, 0.92);
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(circle at top, rgba(63, 132, 221, 0.12), transparent 34%),
+                linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-color: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100%;
+  }
+  .app {
+    display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 18px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 16px;
+    max-width: 1400px; margin: 0 auto;
+  }
+  .app > * { min-width: 0; }
+  @media (max-width: 980px) { .app { grid-template-columns: minmax(0, 1fr); } }
+  .eyebrow { color: var(--user); font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+  h1 { margin: 6px 0 0; font-size: clamp(22px, 2.6vw, 34px); line-height: 1.1; text-wrap: balance; }
+  .lead { margin: 8px 0 12px; max-width: 46rem; color: var(--muted); font-size: 14px; line-height: 1.55; }
+  .lead strong { color: var(--ink); font-weight: 600; }
+  .map-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: rgba(8, 18, 32, 0.6); }
+  svg { display: block; width: 100%; min-width: 620px; height: auto; }
+  svg text { font-family: var(--mono); }
+  .band { cursor: pointer; transition: opacity .15s; }
+  .band:focus { outline: none; }
+  .band:focus-visible rect { stroke: var(--ink); stroke-width: 2; }
+  .dim .band, .dim .link { opacity: 0.22; }
+  .dim .band.on, .dim .link.on { opacity: 1; }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; color: var(--muted); font-size: 12.5px; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--c); }
+  .receipt {
+    margin-top: 10px; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; color: var(--muted);
+    padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: rgba(8, 18, 32, 0.78);
+    overflow-wrap: anywhere;
+  }
+  .receipt strong { color: var(--ink); }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: grid; gap: 12px; align-content: start; }
+  .tabs { display: flex; gap: 6px; }
+  .tabs button {
+    flex: 1; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: transparent;
+    color: var(--muted); font: 600 13px var(--sans); cursor: pointer;
+  }
+  .tabs button[aria-selected="true"] { color: var(--ink); background: rgba(90, 166, 255, 0.16); border-color: rgba(90, 166, 255, 0.5); }
+  .tabs button:focus-visible, .chip:focus-visible, input:focus-visible { outline: 2px solid var(--user); outline-offset: 2px; }
+  .section { display: grid; gap: 12px; }
+  h2 { margin: 0; font-size: 14px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 13.5px; line-height: 1.55; }
+  .card h3 { margin: 0 0 4px; font-size: 14.5px; }
+  .card code, .tbl code, .lead code { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+  .card p { margin: 4px 0; color: var(--muted); }
+  .card p strong { color: var(--ink); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font: 12px var(--mono); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line);
+    background: transparent; color: var(--ink); cursor: pointer;
+  }
+  .chip.on { border-color: var(--user); background: rgba(134, 212, 255, 0.12); }
+  .row { display: flex; gap: 8px; }
+  input {
+    flex: 1; min-width: 0; font: 14px var(--mono); padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink);
+  }
+  .bits { display: grid; grid-template-columns: 10fr 10fr 12fr; gap: 2px; font: 11.5px var(--mono); text-align: center; }
+  .bits div { padding: 6px 2px; border-radius: 4px; overflow-wrap: anywhere; }
+  .bits .pd { background: rgba(240, 163, 92, 0.18); }
+  .bits .pt { background: rgba(134, 212, 255, 0.16); }
+  .bits .of { background: rgba(160, 231, 160, 0.16); }
+  .verdict { font-weight: 600; }
+  .ok { color: var(--frame); } .bad { color: var(--danger); }
+  details.predict { border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13.5px; line-height: 1.55; }
+  details.predict summary { cursor: pointer; font-weight: 600; }
+  details.predict p { color: var(--muted); margin: 6px 0 0; }
+  .tbl-wrap { overflow-x: auto; }
+  .tbl { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  .tbl th, .tbl td { text-align: left; padding: 6px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .tbl th { color: var(--muted); font-weight: 600; }
+  .tbl td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  pre { margin: 0; font: 12px/1.55 var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; }
+  ol.take { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 13.5px; line-height: 1.55; color: var(--muted); }
+  ol.take strong { color: var(--ink); }
+  @media (prefers-reduced-motion: reduce) { .band { transition: none; } }
+</style>
+
+<div class="app">
+  <main>
+    <div class="eyebrow">PintOS · Task 2 · Memory layout</div>
+    <h1>One process, two maps: where every address lives</h1>
+    <p class="lead">
+      Left: the <strong>virtual</strong> 4 GB that one process sees. Right: the <strong>physical</strong> RAM sticks (example: 4 MB).
+      Every address below <code>PHYS_BASE</code> (0xc0000000) belongs to the user. Every address above it belongs to the kernel.
+      The kernel half is a fixed shift: virtual <code>0xc0000000 + x</code> is physical <code>x</code>.
+      Click a band to see its macro and source line.
+    </p>
+    <div class="map-wrap"><svg id="map" viewBox="0 0 760 640" role="img" aria-label="Virtual to physical memory map"></svg></div>
+    <div class="legend">
+      <span style="--c: var(--user)">User virtual</span>
+      <span style="--c: var(--kern)">Kernel virtual</span>
+      <span style="--c: var(--frame)">Physical frame in use</span>
+      <span style="--c: var(--void)">Unmapped (access → page fault)</span>
+    </div>
+    <div class="receipt" id="receipt"></div>
+  </main>
+
+  <aside class="panel">
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-explore" aria-selected="true" data-tab="explore">Explore</button>
+      <button role="tab" id="tab-code" aria-selected="false" data-tab="code">Code</button>
+      <button role="tab" id="tab-take" aria-selected="false" data-tab="take">Takeaways</button>
+    </div>
+
+    <section class="section" id="explore">
+      <div class="card" id="detail"></div>
+
+      <h2>Translate an address</h2>
+      <div class="row"><input id="va" value="0xbffffffc" spellcheck="false" aria-label="Virtual address in hex"></div>
+      <div class="chips" id="presets"></div>
+      <div class="bits" id="bits"></div>
+      <div class="card" id="xlate"></div>
+
+      <h2>Predict first</h2>
+      <details class="predict"><summary>A user passes 0xc0000000 to write(). Is it caught by is_user_vaddr or by pagedir_get_page?</summary>
+        <p>By <code>is_user_vaddr</code>. It returns <code>vaddr &lt; PHYS_BASE</code> (vaddr.h:59), and 0xc0000000 is not below itself. Note that the address IS mapped: it is physical 0, so a page-table check alone would let it through.</p></details>
+      <details class="predict"><summary>A user passes 0x10000000. It is below PHYS_BASE. Is it safe?</summary>
+        <p>No. It is a user address, but nothing is installed there. <code>pagedir_get_page</code> returns NULL. You need both checks: "is it user?" and "is it mapped?".</p></details>
+      <details class="predict"><summary>The arguments overflow the stack page. What stops them from overwriting the code?</summary>
+        <p>Distance and an empty gap. The code sits near 0x08048000, about 3 GB lower. Below 0xbffff000 nothing is mapped, so a write there page-faults. During argument passing, <code>push</code> also refuses to go below <code>PHYS_BASE - PGSIZE</code> (process.c:297).</p></details>
+      <details class="predict"><summary>The user stack frame sits at physical 0x00300000 (say). Name its two virtual addresses.</summary>
+        <p>User: 0xbffff000 (set by <code>install_page</code>, process.c:733). Kernel: 0xc0300000 = <code>ptov (0x300000)</code>. That second name is <code>kpage</code>, the pointer <code>palloc_get_page</code> returned (process.c:730).</p></details>
+    </section>
+
+    <section class="section" id="code" hidden>
+      <h2>Every address macro</h2>
+      <div class="tbl-wrap"><table class="tbl">
+        <thead><tr><th>Macro / value</th><th>Value</th><th>Where</th></tr></thead>
+        <tbody>
+          <tr><td><code>PHYS_BASE</code></td><td class="num">0xc0000000</td><td>threads/vaddr.h:53</td></tr>
+          <tr><td><code>LOADER_PHYS_BASE</code></td><td class="num">0xc0000000</td><td>threads/loader.h:13</td></tr>
+          <tr><td><code>LOADER_BASE</code> (phys)</td><td class="num">0x00007c00</td><td>threads/loader.h:5</td></tr>
+          <tr><td><code>LOADER_END</code> (phys)</td><td class="num">0x00007e00</td><td>threads/loader.h:6</td></tr>
+          <tr><td><code>LOADER_KERN_BASE</code> (phys)</td><td class="num">0x00020000</td><td>threads/loader.h:9</td></tr>
+          <tr><td>Kernel <code>_start</code> (virt)</td><td class="num">0xc0020000</td><td>threads/kernel.lds.S:9</td></tr>
+          <tr><td>Free RAM start (phys)</td><td class="num">0x00100000</td><td>threads/palloc.c:49</td></tr>
+          <tr><td>User code start (virt)</td><td class="num">0x08048000</td><td>lib/user/user.lds:9</td></tr>
+          <tr><td>User stack page (virt)</td><td class="num">0xbffff000</td><td>userprog/process.c:733</td></tr>
+          <tr><td><code>PGBITS</code> / <code>PGSIZE</code></td><td class="num">12 / 4096</td><td>threads/vaddr.h:19–20</td></tr>
+          <tr><td><code>PTBITS</code></td><td class="num">10</td><td>threads/pte.h:22</td></tr>
+          <tr><td><code>PDBITS</code></td><td class="num">10</td><td>threads/pte.h:28</td></tr>
+        </tbody>
+      </table></div>
+
+      <h2>The two checks you call</h2>
+<pre>/* threads/vaddr.h:57 */
+is_user_vaddr (vaddr)   → vaddr &lt; PHYS_BASE
+
+/* threads/vaddr.h:72, :82 — the fixed shift */
+ptov (paddr)  → paddr + PHYS_BASE
+vtop (vaddr)  → vaddr - PHYS_BASE
+
+/* userprog/pagedir.c — NULL if no page installed */
+pagedir_get_page (pd, uaddr)</pre>
+
+      <h2>How a process gets the kernel half</h2>
+<pre>/* userprog/pagedir.c:18–21 */
+uint32_t *pd = palloc_get_page (0);
+if (pd != NULL)
+  memcpy (pd, init_page_dir, PGSIZE);
+/* Copies entries 768..1023 (0xc0000000 &gt;&gt; 22 = 768).
+   Entries 0..767 (user half) start empty. */</pre>
+
+      <h2>How a user page gets a frame</h2>
+<pre>/* userprog/process.c:730–733 (setup_stack) */
+kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+install_page (((uint8_t *)PHYS_BASE) - PGSIZE, kpage, true);
+/* kpage is the kernel name of the frame (0xc0......).
+   install_page gives it a second, user name. */</pre>
+    </section>
+
+    <section class="section" id="take" hidden>
+      <h2>Takeaways</h2>
+      <ol class="take">
+        <li><strong>0xc0000000 is a virtual address.</strong> It is <code>PHYS_BASE</code>. It maps to physical 0x00000000. The kernel half is always "virtual minus PHYS_BASE".</li>
+        <li><strong>User pages have no fixed offset.</strong> <code>palloc_get_page (PAL_USER)</code> hands out any free frame from the user pool. The page table records which one.</li>
+        <li><strong>Every user frame has two names.</strong> The user name (0x0804…, 0xbfff…) and the kernel name (0xc0…). The kernel can write through either.</li>
+        <li><strong>The stack starts at PHYS_BASE and grows down.</strong> Only one page is mapped (0xbffff000–0xbfffffff). Overflow hits unmapped memory and page-faults.</li>
+        <li><strong>Every process shares the same kernel half.</strong> <code>pagedir_create</code> copies the top directory entries. A syscall needs no CR3 switch, so the kernel can read user memory directly.</li>
+        <li><strong>Safe user pointer = two checks.</strong> Below <code>PHYS_BASE</code>? Then mapped in this process's page directory? B's <code>safemem.c</code> does both.</li>
+      </ol>
+    </section>
+  </aside>
+</div>
+
+<script>
+(() => {
+  const RAM = 0x400000;          // example: 4 MB of physical RAM
+  const PB = 0xc0000000;
+  const svg = document.getElementById('map');
+  const NS = 'http://www.w3.org/2000/svg';
+  const hex = n => '0x' + (n >>> 0).toString(16).padStart(8, '0');
+  const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+  // Bands are drawn top = high address. Heights are not to scale.
+  const VX = 70, PX = 470, W = 220;
+  const vbands = [
+    { id: 'kvoid', y: 20,  h: 40,  kind: 'void', lo: PB + RAM, hi: 0xffffffff, label: 'Kernel: beyond RAM',
+      text: 'Nothing is mapped here. Only as much kernel space exists as there is RAM.', src: 'threads/init.c:180 (loop stops at init_ram_pages)' },
+    { id: 'kup',   y: 60,  h: 150, kind: 'kern', lo: PB + 0x280000, hi: PB + RAM - 1, label: 'Kernel view of user pool',
+      text: 'The kernel\'s own name for every user frame. kpage pointers live here.', src: 'threads/palloc.c:60', to: 'pup' },
+    { id: 'kkp',   y: 210, h: 120, kind: 'kern', lo: PB + 0x100000, hi: PB + 0x27ffff, label: 'Kernel view of kernel pool',
+      text: 'Thread pages, page directories and malloc memory come from here.', src: 'threads/palloc.c:59', to: 'pkp' },
+    { id: 'klow',  y: 330, h: 50,  kind: 'kern', lo: PB, hi: PB + 0xfffff, label: 'Kernel image (low 1 MB)',
+      text: 'The kernel code starts at virtual 0xc0020000 = PHYS_BASE + LOADER_KERN_BASE.', src: 'threads/kernel.lds.S:9', to: 'plow' },
+    { id: 'stack', y: 380, h: 34,  kind: 'user', lo: 0xbffff000, hi: 0xbfffffff, label: 'User stack (1 page)',
+      text: 'esp starts at PHYS_BASE and grows down. Only this one page is installed.', src: 'userprog/process.c:733', to: 'fstack' },
+    { id: 'gap',   y: 414, h: 120, kind: 'void', lo: 0x08050000, hi: 0xbfffefff, label: 'Unmapped gap',
+      text: 'About 3 GB of nothing. A stack overflow or a wild pointer lands here and page-faults.', src: 'pagedir_get_page returns NULL here' },
+    { id: 'ucode', y: 534, h: 46,  kind: 'user', lo: 0x08048000, hi: 0x0804ffff, label: 'User code + data',
+      text: 'The linker script puts every user program at 0x08048000. load() installs these pages.', src: 'lib/user/user.lds:9, process.c:694–701', to: 'fcode' },
+    { id: 'ulow',  y: 580, h: 40,  kind: 'void', lo: 0x00000000, hi: 0x08047fff, label: 'Unmapped (NULL page)',
+      text: 'Address 0 is never mapped. That is why dereferencing NULL page-faults.', src: 'process.c:655 rejects segments below PGSIZE' },
+  ];
+  const pbands = [
+    { id: 'pup',  y: 60,  h: 270, kind: 'phys', lo: 0x280000, hi: RAM - 1, label: 'User pool',
+      text: 'Half of free RAM. palloc_get_page (PAL_USER) hands out frames from here.', src: 'threads/palloc.c:52, :60' },
+    { id: 'pkp',  y: 330, h: 170, kind: 'phys', lo: 0x100000, hi: 0x27ffff, label: 'Kernel pool',
+      text: 'The other half of free RAM. Free RAM starts at 1 MB.', src: 'threads/palloc.c:49, :59' },
+    { id: 'plow', y: 500, h: 120, kind: 'phys', lo: 0x0, hi: 0xfffff, label: 'Low 1 MB: loader + kernel',
+      text: 'Loader at 0x7c00–0x7e00. Kernel image loaded at 0x20000.', src: 'threads/loader.h:5, :6, :9' },
+  ];
+  const frames = [
+    { id: 'fstack', y: 100, h: 18, label: 'stack frame', pa: 0x300000 },
+    { id: 'fcode',  y: 230, h: 18, label: 'code frame',  pa: 0x2a0000 },
+  ];
+
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); (parent || svg).appendChild(e); return e; };
+  const fill = k => ({ user: 'rgba(134,212,255,0.20)', kern: 'rgba(240,163,92,0.20)', void: 'rgba(42,58,82,0.45)', phys: 'rgba(160,231,160,0.07)' }[k]);
+  const stroke = k => ({ user: css('--user'), kern: css('--kern'), void: '#3a4c66', phys: css('--frame') }[k]);
+  const ink = css('--ink'), muted = css('--muted');
+
+  el('text', { x: VX, y: 12, fill: muted, 'font-size': 12 }).textContent = 'VIRTUAL (one process, 4 GB)';
+  el('text', { x: PX, y: 12, fill: muted, 'font-size': 12 }).textContent = 'PHYSICAL RAM (example 4 MB)';
+
+  const links = el('g', {});
+  const all = {};
+  function band(b, x) {
+    const g = el('g', { class: 'band', tabindex: 0, 'data-id': b.id, role: 'button', 'aria-label': b.label });
+    el('rect', { x, y: b.y, width: W, height: b.h, fill: fill(b.kind), stroke: stroke(b.kind), 'stroke-width': 1 }, g);
+    el('text', { x: x + 8, y: b.y + Math.min(b.h / 2 + 4, 20), fill: ink, 'font-size': 12 }, g).textContent = b.label;
+    el('text', { x: x - 6, y: b.y + b.h - 3, fill: muted, 'font-size': 10, 'text-anchor': 'end' }, g).textContent = hex(b.lo);
+    if (x === PX) el('text', { x: x + W + 6, y: b.y + b.h - 3, fill: muted, 'font-size': 10 }, g).textContent = hex(b.lo);
+    g.addEventListener('click', () => select(b.id));
+    g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(b.id); } });
+    all[b.id] = { ...b, g };
+  }
+  vbands.forEach(b => band(b, VX));
+  pbands.forEach(b => band(b, PX));
+  // Physical top label
+  el('text', { x: PX + W + 6, y: 64, fill: muted, 'font-size': 10 }).textContent = hex(RAM) + ' top';
+
+  // PHYS_BASE boundary
+  el('line', { x1: 20, x2: VX + W + 30, y1: 380, y2: 380, stroke: ink, 'stroke-width': 1.5, 'stroke-dasharray': '5 4' });
+  el('text', { x: VX + W + 4, y: 375, fill: ink, 'font-size': 11, 'font-weight': 700 }).textContent = 'PHYS_BASE';
+
+  // Frames inside user pool
+  frames.forEach(f => {
+    const g = el('g', { class: 'band', 'data-id': f.id });
+    el('rect', { x: PX + 30, y: f.y, width: W - 60, height: f.h, fill: 'rgba(160,231,160,0.35)', stroke: css('--frame') }, g);
+    el('text', { x: PX + 38, y: f.y + 13, fill: ink, 'font-size': 11 }, g).textContent = f.label + ' @ ' + hex(f.pa);
+    all[f.id] = { ...f, g, kind: 'frame' };
+  });
+
+  // Links: kernel bands map as a whole (trapezoid). User pages map to one frame (curve).
+  function trap(fromId, toId, color) {
+    const a = all[fromId], b = all[toId];
+    const p = `M${VX + W},${a.y} L${PX},${b.y} L${PX},${b.y + b.h} L${VX + W},${a.y + a.h} Z`;
+    return el('path', { d: p, fill: color, stroke: 'none', class: 'link', 'data-from': fromId, 'data-to': toId }, links);
+  }
+  function curve(fromId, toId, color) {
+    const a = all[fromId], b = all[toId];
+    const y1 = a.y + a.h / 2, y2 = b.y + b.h / 2, x1 = VX + W, x2 = PX + 30;
+    return el('path', { d: `M${x1},${y1} C${x1 + 90},${y1} ${x2 - 90},${y2} ${x2},${y2}`, fill: 'none', stroke: color, 'stroke-width': 2.2, class: 'link', 'data-from': fromId, 'data-to': toId }, links);
+  }
+  trap('kup', 'pup', 'rgba(240,163,92,0.10)');
+  trap('kkp', 'pkp', 'rgba(240,163,92,0.10)');
+  trap('klow', 'plow', 'rgba(240,163,92,0.10)');
+  curve('stack', 'fstack', css('--user'));
+  curve('ucode', 'fcode', css('--user'));
+
+  const related = {
+    kup: ['kup', 'pup', 'fstack', 'fcode'], kkp: ['kkp', 'pkp'], klow: ['klow', 'plow'],
+    stack: ['stack', 'fstack', 'kup'], ucode: ['ucode', 'fcode', 'kup'],
+    pup: ['pup', 'kup', 'fstack', 'fcode', 'stack', 'ucode'], pkp: ['pkp', 'kkp'], plow: ['plow', 'klow'],
+    gap: ['gap'], ulow: ['ulow'], kvoid: ['kvoid'],
+  };
+  const detail = document.getElementById('detail');
+  const receipt = document.getElementById('receipt');
+
+  function select(id) {
+    const on = new Set(related[id] || [id]);
+    svg.classList.add('dim');
+    svg.querySelectorAll('.band').forEach(g => g.classList.toggle('on', on.has(g.dataset.id)));
+    svg.querySelectorAll('.link').forEach(p => p.classList.toggle('on', on.has(p.dataset.from) && on.has(p.dataset.to)));
+    const b = all[id];
+    let extra = '';
+    if (id === 'stack' || id === 'ucode') {
+      const f = all[id === 'stack' ? 'fstack' : 'fcode'];
+      extra = `<p><strong>Two names, one frame:</strong> user ${hex(b.lo)} and kernel ${hex(PB + f.pa)} both reach physical ${hex(f.pa)}.</p>`;
+    }
+    detail.innerHTML = `<h3>${b.label}</h3>
+      <p><code>${hex(b.lo)}</code> – <code>${hex(b.hi)}</code></p>
+      <p>${b.text}</p>${extra}<p><strong>Source:</strong> <code>${b.src}</code></p>`;
+    receipt.innerHTML = vbands.some(v => v.id === id)
+      ? `<strong>${b.label}</strong> · virtual · ${b.kind === 'kern' ? 'kernel: physical = virtual − PHYS_BASE' : b.kind === 'user' ? 'user: physical frame chosen by palloc, recorded by install_page' : 'unmapped: any access page-faults'}`
+      : `<strong>${b.label}</strong> · physical · reachable from the kernel at PHYS_BASE + address`;
+  }
+
+  // Translator
+  const presets = [
+    ['0x00000000', 'NULL'], ['0x08048000', 'code'], ['0x10000000', 'gap'], ['0xbffffffc', 'stack top'],
+    ['0xbfffeffc', 'below stack'], ['0xc0000000', 'PHYS_BASE'], ['0xc0020000', 'kernel _start'], ['0xc0300000', 'user frame, kernel name'],
+  ];
+  const pre = document.getElementById('presets');
+  const input = document.getElementById('va');
+  presets.forEach(([v, n]) => {
+    const b = document.createElement('button'); b.className = 'chip'; b.textContent = n; b.title = v;
+    b.addEventListener('click', () => { input.value = v; translate(); }); pre.appendChild(b);
+  });
+  input.addEventListener('input', translate);
+
+  function regionOf(va) {
+    return vbands.find(b => va >= b.lo && va <= b.hi) || (va >= 0x08048000 && va < 0xbffff000 ? all.gap : null);
+  }
+  function translate() {
+    const s = input.value.trim().toLowerCase();
+    const bitsEl = document.getElementById('bits'), out = document.getElementById('xlate');
+    if (!/^(0x)?[0-9a-f]{1,8}$/.test(s)) { bitsEl.innerHTML = ''; out.innerHTML = '<p class="bad">Type a 32-bit hex address, for example 0xbffffffc.</p>'; return; }
+    const va = parseInt(s.replace(/^0x/, ''), 16) >>> 0;
+    const pd = va >>> 22, pt = (va >>> 12) & 0x3ff, off = va & 0xfff;
+    bitsEl.innerHTML = `<div class="pd">dir [31:22]<br>${pd}</div><div class="pt">table [21:12]<br>${pt}</div><div class="of">offset [11:0]<br>0x${off.toString(16)}</div>`;
+    pre.querySelectorAll('.chip').forEach(c => c.classList.toggle('on', c.title === hex(va)));
+    const user = va < PB;
+    const r = regionOf(va);
+    let lines = `<p><code>is_user_vaddr</code> → <strong>${user}</strong> (${hex(va)} ${user ? '&lt;' : '≥'} PHYS_BASE). Directory entry ${pd} is in the ${pd < 768 ? 'user half (0–767)' : 'kernel half (768–1023)'}.</p>`;
+    if (!user) {
+      const pa = va - PB;
+      lines += pa < RAM
+        ? `<p class="verdict ok">Mapped. Physical = ${hex(va)} − PHYS_BASE = ${hex(pa)}.</p><p>A syscall must still reject it: it is kernel memory.</p>`
+        : `<p class="verdict bad">Not mapped. ${hex(pa)} is past the end of RAM.</p>`;
+    } else if (r && r.kind === 'user') {
+      const f = all[r.to];
+      lines += `<p class="verdict ok">Mapped (in ${r.label.toLowerCase()}).</p><p>This example's frame is physical ${hex(f.pa + off)}. Its kernel name is ${hex(PB + f.pa + off)}.</p>`;
+    } else {
+      lines += `<p class="verdict bad">Not mapped. <code>pagedir_get_page</code> returns NULL. Touching it page-faults.</p>`;
+    }
+    out.innerHTML = lines;
+    if (r) select(r.id);
+  }
+
+  // Tabs
+  document.querySelectorAll('.tabs button').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
+    ['explore', 'code', 'take'].forEach(id => { document.getElementById(id).hidden = id !== btn.dataset.tab; });
+  }));
+
+  translate();
+})();
+</script>
