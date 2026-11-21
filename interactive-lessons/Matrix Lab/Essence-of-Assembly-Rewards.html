@@ -1,0 +1,670 @@
+<title>Essence of Assembly Rewards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=STIX+Two+Text:ital@0;1&display=swap">
+<style>
+  /* Layout: full-height 3D stage on the left, one narrow control panel on the right. Dark single look. */
+  :root {
+    color-scheme: dark;
+    --bg: #07111f; --bg-2: #0a1627; --ink: #ebf2ff; --muted: #8aa1c0;
+    --line: rgba(132, 160, 202, 0.24); --panel: rgba(8, 18, 32, 0.92);
+    --goal: #86d4ff; --cur: #f08f3c; --worst: #ff6b6b; --ok: #a0e7a0;
+    --c-col: #c792ea; --c-6d: #ffd166; --c-mssd: #ff8a8a; --c-sdf: #a0e7a0;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --math: "STIX Two Text", "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(circle at 30% 0%, rgba(63, 132, 221, 0.12), transparent 40%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-color: var(--bg);
+    color: var(--ink); font-family: var(--sans); font-size: 14px;
+  }
+  .app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 360px; }
+  .stage { display: grid; grid-template-rows: minmax(0, 1fr) 190px; min-height: 0; min-width: 0; }
+  .stage canvas { display: block; width: 100%; height: 100%; }
+  #scene { cursor: grab; touch-action: none; }
+  #scene.dragging { cursor: grabbing; }
+  #plot { border-top: 1px solid var(--line); }
+  .panel {
+    border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto;
+    padding-block: 20px 28px; padding-left: max(18px, env(safe-area-inset-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 16px; min-width: 0;
+  }
+  @media (max-width: 900px) {
+    .app { display: block; height: auto; }
+    .stage { height: 78vh; min-height: 460px; grid-template-rows: minmax(0, 1fr) 170px; }
+    .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  }
+  .eyebrow { color: var(--goal); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  h1 { margin: 6px 0 0; font-size: 26px; line-height: 1.05; text-wrap: balance; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+  .tabs button, .seg button, .btns button {
+    font: inherit; color: var(--muted); background: transparent; border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 4px; cursor: pointer; font-size: 12px;
+  }
+  .tabs button .n { display: block; font-family: var(--mono); font-size: 10px; color: var(--cur); }
+  .tabs button[aria-pressed="true"], .seg button[aria-pressed="true"] {
+    color: var(--ink); border-color: var(--goal); background: rgba(134, 212, 255, 0.1);
+  }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--goal); outline-offset: 2px; }
+  .btns button:hover, .tabs button:hover, .seg button:hover { color: var(--ink); }
+  h2 { margin: 0; font-size: 19px; }
+  .cap { margin: 6px 0 0; color: var(--muted); line-height: 1.5; }
+  .cap b { color: var(--ink); font-weight: 600; }
+  .formula {
+    font-family: var(--math); font-size: 19px; color: var(--ink); padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 10px; overflow-x: auto; white-space: nowrap;
+  }
+  .formula .k { color: var(--muted); font-family: var(--sans); font-size: 11px; display: block; margin-bottom: 2px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .seg { display: inline-flex; gap: 4px; }
+  .seg button { padding: 6px 10px; }
+  .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; width: 100%; }
+  .sliders { display: grid; gap: 6px; }
+  .sl { display: grid; grid-template-columns: 34px minmax(0, 1fr) 62px; gap: 8px; align-items: center; }
+  .sl span:first-child { font-family: var(--math); font-style: italic; font-size: 15px; }
+  .sl output { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--cur); }
+  .btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .btns button { padding: 6px 10px; }
+  .reads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .read { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 2px; }
+  .read .k { font-size: 11px; color: var(--muted); }
+  .read .v { font-family: var(--mono); font-size: 20px; font-variant-numeric: tabular-nums; }
+  .fit { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .pill { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 99px; border: 1px solid; }
+  .pill.yes { color: var(--ok); border-color: var(--ok); }
+  .pill.no { color: var(--worst); border-color: var(--worst); }
+  .paper { display: grid; gap: 5px; }
+  .bar { display: grid; grid-template-columns: 92px minmax(0, 1fr) 42px; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .bar .t { height: 8px; border-radius: 4px; background: rgba(132, 160, 202, 0.15); overflow: hidden; }
+  .bar .t i { display: block; height: 100%; border-radius: 4px; }
+  .bar b { font-family: var(--mono); font-weight: 400; color: var(--ink); text-align: right; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 12px; }
+  [hidden] { display: none !important; }
+</style>
+
+<div class="app">
+  <div class="stage">
+    <canvas id="scene" aria-label="3D view of the part and its goal pose"></canvas>
+    <canvas id="plot" aria-label="Error as the part spins"></canvas>
+  </div>
+
+  <aside class="panel">
+    <div>
+      <div class="eyebrow">IndustReal · Sec. IV-F</div>
+      <h1>Essence of Assembly Rewards</h1>
+    </div>
+
+    <div class="tabs" role="group" aria-label="Scenes">
+      <button id="tab1" data-scene="1" aria-pressed="true"><span class="n">1</span>Keypoints</button>
+      <button id="tab2" data-scene="2" aria-pressed="false"><span class="n">2</span>MSSD</button>
+      <button id="tab3" data-scene="3" aria-pressed="false"><span class="n">3</span>SDF</button>
+      <button id="tab4" data-scene="4" aria-pressed="false"><span class="n">4</span>Max vs RMS</button>
+    </div>
+
+    <div>
+      <h2 id="sTitle"></h2>
+      <p class="cap" id="sCap"></p>
+    </div>
+    <div class="formula" id="sFormula"></div>
+
+    <div class="row">
+      <span class="lbl">Part</span>
+      <div class="seg" role="group" aria-label="Part">
+        <button id="shapeMug" data-shape="mug" aria-pressed="true">Mug</button>
+        <button id="shapeCan" data-shape="can" aria-pressed="false">Can</button>
+      </div>
+    </div>
+
+    <div class="row" id="kpRow">
+      <span class="lbl">Keypoints</span>
+      <div class="seg" role="group" aria-label="Keypoint set">
+        <button id="kpCol" data-kp="col" aria-pressed="true">Collinear · 4</button>
+        <button id="kp6d" data-kp="6d" aria-pressed="false">6-DOF · 13</button>
+      </div>
+    </div>
+
+    <div class="row" id="symRow" hidden>
+      <span class="lbl">Symmetry list</span>
+      <div class="seg" role="group" aria-label="Symmetry list">
+        <button id="symOn" data-sym="on" aria-pressed="true">On</button>
+        <button id="symOff" data-sym="off" aria-pressed="false">Off</button>
+      </div>
+    </div>
+
+    <div class="sliders">
+      <span class="lbl">Pose of the part</span>
+      <label class="sl"><span>spin</span><input id="sSpin" type="range" min="-180" max="180" step="1" value="0"><output id="oSpin"></output></label>
+      <label class="sl"><span>tilt</span><input id="sTilt" type="range" min="-30" max="30" step="0.5" value="0"><output id="oTilt"></output></label>
+      <label class="sl"><span>x</span><input id="sX" type="range" min="-20" max="20" step="0.5" value="0"><output id="oX"></output></label>
+      <label class="sl"><span>y</span><input id="sY" type="range" min="-20" max="20" step="0.5" value="0"><output id="oY"></output></label>
+      <label class="sl"><span>z</span><input id="sZ" type="range" min="-20" max="20" step="0.5" value="0"><output id="oZ"></output></label>
+    </div>
+
+    <div class="btns" id="presets"></div>
+
+    <div class="fit">Fits the goal <span class="pill" id="fitPill"></span></div>
+    <div class="reads" id="reads"></div>
+
+    <div class="paper" id="paperBox" hidden>
+      <span class="lbl">Insert success in the paper · Table I</span>
+      <div class="bar"><span>Collinear kp</span><span class="t"><i style="width:15.4%;background:var(--c-col)"></i></span><b>15.4%</b></div>
+      <div class="bar"><span>6-DOF kp</span><span class="t"><i style="width:54.2%;background:var(--c-6d)"></i></span><b>54.2%</b></div>
+      <div class="bar"><span>Chamfer</span><span class="t"><i style="width:1.8%;background:var(--muted)"></i></span><b>1.8%</b></div>
+      <div class="bar"><span>SDF query</span><span class="t"><i style="width:88.6%;background:var(--c-sdf)"></i></span><b>88.6%</b></div>
+    </div>
+
+    <p class="note" id="sNote"></p>
+  </aside>
+</div>
+
+<script>
+// MATH-START  (millimetres; model axis is y; the handle points along +x)
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+const R_CYL = 40, H_CYL = 45;
+const HANDLE = { c: [50, 0, 0], half: [10, 20, 6] };
+const SPIN_STEP = 2 * DEG;
+
+function cylSdf(p) {
+  const dx = Math.hypot(p[0], p[2]) - R_CYL, dy = Math.abs(p[1]) - H_CYL;
+  return Math.min(Math.max(dx, dy), 0) + Math.hypot(Math.max(dx, 0), Math.max(dy, 0));
+}
+
+function boxSdf(p, b) {
+  const q = [0, 1, 2].map((i) => Math.abs(p[i] - b.c[i]) - b.half[i]);
+  return Math.hypot(...q.map((v) => Math.max(v, 0))) + Math.min(Math.max(...q), 0);
+}
+
+function cylinderPoints() {
+  const out = [];
+  for (let i = 0; i < 48; i++) {
+    const a = i * TAU / 48;
+    for (let l = -4; l <= 4; l++) out.push([R_CYL * Math.cos(a), H_CYL * l / 4, R_CYL * Math.sin(a)]);
+  }
+  for (const y of [-H_CYL, H_CYL]) {
+    out.push([0, y, 0]);
+    for (const k of [0.25, 0.5, 0.75]) {
+      for (let i = 0; i < 24; i++) out.push([k * R_CYL * Math.cos(i * TAU / 24), y, k * R_CYL * Math.sin(i * TAU / 24)]);
+    }
+  }
+  return out;
+}
+
+function boxPoints(b, n = 4) {
+  const out = [];
+  for (let axis = 0; axis < 3; axis++) {
+    for (const sign of [-1, 1]) {
+      const [u, v] = [0, 1, 2].filter((i) => i !== axis);
+      for (let i = 0; i <= n; i++) {
+        for (let j = 0; j <= n; j++) {
+          const p = [...b.c];
+          p[axis] += sign * b.half[axis];
+          p[u] += b.half[u] * (2 * i / n - 1);
+          p[v] += b.half[v] * (2 * j / n - 1);
+          out.push(p);
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function axisKeypoints(s) {
+  const k = [[0, 0, 0]];
+  for (const v of [-s, -s / 2, s / 2, s]) k.push([v, 0, 0], [0, v, 0], [0, 0, v]);
+  return k;
+}
+
+const SHAPES = {
+  mug: {
+    points: cylinderPoints().concat(boxPoints(HANDLE)),
+    sdf: (p) => Math.min(cylSdf(p), boxSdf(p, HANDLE)),
+    spins: [0],
+  },
+  can: {
+    points: cylinderPoints(),
+    sdf: cylSdf,
+    spins: Array.from({ length: Math.round(TAU / SPIN_STEP) }, (_, k) => k * SPIN_STEP),
+  },
+};
+const KP_COL = [-45, -15, 15, 45].map((y) => [0, y, 0]);
+const KP_6D = axisKeypoints(40);
+const GOAL = { x: 0, y: 0, z: 0, spin: 0, tilt: 0 };
+
+// Pose: spin about the model axis, then tilt about x, then translate.
+function place(p, pose) {
+  const cs = Math.cos(pose.spin), ss = Math.sin(pose.spin);
+  const x1 = cs * p[0] + ss * p[2], z1 = -ss * p[0] + cs * p[2];
+  const ct = Math.cos(pose.tilt), st = Math.sin(pose.tilt);
+  return [x1 + pose.x, ct * p[1] - st * z1 + pose.y, st * p[1] + ct * z1 + pose.z];
+}
+
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+function keypointError(pose, mode) {
+  const k = mode === "col" ? KP_COL : KP_6D;
+  return k.reduce((s, p) => s + dist(place(p, pose), p), 0) / k.length;
+}
+
+function mssd(shapeKey, pose, useList) {
+  const shape = SHAPES[shapeKey];
+  const gap = (s) => Math.abs(Math.atan2(Math.sin(s - pose.spin), Math.cos(s - pose.spin)));
+  const spins = useList ? [...shape.spins].sort((a, b) => gap(a) - gap(b)) : [0];  // likely winner first
+  const now = shape.points.map((p) => place(p, pose));
+  let best = null;
+  for (const spin of spins) {
+    const g = { ...GOAL, spin };
+    let worst = 0, worstVal = -1;
+    for (let i = 0; i < now.length; i++) {
+      const d = dist(now[i], place(shape.points[i], g));
+      if (d > worstVal) { worstVal = d; worst = i; }
+      if (best && worstVal >= best.value) break;  // this partner already loses
+    }
+    if (!best || worstVal < best.value) best = { value: worstVal, spin, worst };
+  }
+  const g = { ...GOAL, spin: best.spin };
+  best.bands = now.map((q, i) => dist(q, place(shape.points[i], g)));
+  return best;
+}
+
+function sdfRms(shapeKey, pose) {
+  const shape = SHAPES[shapeKey];
+  const phis = shape.points.map((p) => shape.sdf(place(p, pose)));
+  return { phis, rms: Math.sqrt(phis.reduce((s, v) => s + v * v, 0) / phis.length) };
+}
+
+function fits(shapeKey, pose) {
+  if (Math.hypot(pose.x, pose.y, pose.z) > 0.5 || Math.abs(pose.tilt) > 1 * DEG) return false;
+  return shapeKey === "can" || Math.abs(pose.spin) < 1 * DEG;
+}
+
+function tiePresets(shapeKey) {
+  const spun = { ...GOAL, spin: 12 * DEG };
+  const m = mssd("mug", spun, true).value;
+  return { spun, shift: { ...GOAL, x: m / Math.SQRT2, z: m / Math.SQRT2 } };
+}
+// MATH-END
+
+const state = { scene: 1, shape: "mug", kp: "col", useList: true, pose: { ...GOAL } };
+const $ = (id) => document.getElementById(id);
+const COL = {};
+["--ink", "--muted", "--line", "--goal", "--cur", "--worst", "--ok", "--c-col", "--c-6d", "--c-mssd", "--c-sdf"]
+  .forEach((k) => { COL[k.slice(2)] = getComputedStyle(document.documentElement).getPropertyValue(k).trim(); });
+
+const SCENES = {
+  1: {
+    title: "Keypoints miss some fits",
+    cap: () => state.kp === "col"
+      ? "Four dots sit on the mug's axis. <b>Spin the mug 90°.</b> The handle swings away, but the dots never move."
+      : "Thirteen dots spread over three axes. <b>Pick the can and spin it 90°.</b> It still fits, but the dots read a large error.",
+    formula: '<span class="k">reward</span>−<i>mean</i><sub>k</sub> ‖ <i>k</i><sub>now</sub> − <i>k</i><sub>goal</sub> ‖',
+    note: "The paper saw these two failures with a rectangular peg and a gear. The mug and the can show the same pair.",
+  },
+  2: {
+    title: "MSSD keeps the longest band",
+    cap: () => "Each surface point gets a band to its goal partner. <b>MSSD is the longest band.</b> The list lets it try every equal-looking partner first.",
+    formula: '<span class="k">error</span><i>min</i><sub>S ∈ list</sub> <i>max</i><sub>i</sub> ‖ <i>T</i><sub>now</sub><i>x</i><sub>i</sub> − <i>T</i><sub>goal</sub><i>S x</i><sub>i</sub> ‖',
+    note: "Cost: someone must write the list for every part. The can's list here holds one spin every 2°.",
+  },
+  3: {
+    title: "SDF reads the space itself",
+    cap: () => "The slice shows the goal's signed distance field. <b>Each point reads the value where it sits.</b> A spun can keeps every point on the zero surface with no list.",
+    formula: '<span class="k">reward</span>−<i>log</i> √( <sup>1</sup>⁄<sub><i>N</i></sub> Σ<sub>i</sub> <i>φ</i>(<i>T</i><sub>now</sub><i>x</i><sub>i</sub>)² )',
+    note: "The paper samples 1000 points and stores φ on a voxel grid. This page uses 578 to 728 points and an exact formula.",
+  },
+  4: {
+    title: "One band versus every point",
+    cap: () => "<b>Shift</b> and <b>Spin</b> share one MSSD value. MSSD reads only the tallest bar, so it scores a tie. The RMS reads every bar.",
+    formula: '<span class="k">same bars · two summaries</span><i>max</i><sub>i</sub> <i>d</i><sub>i</sub> &nbsp;vs&nbsp; √( <i>mean</i><sub>i</sub> <i>d</i><sub>i</sub>² )',
+    note: "The paper did not test MSSD as a reward. This scene shows the reasoning only. It is not a result.",
+  },
+};
+
+function presetList() {
+  if (state.scene === 4) {
+    const t = tiePresets();
+    return [["Shift", t.shift], ["Spin", t.spun], ["Goal", GOAL]];
+  }
+  return [["Goal", GOAL], ["Spin 90°", { ...GOAL, spin: 90 * DEG }],
+    ["Tilt 15°", { ...GOAL, tilt: 15 * DEG }], ["Shift 10 mm", { ...GOAL, x: 10 }]];
+}
+
+function buildPresets() {
+  const box = $("presets");
+  box.replaceChildren();
+  presetList().forEach(([label, pose], i) => {
+    const b = document.createElement("button");
+    b.id = `preset${i}`;
+    b.textContent = label;
+    b.addEventListener("click", () => { state.pose = { ...pose }; syncSliders(); draw(); });
+    box.appendChild(b);
+  });
+}
+
+const SLIDERS = [["sSpin", "oSpin", "spin", DEG, "°"], ["sTilt", "oTilt", "tilt", DEG, "°"],
+  ["sX", "oX", "x", 1, " mm"], ["sY", "oY", "y", 1, " mm"], ["sZ", "oZ", "z", 1, " mm"]];
+
+function syncSliders() {
+  SLIDERS.forEach(([id, , key, f]) => { $(id).value = (state.pose[key] / f).toFixed(1); });
+}
+
+function setPressed(attr, value) {
+  document.querySelectorAll(`[data-${attr}]`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+}
+
+function updatePanel() {
+  const sc = SCENES[state.scene];
+  $("sTitle").textContent = sc.title;
+  $("sCap").innerHTML = sc.cap();
+  $("sFormula").innerHTML = sc.formula;
+  $("sNote").textContent = sc.note;
+  $("kpRow").hidden = state.scene !== 1;
+  $("symRow").hidden = state.scene !== 2;
+  $("paperBox").hidden = state.scene !== 3;
+}
+
+function readout(k, v, color) {
+  return `<div class="read"><span class="k">${k}</span><span class="v" style="color:${color}">${v}</span></div>`;
+}
+
+// ---------- 3D view (same orbit camera as the BOP lessons) ----------
+const scene = $("scene"), plot = $("plot");
+const sctx = scene.getContext("2d"), pctx = plot.getContext("2d");
+const view = { yaw: -0.6, pitch: 0.35, zoom: 1 };
+const CAM_DIST = 10, UNIT = 25;  // 25 mm per view unit
+let vp = { cx: 0, cy: 0, px: 1 };
+
+function project(p) {
+  const x = p[0] / UNIT, y = p[1] / UNIT, z = -p[2] / UNIT;
+  const cy = Math.cos(view.yaw), sy = Math.sin(view.yaw), cp = Math.cos(view.pitch), sp = Math.sin(view.pitch);
+  const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+  const y2 = cp * y + sp * z1, z2 = -sp * y + cp * z1;
+  const f = vp.px * view.zoom * CAM_DIST / (CAM_DIST + z2);
+  return [vp.cx + x1 * f, vp.cy - y2 * f];
+}
+
+function fitCanvas(c, ctx) {
+  const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return [r.width, r.height];
+}
+
+function line(ctx, a, b, color, width = 1, dash = null) {
+  const p = project(a), q = project(b);
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+  ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function poly(ctx, pts, color, width = 1, dash = null, close = true) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+  ctx.beginPath();
+  pts.forEach((p, i) => { const s = project(p); i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]); });
+  if (close) ctx.closePath();
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function dot(ctx, p, r, color) {
+  const s = project(p);
+  ctx.beginPath(); ctx.arc(s[0], s[1], r, 0, TAU); ctx.fillStyle = color; ctx.fill();
+}
+
+function text(ctx, str, s, color, align = "left") {
+  ctx.font = "12px Inter, sans-serif"; ctx.fillStyle = color; ctx.textAlign = align;
+  ctx.fillText(str, s[0], s[1]);
+}
+
+function wire(ctx, shapeKey, pose, color, width, dash) {
+  const P = (p) => place(p, pose);
+  for (const y of [-H_CYL, 0, H_CYL]) {
+    const ring = Array.from({ length: 49 }, (_, i) => P([R_CYL * Math.cos(i * TAU / 48), y, R_CYL * Math.sin(i * TAU / 48)]));
+    poly(ctx, ring, color, y === 0 ? width * 0.5 : width, dash, false);
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = i * TAU / 12, c = [R_CYL * Math.cos(a), 0, R_CYL * Math.sin(a)];
+    line(ctx, P([c[0], -H_CYL, c[2]]), P([c[0], H_CYL, c[2]]), color, width * 0.6, dash);
+  }
+  if (shapeKey !== "mug") return;
+  const { c, half } = HANDLE;
+  const corner = (sx, sy, sz) => P([c[0] + sx * half[0], c[1] + sy * half[1], c[2] + sz * half[2]]);
+  const s = [-1, 1];
+  for (const a of s) for (const b of s) {
+    line(ctx, corner(-1, a, b), corner(1, a, b), color, width, dash);
+    line(ctx, corner(a, -1, b), corner(a, 1, b), color, width, dash);
+    line(ctx, corner(a, b, -1), corner(a, b, 1), color, width, dash);
+  }
+}
+
+function floor(ctx) {
+  for (let v = -100; v <= 100; v += 20) {
+    line(ctx, [v, -H_CYL - 20, -100], [v, -H_CYL - 20, 100], "rgba(132,160,202,0.08)");
+    line(ctx, [-100, -H_CYL - 20, v], [100, -H_CYL - 20, v], "rgba(132,160,202,0.08)");
+  }
+}
+
+function sdfColor(d) {
+  const a = Math.min(1, Math.abs(d) / 30), band = Math.abs(d) % 5;
+  const edge = band < 0.5 || band > 4.5 ? 1.35 : 1;
+  if (d < 0) return `rgba(${(50 + 50 * a) * edge | 0},${(100 + 80 * a) * edge | 0},${(170 + 60 * a) * edge | 0},0.55)`;
+  return `rgba(${(120 + 110 * (1 - a)) * edge | 0},${(60 + 50 * (1 - a)) * edge | 0},40,${0.45 * (1 - a) + 0.08})`;
+}
+
+function sdfSlice(ctx) {
+  const sdf = SHAPES[state.shape].sdf, step = 4;
+  for (let x = -76; x < 84; x += step) {
+    for (let y = -72; y < 72; y += step) {
+      const d = sdf([x + step / 2, y + step / 2, 0]);
+      const q = [[x, y, 0], [x + step, y, 0], [x + step, y + step, 0], [x, y + step, 0]].map(project);
+      ctx.fillStyle = sdfColor(d);
+      ctx.beginPath(); q.forEach((s, i) => (i ? ctx.lineTo(s[0], s[1]) : ctx.moveTo(s[0], s[1]))); ctx.closePath(); ctx.fill();
+    }
+  }
+  text(ctx, "φ slice through the goal", project([-76, 76, 0]), COL.muted);
+}
+
+function bandColor(t) {
+  const a = Math.min(1, t);
+  return `rgba(${134 + 121 * a | 0},${212 - 105 * a | 0},${255 - 148 * a | 0},${0.2 + 0.5 * a})`;
+}
+
+function drawScene() {
+  const [w, h] = fitCanvas(scene, sctx);
+  vp = { cx: w / 2, cy: h / 2 + 10, px: Math.min(w, h) / 9 };
+  sctx.clearRect(0, 0, w, h);
+  const shapeKey = state.shape, pose = state.pose;
+
+  floor(sctx);
+  if (state.scene === 3) sdfSlice(sctx);
+  wire(sctx, shapeKey, GOAL, COL.goal, 1.3, [5, 4]);
+
+  if (state.scene === 1) {
+    const ks = state.kp === "col" ? KP_COL : KP_6D, color = state.kp === "col" ? COL["c-col"] : COL["c-6d"];
+    ks.forEach((k) => { line(sctx, k, place(k, pose), color, 1.5); dot(sctx, k, 3.5, COL.goal); dot(sctx, place(k, pose), 4.5, color); });
+  }
+  if (state.scene === 2 || state.scene === 4) {
+    const m = mssd(shapeKey, pose, state.scene === 2 ? state.useList : true), g = { ...GOAL, spin: m.spin };
+    const pts = SHAPES[shapeKey].points, top = Math.max(m.value, 1e-6);
+    pts.forEach((p, i) => { if (i % 2 === 0 && i !== m.worst) line(sctx, place(p, pose), place(p, g), bandColor(m.bands[i] / top)); });
+    if (m.value > 0.3) {
+      const a = place(pts[m.worst], pose), b = place(pts[m.worst], g);
+      line(sctx, a, b, COL.worst, 3.5); dot(sctx, a, 5, COL.worst); dot(sctx, b, 4, COL.goal);
+      const s = project(a);
+      text(sctx, `max ${m.value.toFixed(1)} mm`, [s[0] + 10, s[1] - 10], COL.worst);
+    }
+  }
+
+  wire(sctx, shapeKey, pose, COL.cur, 2);
+
+  if (state.scene === 3) {
+    const { phis } = sdfRms(shapeKey, pose);
+    SHAPES[shapeKey].points.forEach((p, i) => {
+      const t = Math.min(1, Math.abs(phis[i]) / 8);
+      dot(sctx, place(p, pose), 2.6, t < 0.03 ? COL.ok : `rgb(255,${240 - 150 * t | 0},${200 - 160 * t | 0})`);
+    });
+  }
+
+  text(sctx, "- - goal", [18, 24], COL.goal);
+  text(sctx, "—— now", [18, 42], COL.cur);
+  text(sctx, "drag to orbit · scroll to zoom", [18, h - 14], COL.muted);
+}
+
+// ---------- bottom plot: error as the part spins ----------
+let sweepCache = { key: "", data: null };
+
+function sweep() {
+  const p = state.pose;
+  const key = [state.shape, state.useList, state.scene === 2, p.x, p.y, p.z, p.tilt].join();
+  if (sweepCache.key === key) return sweepCache.data;
+  const list = state.scene === 2 ? state.useList : true, data = { col: [], "6d": [], mssd: [], sdf: [] };
+  for (let d = -180; d <= 180; d += 4) {
+    const q = { ...p, spin: d * DEG };
+    data.col.push([d, keypointError(q, "col")]);
+    data["6d"].push([d, keypointError(q, "6d")]);
+    data.mssd.push([d, mssd(state.shape, q, list).value]);
+    data.sdf.push([d, sdfRms(state.shape, q).rms]);
+  }
+  sweepCache = { key, data };
+  return data;
+}
+
+function drawPlot() {
+  const [w, h] = fitCanvas(plot, pctx);
+  pctx.clearRect(0, 0, w, h);
+  if (state.scene === 4) return drawBars(w, h);
+  const pad = { l: 44, r: 16, t: 28, b: 26 }, pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const xs = (deg) => pad.l + (deg + 180) / 360 * pw;
+
+  pctx.fillStyle = "rgba(160,231,160,0.12)";
+  if (state.shape === "can") pctx.fillRect(pad.l, pad.t, pw, ph);
+  else pctx.fillRect(xs(0) - 2, pad.t, 4, ph);
+
+  pctx.strokeStyle = COL.line; pctx.lineWidth = 1;
+  pctx.beginPath(); pctx.moveTo(pad.l, pad.t + ph); pctx.lineTo(pad.l + pw, pad.t + ph); pctx.stroke();
+  [-180, -90, 0, 90, 180].forEach((d) => text(pctx, `${d}°`, [xs(d), pad.t + ph + 16], COL.muted, "center"));
+  pctx.save(); pctx.translate(16, pad.t + ph / 2); pctx.rotate(-Math.PI / 2);
+  text(pctx, "error", [0, 0], COL.muted, "center"); pctx.restore();
+
+  const data = sweep();
+  const series = [
+    ["col", "collinear kp", COL["c-col"], state.scene === 1 && state.kp === "col"],
+    ["6d", "6-DOF kp", COL["c-6d"], state.scene === 1 && state.kp === "6d"],
+    ["mssd", "MSSD", COL["c-mssd"], state.scene === 2],
+    ["sdf", "SDF RMS", COL["c-sdf"], state.scene === 3],
+  ];
+  const top = Math.max(5, ...Object.values(data).flat().map((v) => v[1]));
+  let lx = pad.l;
+  series.forEach(([key, name, color, on]) => {
+    pctx.strokeStyle = color; pctx.globalAlpha = on ? 1 : 0.25; pctx.lineWidth = on ? 2.5 : 1.5;
+    pctx.beginPath();
+    data[key].forEach(([d, v], i) => { const y = pad.t + ph - v / top * ph; i ? pctx.lineTo(xs(d), y) : pctx.moveTo(xs(d), y); });
+    pctx.stroke(); pctx.globalAlpha = 1;
+    text(pctx, `— ${name}`, [lx, 16], on ? color : COL.muted);
+    lx += pctx.measureText(`— ${name}`).width + 16;
+  });
+  text(pctx, `spin axis · green = fits · top ${top.toFixed(0)} mm`, [w - pad.r, 16], COL.ok, "right");
+  const cx = xs(state.pose.spin / DEG);
+  pctx.strokeStyle = COL.cur; pctx.lineWidth = 1.5;
+  pctx.beginPath(); pctx.moveTo(cx, pad.t); pctx.lineTo(cx, pad.t + ph); pctx.stroke();
+}
+
+function drawBars(w, h) {
+  const m = mssd(state.shape, state.pose, true), sd = sdfRms(state.shape, state.pose);
+  const strips = [
+    { title: "bands · MSSD keeps the tallest", vals: [...m.bands], summary: m.value, color: COL["c-mssd"], kind: "max" },
+    { title: "|φ| · reward keeps the RMS", vals: sd.phis.map(Math.abs), summary: sd.rms, color: COL["c-sdf"], kind: "rms" },
+  ];
+  const top = Math.max(1, ...strips.flatMap((s) => s.vals));
+  const gap = 24, sw = (w - 3 * gap) / 2, pt = 28, ph = h - pt - 18;
+  strips.forEach((s, k) => {
+    const x0 = gap + k * (sw + gap);
+    s.vals.sort((a, b) => b - a);
+    const bw = sw / s.vals.length;
+    s.vals.forEach((v, i) => {
+      const bh = v / top * ph;
+      pctx.fillStyle = s.kind === "max" && i === 0 ? COL.worst : "rgba(134,212,255,0.55)";
+      pctx.fillRect(x0 + i * bw, pt + ph - bh, Math.max(1, bw - 0.3), bh);
+    });
+    text(pctx, s.title, [x0, 16], COL.muted);
+    const y = pt + ph - s.summary / top * ph;
+    pctx.strokeStyle = s.color; pctx.lineWidth = 2; pctx.setLineDash(s.kind === "rms" ? [6, 4] : []);
+    pctx.beginPath(); pctx.moveTo(x0, y); pctx.lineTo(x0 + sw, y); pctx.stroke(); pctx.setLineDash([]);
+    text(pctx, `${s.kind} ${s.summary.toFixed(2)} mm`, [x0 + sw, y - 6], s.color, "right");
+  });
+}
+
+function draw() {
+  const pose = state.pose;
+  SLIDERS.forEach(([, out, key, f, unit]) => { $(out).textContent = `${(pose[key] / f).toFixed(1)}${unit}`; });
+  const ok = fits(state.shape, pose);
+  $("fitPill").textContent = ok ? "yes" : "no";
+  $("fitPill").className = `pill ${ok ? "yes" : "no"}`;
+
+  let html;
+  if (state.scene === 1) {
+    html = readout("collinear error", `${keypointError(pose, "col").toFixed(2)} mm`, COL["c-col"]) +
+      readout("6-DOF error", `${keypointError(pose, "6d").toFixed(2)} mm`, COL["c-6d"]);
+  } else if (state.scene === 2) {
+    const m = mssd(state.shape, pose, state.useList);
+    html = readout("MSSD", `${m.value.toFixed(2)} mm`, COL["c-mssd"]) +
+      readout("best partner S", `spin ${Math.round(m.spin / DEG)}°`, COL.ink);
+  } else if (state.scene === 3) {
+    const r = sdfRms(state.shape, pose).rms;
+    html = readout("RMS φ", `${r.toFixed(2)} mm`, COL["c-sdf"]) +
+      readout("reward", (-Math.log(Math.max(r, 0.01))).toFixed(2), COL.ink);
+  } else {
+    html = readout("MSSD", `${mssd(state.shape, pose, true).value.toFixed(2)} mm`, COL["c-mssd"]) +
+      readout("SDF RMS", `${sdfRms(state.shape, pose).rms.toFixed(2)} mm`, COL["c-sdf"]);
+  }
+  $("reads").innerHTML = html;
+  drawScene();
+  drawPlot();
+}
+
+// ---------- events ----------
+document.querySelectorAll("[data-scene]").forEach((b) => b.addEventListener("click", () => {
+  state.scene = Number(b.dataset.scene); setPressed("scene", b.dataset.scene);
+  if (state.scene === 4) { state.shape = "mug"; setPressed("shape", "mug"); state.pose = { ...tiePresets().spun }; }
+  syncSliders(); buildPresets(); updatePanel(); draw();
+}));
+document.querySelectorAll("[data-shape]").forEach((b) => b.addEventListener("click", () => {
+  state.shape = b.dataset.shape; setPressed("shape", b.dataset.shape); draw();
+}));
+document.querySelectorAll("[data-kp]").forEach((b) => b.addEventListener("click", () => {
+  state.kp = b.dataset.kp; setPressed("kp", b.dataset.kp); updatePanel(); draw();
+}));
+document.querySelectorAll("[data-sym]").forEach((b) => b.addEventListener("click", () => {
+  state.useList = b.dataset.sym === "on"; setPressed("sym", b.dataset.sym); draw();
+}));
+SLIDERS.forEach(([id, , key, f]) => {
+  $(id).addEventListener("input", (e) => { state.pose[key] = Number(e.target.value) * f; draw(); });
+});
+
+let drag = null;
+scene.addEventListener("pointerdown", (e) => {
+  drag = { x: e.clientX, y: e.clientY };
+  scene.setPointerCapture(e.pointerId); scene.classList.add("dragging");
+});
+scene.addEventListener("pointermove", (e) => {
+  if (!drag) return;
+  view.yaw += (e.clientX - drag.x) * 0.008;
+  view.pitch = Math.max(-1.3, Math.min(1.3, view.pitch + (e.clientY - drag.y) * 0.008));
+  drag = { x: e.clientX, y: e.clientY };
+  drawScene();
+});
+const endDrag = () => { drag = null; scene.classList.remove("dragging"); };
+scene.addEventListener("pointerup", endDrag);
+scene.addEventListener("pointercancel", endDrag);
+scene.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  view.zoom = Math.max(0.5, Math.min(2.5, view.zoom * (e.deltaY > 0 ? 0.92 : 1.08)));
+  drawScene();
+}, { passive: false });
+new ResizeObserver(() => draw()).observe(document.querySelector(".stage"));
+
+buildPresets(); updatePanel(); syncSliders(); draw();
+</script>

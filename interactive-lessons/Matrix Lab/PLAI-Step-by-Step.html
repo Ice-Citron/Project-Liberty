@@ -1,0 +1,556 @@
+<title>PLAI Step by Step</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=STIX+Two+Text:ital@0;1&display=swap">
+<style>
+  /* Layout: robot + magnifier stage on the left with a time plot below; narrow control panel on the right. Dark single look. */
+  :root {
+    color-scheme: dark;
+    --bg: #07111f; --bg-2: #0a1627; --ink: #ebf2ff; --muted: #8aa1c0;
+    --line: rgba(132, 160, 202, 0.24); --panel: rgba(8, 18, 32, 0.92);
+    --target: #86d4ff; --actual: #f08f3c; --action: #ffd166; --goal: #ebf2ff;
+    --m-nominal: #ff8a8a; --m-plai: #c792ea; --m-leaky: #6fe3ff; --ok: #a0e7a0;
+    --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --math: "STIX Two Text", "Times New Roman", serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: radial-gradient(circle at 30% 0%, rgba(63, 132, 221, 0.12), transparent 40%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    background-color: var(--bg);
+    color: var(--ink); font-family: var(--sans); font-size: 14px;
+  }
+  .app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) 360px; }
+  .stage { display: grid; grid-template-rows: minmax(0, 1fr) 200px; min-height: 0; min-width: 0; }
+  .stage canvas { display: block; width: 100%; height: 100%; }
+  #plot { border-top: 1px solid var(--line); cursor: ew-resize; touch-action: none; }
+  .panel {
+    border-left: 1px solid var(--line); background: var(--panel); overflow-y: auto;
+    padding-block: 20px 28px; padding-left: max(18px, env(safe-area-inset-left, 0px));
+    padding-right: max(18px, env(safe-area-inset-right, 0px));
+    display: flex; flex-direction: column; gap: 16px; min-width: 0;
+  }
+  @media (max-width: 900px) {
+    .app { display: block; height: auto; }
+    .stage { height: 82vh; min-height: 560px; grid-template-rows: minmax(0, 1fr) 180px; }
+    .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+  }
+  .eyebrow { color: var(--target); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+  h1 { margin: 6px 0 0; font-size: 26px; line-height: 1.05; text-wrap: balance; }
+  .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; }
+  .group { display: grid; gap: 6px; }
+  .seg { display: grid; gap: 4px; }
+  .seg.three { grid-template-columns: repeat(3, 1fr); }
+  .seg.four { grid-template-columns: repeat(4, 1fr); }
+  .seg button, .transport button {
+    font: inherit; font-size: 12px; color: var(--muted); background: transparent;
+    border: 1px solid var(--line); border-radius: 8px; padding: 7px 4px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { color: var(--ink); border-color: var(--target); background: rgba(134, 212, 255, 0.1); }
+  .seg button .sw { display: inline-block; width: 8px; height: 8px; border-radius: 99px; margin-right: 6px; vertical-align: 1px; }
+  .seg button:hover, .transport button:hover { color: var(--ink); }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--target); outline-offset: 2px; }
+  .cap { margin: 0; color: var(--muted); line-height: 1.5; font-size: 13px; }
+  .cap b { color: var(--ink); font-weight: 600; }
+  .eq { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+  .eq .f { font-family: var(--math); font-size: 21px; white-space: nowrap; overflow-x: auto; }
+  .eq .f .tag { font-family: var(--sans); font-size: 11px; color: var(--muted); margin-left: 8px; }
+  .eq .base { color: var(--target); }
+  .eq .base.cur { color: var(--actual); }
+  .eq .act { color: var(--action); }
+  .nums { font-family: var(--mono); font-size: 12px; display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-variant-numeric: tabular-nums; }
+  .nums span:nth-child(odd) { color: var(--muted); }
+  .transport { display: grid; grid-template-columns: 40px 1fr 40px 64px; gap: 6px; align-items: center; }
+  .transport button { padding: 7px 0; font-family: var(--mono); }
+  #playBtn { color: var(--ink); }
+  .scrub { display: grid; grid-template-columns: minmax(0, 1fr) 88px; gap: 8px; align-items: center; }
+  .scrub output { font-family: var(--mono); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--actual); }
+  .reads { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .read { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 2px; }
+  .read .k { font-size: 11px; color: var(--muted); }
+  .read .v { font-family: var(--mono); font-size: 19px; font-variant-numeric: tabular-nums; }
+  .final { display: grid; gap: 5px; }
+  .bar { display: grid; grid-template-columns: 82px minmax(0, 1fr) 70px; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .bar .t { height: 8px; border-radius: 4px; background: rgba(132, 160, 202, 0.15); overflow: hidden; }
+  .bar .t i { display: block; height: 100%; border-radius: 4px; }
+  .bar b { font-family: var(--mono); font-weight: 400; color: var(--ink); text-align: right; }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; border-top: 1px solid var(--line); padding-top: 12px; display: grid; gap: 4px; margin: 0; }
+  .note code { font-family: var(--mono); font-size: 11px; color: var(--ink); }
+</style>
+
+<div class="app">
+  <div class="stage">
+    <canvas id="scene" aria-label="Franka arm with a zoom lens on the gripper"></canvas>
+    <canvas id="plot" aria-label="Error over time for the three methods"></canvas>
+  </div>
+
+  <aside class="panel">
+    <div>
+      <div class="eyebrow">IndustReal · Sec. V-D</div>
+      <h1>PLAI Step by Step</h1>
+    </div>
+
+    <div class="group">
+      <span class="lbl">Where the action starts</span>
+      <div class="seg three" role="group" aria-label="Method">
+        <button id="mNominal" data-mode="nominal" aria-pressed="false"><span class="sw" style="background:var(--m-nominal)"></span>Nominal</button>
+        <button id="mPlai" data-mode="plai" aria-pressed="true"><span class="sw" style="background:var(--m-plai)"></span>PLAI</button>
+        <button id="mLeaky" data-mode="leaky" aria-pressed="false"><span class="sw" style="background:var(--m-leaky)"></span>Leaky</button>
+      </div>
+      <p class="cap" id="modeCap"></p>
+    </div>
+
+    <div class="eq">
+      <div class="f" id="eqF"></div>
+      <div class="nums" id="eqNums"></div>
+    </div>
+
+    <div class="group">
+      <span class="lbl">Real-world trouble</span>
+      <div class="seg four" role="group" aria-label="Disturbance">
+        <button id="sIdeal" data-scn="ideal" aria-pressed="false">Ideal</button>
+        <button id="sFriction" data-scn="friction" aria-pressed="false">Friction</button>
+        <button id="sGravity" data-scn="gravity" aria-pressed="true">Gravity</button>
+        <button id="sContact" data-scn="contact" aria-pressed="false">Contact</button>
+      </div>
+      <p class="cap" id="scnCap"></p>
+    </div>
+
+    <div class="group">
+      <span class="lbl">Policy steps at 60 Hz</span>
+      <div class="transport">
+        <button id="backBtn" aria-label="Back one step">◀</button>
+        <button id="playBtn">Play</button>
+        <button id="fwdBtn" aria-label="Forward one step">▶</button>
+        <button id="speedBtn" aria-label="Playback speed">1×</button>
+      </div>
+      <div class="scrub">
+        <input id="tSlider" type="range" min="0" max="240" step="1" value="0" aria-label="Policy step">
+        <output id="tOut"></output>
+      </div>
+    </div>
+
+    <div class="reads" id="reads"></div>
+
+    <div class="final">
+      <span class="lbl" id="finalLbl"></span>
+      <div id="finalBars"></div>
+    </div>
+
+    <div class="note">
+      <span>Gains and action scales come from Table IX. Disturbance sizes are picked for clarity.</span>
+      <span>The physics is a 1 kg point at the fingertip. The arm is drawn from it by inverse kinematics.</span>
+      <span>The policy is a stand-in that points at the goal. The real one is a trained network.</span>
+      <span>Real code: <code>industreallib/tasks/classes/industreal_task_base.py</code> · <code>_send_targets</code></span>
+    </div>
+  </aside>
+</div>
+
+<script>
+// SIM-START  (metres, newtons, seconds; 2D side view: [x, z])
+const DT_POLICY = 1 / 60, SUBSTEPS = 16, DT = DT_POLICY / SUBSTEPS;
+const KP = 1000, KD = 2 * Math.sqrt(KP), MASS = 1;      // Table IX gains; kd = 2 sqrt(kp) as in IndustRealLib
+const SCALE = { nominal: 0.01, plai: 0.0005, leaky: 0.0005 };  // Table IX position action scales (m)
+const LEAKY_THRESH = 0.01, POLICY_SAT = 0.01, N_STEPS = 240;
+const TABLE_K = 5e4, TABLE_C = 300;
+const GOAL_FREE = [0.5, 0.1], GOAL_CONTACT = [0.5, -0.005];
+const SCENARIOS = {
+  ideal: { grav: 0, stiction: 0, goal: GOAL_FREE },
+  friction: { grav: 0, stiction: 4, goal: GOAL_FREE },
+  gravity: { grav: 2, stiction: 0, goal: GOAL_FREE },
+  contact: { grav: 0, stiction: 0, goal: GOAL_CONTACT },
+};
+const clip = (v, m) => Math.max(-m, Math.min(m, v));
+
+// Stand-in policy: point at the goal, saturate at 1 cm, output in [-1, 1].
+const policy = (goal, s) => [0, 1].map((i) => clip((goal[i] - s[i]) / POLICY_SAT, 1));
+
+function simulate(scnKey, mode) {
+  const scn = SCENARIOS[scnKey], goal = scn.goal;
+  let s = [goal[0] - 0.03, goal[1] + 0.03], v = [0, 0], sd = [...s];
+  const steps = [];
+  for (let t = 0; t <= N_STEPS; t++) {
+    const act = policy(goal, s).map((u) => u * SCALE[mode]);
+    const base = mode === "nominal" ? [...s] : [...sd];
+    let next = [base[0] + act[0], base[1] + act[1]];
+    if (mode === "leaky") next = [0, 1].map((i) => s[i] + clip(next[i] - s[i], LEAKY_THRESH));
+    let press = 0;
+    const rec = { t, s: [...s], a: act, base, sd: next, err: Math.hypot(goal[0] - s[0], goal[1] - s[1]) };
+    sd = next;
+    for (let k = 0; k < SUBSTEPS; k++) {
+      const F = [KP * (sd[0] - s[0]) - KD * v[0], KP * (sd[1] - s[1]) - KD * v[1] - scn.grav];
+      if (s[1] < 0) { press = Math.max(0, -TABLE_K * s[1] - TABLE_C * v[1]); F[1] += press; }
+      const speed = Math.hypot(v[0], v[1]), fmag = Math.hypot(F[0], F[1]);
+      if (scn.stiction > 0) {
+        if (speed === 0 && fmag <= scn.stiction) continue;  // stuck: spring cannot beat stiction
+        const dir = speed > 0 ? [v[0] / speed, v[1] / speed] : [F[0] / fmag, F[1] / fmag];
+        F[0] -= scn.stiction * dir[0]; F[1] -= scn.stiction * dir[1];
+      }
+      const vNew = [v[0] + F[0] / MASS * DT, v[1] + F[1] / MASS * DT];
+      v = scn.stiction > 0 && vNew[0] * v[0] + vNew[1] * v[1] < 0 ? [0, 0] : vNew;  // friction stops, never reverses
+      s = [s[0] + v[0] * DT, s[1] + v[1] * DT];
+    }
+    rec.press = press;
+    steps.push(rec);
+  }
+  return steps;
+}
+// SIM-END
+
+const MODES = ["nominal", "plai", "leaky"];
+const MODE_NAME = { nominal: "Nominal", plai: "PLAI", leaky: "Leaky PLAI" };
+const state = { mode: "plai", scn: "gravity", t: 0, playing: false, speed: 1, runs: {} };
+const $ = (id) => document.getElementById(id);
+const COL = {};
+["--ink", "--muted", "--line", "--target", "--actual", "--action", "--goal", "--m-nominal", "--m-plai", "--m-leaky", "--ok"]
+  .forEach((k) => { COL[k.slice(2)] = getComputedStyle(document.documentElement).getPropertyValue(k).trim(); });
+COL.mode = { nominal: COL["m-nominal"], plai: COL["m-plai"], leaky: COL["m-leaky"] };
+
+const MODE_CAP = {
+  nominal: "The action starts from <b>where the arm is now</b>. A steady push from outside leaves a steady error.",
+  plai: "The action starts from <b>the last target</b>. Targets pile up until the error is gone.",
+  leaky: "Same as PLAI. The target may lead the arm by <b>at most 10 mm</b> per axis.",
+};
+const SCN_CAP = {
+  ideal: "No disturbance. Every method reaches the goal.",
+  friction: "The joints stick until the spring pulls with more than 4 N.",
+  gravity: "Gravity compensation is 2 N short. The arm sags.",
+  contact: "The goal sits 5 mm inside the table. PLAI keeps pushing its target down. This is <b>windup</b>.",
+};
+
+function run() {
+  MODES.forEach((m) => { state.runs[m] = simulate(state.scn, m); });
+}
+
+const mm = (v) => (v * 1000).toFixed(2);
+const vecRel = (p, g) => `(${mm(p[0] - g[0])}, ${mm(p[1] - g[1])})`;
+
+function updatePanel() {
+  const steps = state.runs[state.mode], rec = steps[state.t], goal = SCENARIOS[state.scn].goal;
+  $("modeCap").innerHTML = MODE_CAP[state.mode];
+  $("scnCap").innerHTML = SCN_CAP[state.scn];
+  const baseCls = state.mode === "nominal" ? "base cur" : "base";
+  const baseSym = state.mode === "nominal" ? "<i>s</i><sub>t</sub>" : "<i>s̄</i><sub>t</sub>";
+  const tag = { nominal: "Eq. 2", plai: "Eq. 3", leaky: "Eq. 3 + clamp" }[state.mode];
+  let f = `<i>s̄</i><sub>t+1</sub> = <span class="${baseCls}">${baseSym}</span> ⊕ <span class="act"><i>a</i><sub>t</sub></span>`;
+  if (state.mode === "leaky") f = `<i>s̄</i><sub>t+1</sub> = <i>s</i><sub>t</sub> + clip( <span class="${baseCls}">${baseSym}</span> ⊕ <span class="act"><i>a</i><sub>t</sub></span> − <i>s</i><sub>t</sub> )`;
+  $("eqF").innerHTML = `${f}<span class="tag">${tag}</span>`;
+  $("eqNums").innerHTML =
+    `<span>mm from goal</span><span>(x, z)</span>` +
+    `<span style="color:var(--${state.mode === "nominal" ? "actual" : "target"})">${state.mode === "nominal" ? "s" : "s̄"}<sub>${state.t}</sub></span><span>${vecRel(rec.base, goal)}</span>` +
+    `<span style="color:var(--action)">a<sub>${state.t}</sub></span><span>(${mm(rec.a[0])}, ${mm(rec.a[1])})</span>` +
+    `<span style="color:var(--target)">s̄<sub>${state.t + 1}</sub></span><span>${vecRel(rec.sd, goal)}</span>`;
+
+  $("tSlider").value = state.t;
+  $("tOut").textContent = `t = ${state.t} · ${(state.t * DT_POLICY).toFixed(2)} s`;
+  $("playBtn").textContent = state.playing ? "Pause" : "Play";
+  $("speedBtn").textContent = `${state.speed}×`;
+
+  const pull = Math.hypot(rec.sd[0] - rec.s[0], rec.sd[1] - rec.s[1]) * KP;
+  const third = state.scn === "contact"
+    ? ["table push", `${rec.press.toFixed(1)} N`]
+    : ["gap s̄ − s", `${mm(Math.hypot(rec.sd[0] - rec.s[0], rec.sd[1] - rec.s[1]))} mm`];
+  $("reads").innerHTML =
+    `<div class="read"><span class="k">error to goal</span><span class="v" style="color:${COL.actual}">${mm(rec.err)} mm</span></div>` +
+    `<div class="read"><span class="k">${third[0]}</span><span class="v">${third[1]}</span></div>` +
+    `<div class="read"><span class="k">spring pull kp·|s̄ − s|</span><span class="v" style="color:${COL.target}">${pull.toFixed(1)} N</span></div>` +
+    `<div class="read"><span class="k">action |a|</span><span class="v" style="color:${COL.action}">${mm(Math.hypot(...rec.a))} mm</span></div>`;
+
+  const contact = state.scn === "contact";
+  $("finalLbl").textContent = contact ? "Table push after 4 s" : "Error after 4 s";
+  const finals = MODES.map((m) => { const L = state.runs[m][N_STEPS]; return [m, contact ? L.press : L.err * 1000]; });
+  const top = Math.max(...finals.map((f) => f[1]), contact ? 1 : 3);
+  $("finalBars").innerHTML = finals.map(([m, v]) =>
+    `<div class="bar"><span>${MODE_NAME[m]}</span><span class="t"><i style="width:${(v / top * 100).toFixed(1)}%;background:${COL.mode[m]}"></i></span><b>${v.toFixed(contact ? 1 : 2)} ${contact ? "N" : "mm"}</b></div>`).join("");
+}
+
+// ---------- drawing ----------
+const scene = $("scene"), plot = $("plot");
+const sctx = scene.getContext("2d"), pctx = plot.getContext("2d");
+
+function fitCanvas(c, ctx) {
+  const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(r.width * dpr); c.height = Math.round(r.height * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return [r.width, r.height];
+}
+
+function text(ctx, str, x, y, color, align = "left", size = 12) {
+  ctx.font = `${size}px Inter, sans-serif`; ctx.fillStyle = color; ctx.textAlign = align; ctx.fillText(str, x, y);
+}
+
+function arrow(ctx, a, b, color, width = 2) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+  if (len < 0.5) return;
+  const ux = dx / len, uy = dy / len, hd = Math.min(8, len * 0.45);
+  ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0] - ux * hd * 0.6, b[1] - uy * hd * 0.6); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b[0], b[1]);
+  ctx.lineTo(b[0] - ux * hd - uy * hd * 0.5, b[1] - uy * hd + ux * hd * 0.5);
+  ctx.lineTo(b[0] - ux * hd + uy * hd * 0.5, b[1] - uy * hd - ux * hd * 0.5);
+  ctx.closePath(); ctx.fill();
+}
+
+// Franka-like proportions (m): shoulder height, upper arm, forearm, hand length.
+const SHOULDER = [0, 0.333], L1 = 0.327, L2 = 0.393, HAND = 0.21;
+
+function armJoints(ee) {
+  const w = [ee[0], ee[1] + HAND];
+  const dx = w[0] - SHOULDER[0], dz = w[1] - SHOULDER[1];
+  const d = Math.min(Math.hypot(dx, dz), L1 + L2 - 1e-6);
+  const base = Math.atan2(dz, dx), bend = Math.acos((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d));
+  const elbow = [SHOULDER[0] + L1 * Math.cos(base + bend), SHOULDER[1] + L1 * Math.sin(base + bend)];
+  return { elbow, wrist: w };
+}
+
+function capsule(ctx, a, b, width, fill, edge) {
+  ctx.lineCap = "round";
+  ctx.strokeStyle = edge; ctx.lineWidth = width + 3;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.strokeStyle = fill; ctx.lineWidth = width;
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  ctx.lineCap = "butt";
+}
+
+function joint(ctx, p, r) {
+  ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2); ctx.fillStyle = "#1a2433"; ctx.fill();
+  ctx.lineWidth = 2; ctx.strokeStyle = "#9fb0c8"; ctx.stroke();
+}
+
+function drawArm(r, rec, goal) {
+  const scale = Math.min(r.w / 0.98, r.h / 0.95);
+  const ox = r.x + r.w / 2 - 0.3 * scale, oz = r.y + r.h - 0.07 * scale;
+  const S = (p) => [ox + p[0] * scale, oz - p[1] * scale];
+
+  // table
+  const t0 = S([-0.2, 0]), t1 = S([0.8, 0]);
+  sctx.fillStyle = "rgba(132,160,202,0.08)"; sctx.fillRect(t0[0], t0[1], t1[0] - t0[0], 0.05 * scale);
+  sctx.strokeStyle = COL.muted; sctx.lineWidth = 1.5;
+  sctx.beginPath(); sctx.moveTo(t0[0], t0[1]); sctx.lineTo(t1[0], t1[1]); sctx.stroke();
+
+  const { elbow, wrist } = armJoints(rec.s);
+  const white = "#e9eef6", edge = "#56667d", u = scale;
+  // pedestal and base link
+  const pb = S([-0.07, 0.0]);
+  sctx.fillStyle = "#cfd8e6"; sctx.strokeStyle = edge; sctx.lineWidth = 1.5;
+  sctx.beginPath(); sctx.roundRect(pb[0], pb[1] - 0.12 * u, 0.14 * u, 0.12 * u, 6); sctx.fill(); sctx.stroke();
+  capsule(sctx, S([0, 0.11]), S(SHOULDER), 0.09 * u, white, edge);
+  capsule(sctx, S(SHOULDER), S(elbow), 0.075 * u, white, edge);
+  capsule(sctx, S(elbow), S(wrist), 0.065 * u, white, edge);
+  joint(sctx, S(SHOULDER), 0.03 * u);
+  joint(sctx, S(elbow), 0.028 * u);
+  joint(sctx, S(wrist), 0.025 * u);
+  // hand: flange, palm, two fingers
+  const flange = [rec.s[0], rec.s[1] + 0.105];
+  capsule(sctx, S(wrist), S(flange), 0.045 * u, white, edge);
+  const palm = S([rec.s[0] - 0.05, rec.s[1] + 0.105]);
+  sctx.fillStyle = white; sctx.strokeStyle = edge;
+  sctx.beginPath(); sctx.roundRect(palm[0], palm[1], 0.1 * u, 0.045 * u, 4); sctx.fill(); sctx.stroke();
+  for (const dx of [-0.022, 0.012]) {
+    const f = S([rec.s[0] + dx, rec.s[1] + 0.06]);
+    sctx.fillStyle = "#2a3446"; sctx.fillRect(f[0], f[1], 0.01 * u, 0.06 * u);
+  }
+
+  // goal mark and the lens frame
+  const g = S(goal);
+  sctx.strokeStyle = COL.goal; sctx.lineWidth = 1.5;
+  sctx.beginPath(); sctx.arc(g[0], g[1], 5, 0, Math.PI * 2); sctx.stroke();
+  const half = 0.036 * scale;
+  sctx.strokeStyle = "rgba(235,242,255,0.55)"; sctx.setLineDash([4, 3]);
+  sctx.strokeRect(g[0] - half, g[1] - half, 2 * half, 2 * half); sctx.setLineDash([]);
+  text(sctx, "Franka-style arm · 1 : 1", r.x + 4, r.y + 16, COL.muted);
+  return { lensSrc: [g[0] - half, g[1] - half, 2 * half] };
+}
+
+function drawLens(r, steps, t, goal, src) {
+  const box = Math.min(r.w, r.h) - 30, bx = r.x + (r.w - box) / 2, by = r.y + 22;
+  const px = box / 72, cx = bx + box / 2, cy = by + box / 2;   // 72 mm window
+  const P = (p) => [cx + (p[0] - goal[0]) * 1000 * px, cy - (p[1] - goal[1]) * 1000 * px];
+  const inside = (q) => q[0] >= bx && q[0] <= bx + box && q[1] >= by && q[1] <= by + box;
+
+  // connector lines from the arm view
+  sctx.strokeStyle = "rgba(235,242,255,0.18)"; sctx.lineWidth = 1;
+  sctx.beginPath(); sctx.moveTo(src[0] + src[2], src[1]); sctx.lineTo(bx, by);
+  sctx.moveTo(src[0] + src[2], src[1] + src[2]); sctx.lineTo(bx, by + box); sctx.stroke();
+
+  sctx.save();
+  sctx.beginPath(); sctx.rect(bx, by, box, box); sctx.fillStyle = "rgba(4,10,20,0.85)"; sctx.fill(); sctx.clip();
+  sctx.strokeStyle = "rgba(132,160,202,0.08)";
+  for (let v = -35; v <= 35; v += 5) {
+    const a = P([goal[0] + v / 1000, goal[1]]), b = P([goal[0], goal[1] + v / 1000]);
+    sctx.beginPath(); sctx.moveTo(a[0], by); sctx.lineTo(a[0], by + box); sctx.moveTo(bx, b[1]); sctx.lineTo(bx + box, b[1]); sctx.stroke();
+  }
+  // table surface if visible
+  const tz = P([goal[0], 0])[1];
+  if (tz < by + box) {
+    sctx.fillStyle = "rgba(132,160,202,0.14)"; sctx.fillRect(bx, tz, box, by + box - tz);
+    sctx.strokeStyle = COL.muted; sctx.lineWidth = 1.5;
+    sctx.beginPath(); sctx.moveTo(bx, tz); sctx.lineTo(bx + box, tz); sctx.stroke();
+    text(sctx, "table", bx + 8, tz + 16, COL.muted);
+  }
+  // past path of the fingertip
+  sctx.strokeStyle = "rgba(240,143,60,0.35)"; sctx.lineWidth = 1.5; sctx.beginPath();
+  for (let k = 0; k <= t; k++) { const q = P(steps[k].s); k ? sctx.lineTo(q[0], q[1]) : sctx.moveTo(q[0], q[1]); }
+  sctx.stroke();
+  // recent actions: Nominal fans out from s, PLAI chains tip to tail
+  for (let k = Math.max(0, t - 40); k <= t; k++) {
+    const age = (t - k) / 40;
+    sctx.globalAlpha = k === t ? 1 : 0.15 + 0.45 * (1 - age);
+    arrow(sctx, P(steps[k].base), P([steps[k].base[0] + steps[k].a[0], steps[k].base[1] + steps[k].a[1]]), COL.action, k === t ? 2.5 : 1.2);
+  }
+  sctx.globalAlpha = 1;
+
+  const rec = steps[t], s = P(rec.s), sd = P(rec.sd), g = P(goal);
+  // spring between the fingertip and its target
+  const dx = sd[0] - s[0], dy = sd[1] - s[1], len = Math.hypot(dx, dy);
+  if (len > 3) {
+    const ux = dx / len, uy = dy / len, n = 10;
+    sctx.strokeStyle = "rgba(134,212,255,0.6)"; sctx.lineWidth = 1.5; sctx.beginPath(); sctx.moveTo(s[0], s[1]);
+    for (let i = 1; i < n; i++) {
+      const k = i / n, side = (i % 2 ? 1 : -1) * 5;
+      sctx.lineTo(s[0] + dx * k - uy * side, s[1] + dy * k + ux * side);
+    }
+    sctx.lineTo(sd[0], sd[1]); sctx.stroke();
+  }
+  // goal
+  sctx.strokeStyle = COL.goal; sctx.lineWidth = 2;
+  sctx.beginPath(); sctx.arc(g[0], g[1], 7, 0, Math.PI * 2); sctx.stroke();
+  sctx.beginPath(); sctx.moveTo(g[0] - 11, g[1]); sctx.lineTo(g[0] + 11, g[1]); sctx.moveTo(g[0], g[1] - 11); sctx.lineTo(g[0], g[1] + 11); sctx.stroke();
+  text(sctx, "goal", g[0] + 12, g[1] - 10, COL.goal);
+  // target
+  if (inside(sd)) {
+    sctx.strokeStyle = COL.target; sctx.lineWidth = 2;
+    sctx.strokeRect(sd[0] - 6, sd[1] - 6, 12, 12);
+    text(sctx, "s̄  target", sd[0] + 10, sd[1] + 18, COL.target);
+  }
+  // fingertip
+  sctx.beginPath(); sctx.arc(s[0], s[1], 6, 0, Math.PI * 2); sctx.fillStyle = COL.actual; sctx.fill();
+  text(sctx, "s  fingertip", s[0] - 10, s[1] - 12, COL.actual, "right");
+  sctx.restore();
+
+  if (!inside(sd)) {
+    const ex = Math.max(bx + 10, Math.min(bx + box - 10, sd[0]));
+    const below = sd[1] > by + box;
+    const ey = below ? by + box - 6 : by + 6;
+    arrow(sctx, [ex, below ? ey - 22 : ey + 22], [ex, ey], COL.target, 2);
+    const off = Math.abs(rec.sd[1] - goal[1]) * 1000;
+    text(sctx, `s̄ is ${off.toFixed(0)} mm ${below ? "below" : "above"}`, ex - 8, below ? ey - 28 : ey + 38, COL.target, "right");
+  }
+  sctx.strokeStyle = "rgba(235,242,255,0.55)"; sctx.lineWidth = 1; sctx.strokeRect(bx, by, box, box);
+  text(sctx, "zoom · 72 mm window · grid 5 mm", bx, by - 8, COL.muted);
+}
+
+function drawScene() {
+  const [w, h] = fitCanvas(scene, sctx);
+  sctx.clearRect(0, 0, w, h);
+  const steps = state.runs[state.mode], goal = SCENARIOS[state.scn].goal;
+  const wide = w > 640;
+  const armR = wide ? { x: 12, y: 8, w: w * 0.5 - 12, h: h - 16 } : { x: 8, y: 8, w: w - 16, h: h * 0.45 };
+  const lensR = wide ? { x: w * 0.5 + 10, y: 8, w: w * 0.5 - 22, h: h - 16 } : { x: 8, y: h * 0.45 + 4, w: w - 16, h: h * 0.55 - 8 };
+  const { lensSrc } = drawArm(armR, steps[state.t], goal);
+  drawLens(lensR, steps, state.t, goal, lensSrc);
+}
+
+function drawPlot() {
+  const [w, h] = fitCanvas(plot, pctx);
+  pctx.clearRect(0, 0, w, h);
+  const contact = state.scn === "contact";
+  const pad = { l: 48, r: 18, t: 28, b: 26 }, pw = w - pad.l - pad.r, ph = h - pad.t - pad.b;
+  const val = (rec) => (contact ? rec.press : rec.err * 1000);
+  const top = contact ? Math.max(5, ...MODES.map((m) => val(state.runs[m][N_STEPS]))) * 1.1 : 10;
+  const X = (k) => pad.l + k / N_STEPS * pw, Y = (v) => pad.t + ph - Math.min(v, top) / top * ph;
+
+  pctx.strokeStyle = COL.line; pctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + ph * i / 4;
+    pctx.beginPath(); pctx.moveTo(pad.l, y); pctx.lineTo(pad.l + pw, y); pctx.stroke();
+    text(pctx, (top * (1 - i / 4)).toFixed(contact ? 0 : 1), pad.l - 6, y + 4, COL.muted, "right", 11);
+  }
+  for (let s = 0; s <= 4; s++) text(pctx, `${s} s`, X(s * 60), pad.t + ph + 16, COL.muted, "center", 11);
+  text(pctx, contact ? "table push (N)" : "error to goal (mm, clipped at 10)", pad.l, 16, COL.muted);
+
+  let lx = w - pad.r;
+  [...MODES].reverse().forEach((m) => {
+    const on = m === state.mode;
+    pctx.strokeStyle = COL.mode[m]; pctx.globalAlpha = on ? 1 : 0.35; pctx.lineWidth = on ? 2.5 : 1.5;
+    pctx.beginPath();
+    state.runs[m].forEach((rec, k) => { const y = Y(val(rec)); k ? pctx.lineTo(X(k), y) : pctx.moveTo(X(k), y); });
+    pctx.stroke(); pctx.globalAlpha = 1;
+    pctx.font = "12px Inter, sans-serif";
+    const label = `— ${MODE_NAME[m]}`; lx -= pctx.measureText(label).width;
+    text(pctx, label, lx, 16, on ? COL.mode[m] : COL.muted); lx -= 14;
+  });
+
+  const cx = X(state.t);
+  pctx.strokeStyle = COL.actual; pctx.lineWidth = 1.5;
+  pctx.beginPath(); pctx.moveTo(cx, pad.t); pctx.lineTo(cx, pad.t + ph); pctx.stroke();
+  const cy = Y(val(state.runs[state.mode][state.t]));
+  pctx.beginPath(); pctx.arc(cx, cy, 4, 0, Math.PI * 2); pctx.fillStyle = COL.mode[state.mode]; pctx.fill();
+}
+
+function draw() { updatePanel(); drawScene(); drawPlot(); }
+
+// ---------- playback ----------
+let last = null, acc = 0;
+function tick(ts) {
+  if (!state.playing) { last = null; return; }
+  if (last !== null) acc += (ts - last) / 1000 / DT_POLICY * state.speed;
+  last = ts;
+  const n = Math.floor(acc);
+  if (n > 0) {
+    acc -= n;
+    state.t = Math.min(N_STEPS, state.t + n);
+    if (state.t === N_STEPS) state.playing = false;
+    draw();
+  }
+  requestAnimationFrame(tick);
+}
+function play() {
+  if (state.t >= N_STEPS) state.t = 0;
+  state.playing = true; acc = 0; last = null;
+  draw(); requestAnimationFrame(tick);
+}
+function pause() { state.playing = false; draw(); }
+
+$("playBtn").addEventListener("click", () => (state.playing ? pause() : play()));
+$("backBtn").addEventListener("click", () => { state.playing = false; state.t = Math.max(0, state.t - 1); draw(); });
+$("fwdBtn").addEventListener("click", () => { state.playing = false; state.t = Math.min(N_STEPS, state.t + 1); draw(); });
+$("speedBtn").addEventListener("click", () => {
+  const order = [1, 0.25, 0.5];
+  state.speed = order[(order.indexOf(state.speed) + 1) % order.length]; draw();
+});
+$("tSlider").addEventListener("input", (e) => { state.playing = false; state.t = Number(e.target.value); draw(); });
+
+function setPressed(attr, value) {
+  document.querySelectorAll(`[data-${attr}]`).forEach((b) => b.setAttribute("aria-pressed", String(b.dataset[attr] === value)));
+}
+document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
+  state.mode = b.dataset.mode; setPressed("mode", state.mode); draw();
+}));
+document.querySelectorAll("[data-scn]").forEach((b) => b.addEventListener("click", () => {
+  state.scn = b.dataset.scn; setPressed("scn", state.scn); run(); state.t = 0; play();
+}));
+
+let scrubbing = false;
+function scrubTo(e) {
+  const r = plot.getBoundingClientRect(), padL = 48, pw = r.width - 48 - 18;
+  state.t = Math.round(Math.max(0, Math.min(1, (e.clientX - r.left - padL) / pw)) * N_STEPS);
+  state.playing = false; draw();
+}
+plot.addEventListener("pointerdown", (e) => { scrubbing = true; plot.setPointerCapture(e.pointerId); scrubTo(e); });
+plot.addEventListener("pointermove", (e) => { if (scrubbing) scrubTo(e); });
+plot.addEventListener("pointerup", () => { scrubbing = false; });
+plot.addEventListener("pointercancel", () => { scrubbing = false; });
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.key === "ArrowRight") { state.playing = false; state.t = Math.min(N_STEPS, state.t + 1); draw(); }
+  if (e.key === "ArrowLeft") { state.playing = false; state.t = Math.max(0, state.t - 1); draw(); }
+  if (e.key === " ") { e.preventDefault(); state.playing ? pause() : play(); }
+});
+new ResizeObserver(() => { drawScene(); drawPlot(); }).observe(document.querySelector(".stage"));
+
+run();
+if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { state.t = N_STEPS; draw(); } else { play(); }
+</script>
